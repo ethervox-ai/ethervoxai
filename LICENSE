@@ -1,12 +1,69 @@
-Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
+# 🛡️ EthervoxAI License Summary
 
-You are free to:
-- Share — copy and redistribute the material in any medium or format
-- Adapt — remix, transform, and build upon the material
+EthervoxAI is licensed under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)**.
 
-Under the following terms:
-- Attribution — You must give appropriate credit and provide a link to the license
-- NonCommercial — You may not use the material for commercial purposes
-- ShareAlike — If you remix or build upon the material, you must distribute your contributions under the same license
+This license encourages community collaboration while protecting the project from commercial exploitation. Below is a simple breakdown of what this means for developers, users, and contributors.
 
-License details: https://creativecommons.org/licenses/by-nc-sa/4.0/
+---
+
+## ✅ What You Can Do
+
+- **🔄 Share** — You may copy and redistribute the material in any medium or format.
+- **🧪 Adapt** — You can remix, transform, and build upon EthervoxAI.
+- **🌍 Use Globally** — The license applies internationally.
+
+As long as you:
+
+- **👤 Provide Attribution** — Credit EthervoxAI appropriately. Include the project name, author (Mike Kostersitz), and a link to the repository:  
+  `https://github.com/mkostersitz/ethervoxai`
+
+- **🚫 Don't Use Commercially** — You may not use the software or its derivatives for commercial purposes without explicit permission. This includes selling, licensing, or monetizing products based on EthervoxAI.
+
+- **🔁 Share Alike** — If you create derivative works, you must license them under the same terms.
+
+---
+
+## ❌ What You Cannot Do
+
+- **❌ Sell or license EthervoxAI-based products for profit**
+- **❌ Include EthervoxAI in proprietary commercial applications**
+- **❌ Use EthervoxAI as part of paid services, packages, or SaaS offerings**
+
+For exceptions or commercial licensing, please contact:  
+📧 licensing@ethervox.ai
+
+---
+
+## 📝 Legal Reference
+
+This work is licensed under:  
+**Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License**  
+📖 [View Full License](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+
+---
+
+## 🙌 Why This License?
+
+EthervoxAI is built on principles of openness, privacy, and user control. This license ensures:
+
+- Developers remain free to experiment and contribute.
+- Users benefit from innovations without being tracked or monetized.
+- Companies must collaborate ethically or negotiate commercial usage.
+
+---
+
+## 👥 Contributor Agreement
+
+By contributing to EthervoxAI (code, design, documentation), you agree your contribution falls under this license and you have the legal right to offer it.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution details.
+
+---
+
+## 💬 Questions?
+
+Reach out to the maintainers via GitHub Issues or email:  
+📧 licensing@ethervox.ai  
+We’re happy to discuss partnerships, licenses, or use cases.
+
+Let’s build ambient intelligence that stays honest, private, and inclusive.
