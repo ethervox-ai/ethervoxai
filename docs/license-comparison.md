@@ -1,36 +1,26 @@
-# 🧾 EthervoxAI Legal Notice
+# 📊 License Comparison: Why Creative Commons BY-NC-SA?
 
-EthervoxAI is an open-source software platform for non-commercial use, licensed under the **Creative Commons BY-NC-SA 4.0 International License**.
-
----
-
-## 🔐 Intellectual Property
-
-- The name “EthervoxAI,” associated branding, and code artifacts are the property of Mike Kostersitz unless otherwise noted.
-- Contributors retain rights to their own work, which will be jointly governed under the same license terms.
+EthervoxAI uses **CC BY-NC-SA 4.0** to promote community collaboration while protecting against commercial misappropriation.
 
 ---
 
-## 📛 Trademark Use
+## 🔍 Comparison Table
 
-You may not use EthervoxAI branding, logos, or trademarks in a way that implies endorsement, affiliation, or commercial licensing without written permission.
+| License          | Allows Commercial Use | Requires Sharing Derivatives | Allows Proprietary Forks | Ideal For                    |
+|------------------|-----------------------|-------------------------------|---------------------------|------------------------------|
+| Apache 2.0       | ✅ Yes                | ❌ No                         | ✅ Yes                    | Open platform commercialization|
+| MIT              | ✅ Yes                | ❌ No                         | ✅ Yes                    | Simple OSS distribution       |
+| GPL v3           | ✅ Yes                | ✅ Yes                        | ❌ No                     | Open-source advocacy          |
+| AGPL v3          | ✅ Yes                | ✅ Yes (even SaaS)            | ❌ No                     | Server software protection    |
+| CC BY-NC-SA 4.0  | ❌ No                 | ✅ Yes                        | ❌ No                     | Creative, collaborative, non-commercial AI platforms |
 
 ---
 
-## 🚫 Commercial Use
+## 🧠 Why BY-NC-SA?
 
-No individual or organization may:
+- Protects the project's spirit from commercial dilution
+- Encourages knowledge sharing while discouraging freeloading profiteers
+- Aligns with privacy-respecting, community-built technologies
 
-- Sell, license, or host EthervoxAI as part of a paid product
-- Redistribute modified versions for commercial profit
-
-For commercial licensing or exceptions, contact:  
+For commercial licensing inquiries, contact:  
 📧 licensing@ethervox.ai
-
----
-
-## 🧑‍⚖️ Liability Disclaimer
-
-This project is provided “AS IS” without warranty. All risks associated with usage or deployment are borne by the user.
-
-We comply with applicable privacy laws and do not claim compliance for third-party integrations—please review their respective terms and policies.
