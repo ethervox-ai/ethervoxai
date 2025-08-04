@@ -33,14 +33,30 @@ choco install visualstudio2022buildtools
 choco install visualstudio2022-workload-vctools
 ```
 
+**ARM64 Windows Note**: ✅ **RESOLVED!** EthervoxAI now includes a Cross-Platform Audio Manager with 5 different audio output methods that work on all architectures, including ARM64 Windows. The `speaker` package limitation no longer affects functionality.
+
 ### Audio Library Installation (Optional)
 ```bash
-# Basic TTS (always works)
+# Basic TTS (always works - included by default)
 npm install say
 
-# Advanced audio (requires build tools above)
+# Cross-platform alternatives (work on all architectures including ARM64)
+npm install node-wav-player play-sound node-powershell
+
+# Advanced native audio (requires build tools, may not work on ARM64)
 npm install mic speaker wav node-portaudio
 ```
+
+### Audio Output Methods (Automatic Fallback Chain)
+EthervoxAI now includes a **Cross-Platform Audio Manager** that automatically selects the best available audio output method:
+
+1. **Native Windows TTS** - Built-in Windows text-to-speech (works on all Windows systems)
+2. **WAV Player** - Pure JavaScript WAV file playback (no native dependencies)
+3. **Play-Sound** - Cross-platform sound player wrapper
+4. **Say Package** - Cross-platform TTS library
+5. **PowerShell TTS** - Windows PowerShell-based text-to-speech
+
+**ARM64 Compatibility**: All primary audio methods work on ARM64 Windows! The `speaker` package limitation has been resolved with these alternatives.
 
 ## Installation
 

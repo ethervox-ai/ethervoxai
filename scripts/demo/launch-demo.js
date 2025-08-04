@@ -12,7 +12,7 @@ async function runDemo() {
     console.log('Loading demo modules...');
     
     // Load the WindowsDesktopDemo class
-    const { WindowsDesktopDemo } = require('./dist/demo/windows-desktop');
+    const { WindowsDesktopDemo } = require('../../dist/demo/windows-desktop');
     
     console.log('✅ Demo modules loaded successfully');
     console.log();
@@ -67,7 +67,27 @@ async function runDemo() {
           console.log('📊 Current status:');
           console.log('  - Listening:', demo.isListening ? '✅' : '❌');
           console.log('  - Processing:', demo.isProcessing ? '✅' : '❌');
-          console.log('  - Audio libraries:', typeof require === 'function' ? '⚠️  Simulated' : '✅');
+          
+          // Check audio library status
+          let micStatus = '❌', speakerStatus = '❌', wavStatus = '❌', sayStatus = '❌';
+          
+          try { require('mic'); micStatus = '✅'; } catch(e) { micStatus = '❌'; }
+          try { require('speaker'); speakerStatus = '✅'; } catch(e) { speakerStatus = '❌'; }
+          try { require('wav'); wavStatus = '✅'; } catch(e) { wavStatus = '❌'; }
+          try { require('say'); sayStatus = '✅'; } catch(e) { sayStatus = '❌'; }
+          
+          console.log('  - Audio Libraries:');
+          console.log(`    • Microphone (mic): ${micStatus}`);
+          console.log(`    • Speaker output: ${speakerStatus}`);
+          console.log(`    • WAV processing: ${wavStatus}`);
+          console.log(`    • Text-to-Speech: ${sayStatus}`);
+          
+          if (speakerStatus === '❌') {
+            console.log('  ⚠️  Audio output simulated (speaker package not available)');
+            console.log('     This is common on ARM64 Windows systems.');
+          }
+          
+          console.log(`  - System: ${process.platform} ${process.arch}, Node.js ${process.version}`);
           break;
           
         case 'quit':

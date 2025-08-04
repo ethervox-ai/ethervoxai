@@ -13,17 +13,18 @@ import * as fs from 'fs';
 import { multilingualRuntime } from '../modules/multilingualRuntime';
 import { localLLMStack } from '../modules/localLLMStack';
 import { privacyDashboard } from '../modules/privacyDashboard';
+import { CrossPlatformAudioManager } from '../modules/crossPlatformAudio';
 
 // Audio processing imports (will be installed separately)
 let mic: any, Speaker: any, wav: any;
 
 try {
   mic = require('mic');
-  Speaker = require('speaker');
+  Speaker = require('speaker');  
   wav = require('wav');
 } catch (error) {
-  console.warn('⚠️ Audio dependencies not installed. Run: npm install mic speaker wav');
-  console.warn('   This demo requires additional setup for audio functionality.');
+  console.warn('⚠️ Advanced audio dependencies not installed.');
+  console.warn('   Using cross-platform audio alternatives instead.');
 }
 
 interface AudioConfig {
@@ -55,6 +56,7 @@ export class WindowsDesktopDemo extends EventEmitter {
   private audioConfig: AudioConfig;
   private micInstance: any;
   private speaker: any;
+  private audioManager: CrossPlatformAudioManager;
   private currentSession: VoiceSession | null = null;
   private isListening: boolean = false;
   private isProcessing: boolean = false;
@@ -62,6 +64,10 @@ export class WindowsDesktopDemo extends EventEmitter {
   constructor() {
     super();
     this.audioConfig = this.loadAudioConfig();
+    this.audioManager = new CrossPlatformAudioManager({
+      enableLogging: true,
+      preferredOutput: 'native'
+    });
     this.setupEventHandlers();
   }
 
@@ -142,34 +148,48 @@ export class WindowsDesktopDemo extends EventEmitter {
   }
 
   /**
-   * Setup Windows audio system
+   * Setup Windows audio system with cross-platform fallbacks
    */
   private async setupAudioSystem(): Promise<void> {
-    if (!mic || !Speaker) {
-      console.warn('⚠️ Audio libraries not available - running in simulation mode');
-      return;
+    console.log('🔧 Setting up audio system...');
+    
+    // Always log the cross-platform audio manager status
+    const audioStatus = this.audioManager.getStatus();
+    console.log('🎵 Available audio outputs:', audioStatus.availableOutputs.length);
+    audioStatus.availableOutputs.forEach((output: any) => {
+      console.log(`  • ${output.description} (${output.type})`);
+    });
+    
+    // Try to setup advanced audio (mic/speaker) if available
+    let advancedAudioAvailable = false;
+    
+    if (mic && Speaker) {
+      try {
+        // Initialize microphone
+        this.micInstance = mic({
+          rate: this.audioConfig.input.sampleRate,
+          channels: this.audioConfig.input.channels,
+          debug: false,
+          exitOnSilence: 0
+        });
+
+        // Initialize speaker (optional, we have cross-platform fallback)
+        this.speaker = new Speaker({
+          channels: this.audioConfig.output.channels,
+          bitDepth: this.audioConfig.output.bitDepth,
+          sampleRate: this.audioConfig.output.sampleRate
+        });
+
+        advancedAudioAvailable = true;
+        console.log('🎤 Advanced audio system configured successfully');
+      } catch (error) {
+        console.warn('⚠️ Advanced audio setup failed, using cross-platform alternatives');
+      }
     }
-
-    try {
-      // Initialize microphone
-      this.micInstance = mic({
-        rate: this.audioConfig.input.sampleRate,
-        channels: this.audioConfig.input.channels,
-        debug: false,
-        exitOnSilence: 0
-      });
-
-      // Initialize speaker
-      this.speaker = new Speaker({
-        channels: this.audioConfig.output.channels,
-        bitDepth: this.audioConfig.output.bitDepth,
-        sampleRate: this.audioConfig.output.sampleRate
-      });
-
-      console.log('🎤 Audio system configured successfully');
-    } catch (error) {
-      console.error('❌ Failed to setup audio system:', error);
-      throw error;
+    
+    if (!advancedAudioAvailable) {
+      console.log('🎵 Using cross-platform audio system');
+      console.log(`   Primary method: ${audioStatus.currentOutput}`);
     }
   }
 
@@ -397,41 +417,29 @@ export class WindowsDesktopDemo extends EventEmitter {
   }
 
   /**
-   * Generate speech output
+   * Generate speech output using cross-platform audio manager
    */
   private async generateSpeechOutput(text: string, language: string): Promise<void> {
     console.log(`🔊 Generating speech output in ${language}...`);
 
     try {
-      // Use multilingual runtime for TTS
-      const audioOutput = await multilingualRuntime.generateSpeechOutput(text, language);
+      // Use the cross-platform audio manager for reliable output
+      await this.audioManager.playAudio(text);
+      console.log('🔊 Audio output completed');
       
-      if (this.speaker && audioOutput && audioOutput.byteLength > 0) {
-        // Convert ArrayBuffer to Buffer for speaker
-        const audioBuffer = Buffer.from(audioOutput);
-        this.speaker.write(audioBuffer);
-        console.log('🔊 Audio output played');
-      } else {
-        // Simulation mode or no audio data
-        console.log(`🔊 [SIMULATION] Speaking: "${text}"`);
-        console.log(`🔊 [SIMULATION] Language: ${language}`);
+      // Also try to get native audio if available
+      try {
+        const audioOutput = await multilingualRuntime.generateSpeechOutput(text, language);
         
-        // Check if we have TTS available
-        try {
-          const say = require('say');
-          console.log('🔊 Using system TTS...');
-          
-          // Use system TTS (say package) for actual speech
-          say.speak(text, undefined, 1.0, (err: Error) => {
-            if (err) {
-              console.log('🔊 System TTS failed, text displayed above');
-            } else {
-              console.log('🔊 System TTS completed');
-            }
-          });
-        } catch (error) {
-          console.log('🔊 No TTS engine available - install "say" package for speech output');
+        if (this.speaker && audioOutput && audioOutput.byteLength > 0) {
+          // Use native speaker if available (for higher quality)
+          const audioBuffer = Buffer.from(audioOutput);
+          this.speaker.write(audioBuffer);
+          console.log('🔊 Enhanced audio output played');
         }
+      } catch (nativeError) {
+        // Native audio failed, but cross-platform audio already handled it
+        console.log('🔊 Using cross-platform audio (native unavailable)');
       }
 
       this.emit('speechGenerated', { text, language });

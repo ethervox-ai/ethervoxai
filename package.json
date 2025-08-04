@@ -14,7 +14,7 @@
     "build:watch": "tsc --watch",
     "dev": "npm run build:watch",
     "start": "node dist/index.js",
-    "demo": "node dist/demo.js",
+    "demo": "node scripts/demo/launch-demo.js",
     "demo:windows": "node dist/demo/windows-desktop.js",
     "demo:windows:dev": "npm run build && node dist/demo/windows-desktop.js",
     "lint": "eslint src/**/*.{ts,tsx} --fix",
@@ -23,6 +23,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:audio": "node tests/audio-input-output/launch-audio-test.js",
     "clean": "rimraf dist",
     "typecheck": "tsc --noEmit",
     "typecheck:web": "tsc --project tsconfig.web.json --noEmit",
@@ -79,11 +80,14 @@
   },
   "homepage": "https://github.com/mkostersitz/ethervoxai#readme",
   "dependencies": {
+    "node-powershell": "^5.0.1",
+    "node-wav-player": "^1.0.0",
+    "play-sound": "^1.1.6",
     "say": "^0.16.0"
   },
   "optionalDependencies": {
     "mic": "^2.1.2",
-    "speaker": "^0.5.4",
+    "speaker": "^0.5.5",
     "wav": "^1.0.2"
   }
 }

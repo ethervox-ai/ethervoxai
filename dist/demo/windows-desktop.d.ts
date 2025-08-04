@@ -9,6 +9,7 @@ export declare class WindowsDesktopDemo extends EventEmitter {
     private audioConfig;
     private micInstance;
     private speaker;
+    private audioManager;
     private currentSession;
     private isListening;
     private isProcessing;
@@ -26,7 +27,7 @@ export declare class WindowsDesktopDemo extends EventEmitter {
      */
     private initializeCoreModules;
     /**
-     * Setup Windows audio system
+     * Setup Windows audio system with cross-platform fallbacks
      */
     private setupAudioSystem;
     /**
@@ -62,7 +63,7 @@ export declare class WindowsDesktopDemo extends EventEmitter {
      */
     private requestCloudConsent;
     /**
-     * Generate speech output
+     * Generate speech output using cross-platform audio manager
      */
     private generateSpeechOutput;
     /**
