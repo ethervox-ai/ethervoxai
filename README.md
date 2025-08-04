@@ -27,13 +27,15 @@ ethervoxai/
 │   │   ├── multilingualRuntime.ts
 │   │   ├── localLLMStack.ts
 │   │   └── privacyDashboard.ts
-│   ├── ui/
-│   │   └── dashboard/
-│   │       ├── DashboardWeb.tsx
-│   │       └── DashboardMobile.tsx
+│   ├── examples/
+│   │   └── ui/
+│   │       └── dashboard/
+│   │           ├── DashboardWeb.tsx
+│   │           └── DashboardMobile.tsx
 │   └── index.ts
 ├── package.json
 ├── tsconfig.json
+├── tsconfig.ui.json
 └── README.md
 ```
 
@@ -100,7 +102,7 @@ console.log(`Source: ${result.source}`);
 
 ### Dashboard Usage (Optional)
 
-The dashboard components require React dependencies to be installed:
+The dashboard components are provided as examples in `src/examples/ui/` and require React dependencies:
 
 ```typescript
 // Import core modules (always available)
@@ -108,8 +110,8 @@ import { multilingualRuntime, localLLMStack, privacyDashboard } from 'ethervoxai
 
 // Import dashboard components (requires React installation)
 // Uncomment after installing React dependencies:
-// import { DashboardWeb } from 'ethervoxai/ui/dashboard/DashboardWeb';
-// import { DashboardMobile } from 'ethervoxai/ui/dashboard/DashboardMobile';
+// import { DashboardWeb } from './src/examples/ui/dashboard/DashboardWeb';
+// import { DashboardMobile } from './src/examples/ui/dashboard/DashboardMobile';
 
 // Use core modules directly
 const languages = multilingualRuntime.getLanguageProfiles();

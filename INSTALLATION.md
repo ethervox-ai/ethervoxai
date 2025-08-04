@@ -59,8 +59,14 @@ npm install --save-dev @types/react @types/react-dom
 
 ### Build and Test
 ```bash
-# Build the TypeScript project
+# Build the core TypeScript project (excludes React examples)
 npm run build
+
+# Build only the UI examples (requires React dependencies)
+npm run build:ui
+
+# Build everything (core + examples)
+npm run build:all
 
 # Run tests
 npm run test
@@ -68,8 +74,11 @@ npm run test
 # Run the demo
 npm run demo
 
-# Lint the code
-npm run lint
+# Lint the core code
+npm run lint:core
+
+# Type check examples (requires React types)
+npm run typecheck:ui
 ```
 
 ### Expected Output
@@ -106,16 +115,19 @@ pnpm install
 ```
 ethervoxai/
 ├── src/
-│   ├── modules/           # Core functionality (no external deps)
+│   ├── modules/              # Core functionality (no external deps)
 │   │   ├── multilingualRuntime.ts
 │   │   ├── localLLMStack.ts
 │   │   └── privacyDashboard.ts
-│   ├── ui/               # Optional UI examples (requires React)
-│   │   └── dashboard/
-│   └── index.ts          # Main export (core only)
-├── eslint.config.js      # Modern ESLint v9 config
-├── jest.config.js        # Updated Jest configuration
-└── package.json          # Clean dependencies
+│   ├── examples/             # Optional examples (requires React)
+│   │   └── ui/
+│   │       └── dashboard/
+│   └── index.ts              # Main export (core only)
+├── eslint.config.js          # Modern ESLint v9 config
+├── jest.config.js            # Updated Jest configuration
+├── tsconfig.json             # Core TypeScript config
+├── tsconfig.ui.json          # UI examples TypeScript config
+└── package.json              # Clean dependencies
 ```
 
 ## Next Steps
