@@ -1,0 +1,10 @@
+{
+  "cloudAccessEnabled": false,
+  "cloudAccessPerQuery": true,
+  "requireExplicitConsent": true,
+  "auditLoggingEnabled": true,
+  "encryptionEnabled": true,
+  "dataRetentionDays": 7,
+  "allowedServices": ["weather", "time", "timer"],
+  "blockedServices": ["location", "contacts", "calendar"]
+}

@@ -1,0 +1,16 @@
+{
+  "input": {
+    "sampleRate": 16000,
+    "channels": 1,
+    "bitDepth": 16,
+    "device": "default"
+  },
+  "output": {
+    "sampleRate": 22050,
+    "channels": 2,
+    "bitDepth": 16,
+    "device": "default"
+  },
+  "bufferSize": 1024,
+  "vadThreshold": 0.3
+}

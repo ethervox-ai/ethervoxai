@@ -40,6 +40,7 @@ export class MultilingualRuntime {
 
   constructor() {
     this.initializeDefaultProfiles();
+    this.initializeTTSEngines();
   }
 
   /**
@@ -56,6 +57,142 @@ export class MultilingualRuntime {
     defaultProfiles.forEach(profile => {
       this.languageProfiles.set(profile.code, profile);
     });
+  }
+
+  /**
+   * Initialize Text-to-Speech engines for supported languages
+   */
+  private initializeTTSEngines(): void {
+    // Initialize TTS engines for MVP languages
+    const ttsEngines: { language: string; voice: string }[] = [
+      { language: 'en-US', voice: 'en-US-Neural' },
+      { language: 'en-GB', voice: 'en-GB-Neural' },
+      { language: 'es-419', voice: 'es-MX-Neural' },
+      { language: 'zh-CN', voice: 'zh-CN-Neural' }
+    ];
+
+    ttsEngines.forEach(config => {
+      const engine: TTSEngine = {
+        language: config.language,
+        voice: config.voice,
+        synthesize: async (text: string): Promise<ArrayBuffer> => {
+          // For Windows demo, we'll create a simple TTS implementation
+          return this.synthesizeWithWindowsTTS(text, config.language);
+        }
+      };
+      
+      this.ttsEngines.set(config.language, engine);
+    });
+  }
+
+  /**
+   * Windows TTS synthesis using available system capabilities
+   */
+  private async synthesizeWithWindowsTTS(text: string, language: string): Promise<ArrayBuffer> {
+    // Try to use Windows built-in TTS capabilities
+    try {
+      // Check if 'say' package is available (cross-platform TTS)
+      const say = await this.tryImportSay();
+      if (say) {
+        return this.synthesizeWithSay(text, language, say);
+      }
+
+      // Fallback to Web Speech API synthesis (if available in Electron context)
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        return this.synthesizeWithWebSpeechAPI(text, language);
+      }
+
+      // Final fallback: generate silence or beep
+      console.log(`🔊 [TTS SIMULATION] Would speak: "${text}" in ${language}`);
+      return this.generateSilentAudio(text.length * 100); // 100ms per character
+
+    } catch (error) {
+      console.warn('TTS synthesis failed, using silent audio:', error);
+      return this.generateSilentAudio(text.length * 100);
+    }
+  }
+
+  /**
+   * Try to import 'say' package dynamically
+   */
+  private async tryImportSay(): Promise<any> {
+    try {
+      return require('say');
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Synthesize using 'say' package
+   */
+  private async synthesizeWithSay(text: string, language: string, say: any): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+      // Map our language codes to 'say' package voices
+      const voiceMap: { [key: string]: string } = {
+        'en-US': 'Microsoft Zira Desktop',
+        'en-GB': 'Microsoft Hazel Desktop',
+        'es-419': 'Microsoft Sabina Desktop',
+        'zh-CN': 'Microsoft Huihui Desktop'
+      };
+
+      const voice = voiceMap[language] || voiceMap['en-US'];
+
+      // Export to buffer
+      say.export(text, voice, 1.0, (err: Error, buffer: Buffer) => {
+        if (err) {
+          console.warn(`TTS synthesis failed for ${language}, using silent audio:`, err);
+          resolve(this.generateSilentAudio(text.length * 100));
+        } else {
+          resolve(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
+        }
+      });
+    });
+  }
+
+  /**
+   * Synthesize using Web Speech API (for Electron contexts)
+   */
+  private async synthesizeWithWebSpeechAPI(text: string, language: string): Promise<ArrayBuffer> {
+    return new Promise((resolve) => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = language;
+      
+      utterance.onend = () => {
+        // Web Speech API doesn't provide audio buffer directly
+        // This is a limitation - in a real app you'd use a different approach
+        console.log(`🔊 [WEB TTS] Spoke: "${text}" in ${language}`);
+        resolve(this.generateSilentAudio(text.length * 100));
+      };
+
+      utterance.onerror = () => {
+        console.warn('Web Speech API TTS failed, using silent audio');
+        resolve(this.generateSilentAudio(text.length * 100));
+      };
+
+      speechSynthesis.speak(utterance);
+    });
+  }
+
+  /**
+   * Generate silent audio buffer as fallback
+   */
+  private generateSilentAudio(durationMs: number): ArrayBuffer {
+    const sampleRate = 22050;
+    const channels = 1;
+    const samplesPerChannel = Math.floor((durationMs / 1000) * sampleRate);
+    const totalSamples = samplesPerChannel * channels;
+    
+    // Create silent 16-bit PCM audio
+    const buffer = new ArrayBuffer(totalSamples * 2);
+    const view = new Int16Array(buffer);
+    
+    // Fill with zeros (silence)
+    for (let i = 0; i < totalSamples; i++) {
+      view[i] = 0;
+    }
+    
+    return buffer;
   }
 
   /**

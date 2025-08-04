@@ -41,6 +41,30 @@ export declare class MultilingualRuntime {
      */
     private initializeDefaultProfiles;
     /**
+     * Initialize Text-to-Speech engines for supported languages
+     */
+    private initializeTTSEngines;
+    /**
+     * Windows TTS synthesis using available system capabilities
+     */
+    private synthesizeWithWindowsTTS;
+    /**
+     * Try to import 'say' package dynamically
+     */
+    private tryImportSay;
+    /**
+     * Synthesize using 'say' package
+     */
+    private synthesizeWithSay;
+    /**
+     * Synthesize using Web Speech API (for Electron contexts)
+     */
+    private synthesizeWithWebSpeechAPI;
+    /**
+     * Generate silent audio buffer as fallback
+     */
+    private generateSilentAudio;
+    /**
      * Detect language from audio input
      */
     detectLanguage(audioBuffer: ArrayBuffer): Promise<LanguageDetectionResult>;
