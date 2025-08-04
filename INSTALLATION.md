@@ -49,11 +49,30 @@ npm install
 ```
 
 ### 3. Optional: Install UI Dependencies
+
+The UI examples are split into separate components to avoid conflicts:
+
+#### Web Dashboard (React only)
 ```bash
-# Only if you want to use the example dashboard components
+# Install React for web dashboard
 npm install react@^18.2.0 react-dom@^18.2.0
 npm install --save-dev @types/react @types/react-dom
+
+# Type check web dashboard
+npm run typecheck:web
 ```
+
+#### Mobile Dashboard (React Native)
+```bash
+# Install React Native (includes React at specific version)
+npm install react@18.2.0 react-native@^0.72.0
+npm install --save-dev @types/react-native
+
+# Type check mobile dashboard  
+npm run typecheck:mobile
+```
+
+**Note**: You cannot install both React DOM and React Native in the same project due to version conflicts. Choose one based on your target platform.
 
 ## Verification
 
@@ -62,23 +81,29 @@ npm install --save-dev @types/react @types/react-dom
 # Build the core TypeScript project (excludes React examples)
 npm run build
 
-# Build only the UI examples (requires React dependencies)
-npm run build:ui
+# Build web dashboard (requires React + React DOM)
+npm run build:web
 
-# Build everything (core + examples)
+# Build mobile dashboard (requires React Native)
+npm run build:mobile
+
+# Build everything (core + web examples)
 npm run build:all
 
-# Run tests
+# Run tests (core functionality only)
 npm run test
 
-# Run the demo
+# Run the demo (core functionality)
 npm run demo
 
 # Lint the core code
 npm run lint:core
 
-# Type check examples (requires React types)
-npm run typecheck:ui
+# Type check web examples (requires React types)
+npm run typecheck:web
+
+# Type check mobile examples (requires React Native types)
+npm run typecheck:mobile
 ```
 
 ### Expected Output

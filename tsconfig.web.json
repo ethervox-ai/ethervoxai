@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": false,
+    "isolatedModules": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": [
+    "src/examples/ui/dashboard/DashboardWeb.tsx",
+    "src/examples/ui/dashboard/DashboardWebSimple.tsx",
+    "src/examples/ui/README.md"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/examples/ui/dashboard/DashboardMobile.tsx"
+  ]
+}

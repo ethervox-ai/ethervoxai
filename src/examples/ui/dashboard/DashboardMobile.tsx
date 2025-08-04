@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, TextInput, StyleSheet } from 'react-native';
-import { multilingualRuntime, LanguageProfile } from '../../modules/multilingualRuntime';
-import { localLLMStack, LLMModel, LLMResponse } from '../../modules/localLLMStack';
-import { privacyDashboard, PrivacySettings, CloudQuery, DeviceStatus } from '../../modules/privacyDashboard';
+import { multilingualRuntime, LanguageProfile } from '../../../modules/multilingualRuntime';
+import { localLLMStack, LLMModel, LLMResponse } from '../../../modules/localLLMStack';
+import { privacyDashboard, PrivacySettings, CloudQuery, DeviceStatus } from '../../../modules/privacyDashboard';
 
 interface DashboardState {
   languageProfiles: LanguageProfile[];

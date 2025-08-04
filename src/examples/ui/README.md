@@ -1,44 +1,61 @@
-# UI Examples
+# EthervoxAI UI Examples
 
-This directory contains example UI implementations for the EthervoxAI dashboard. These are provided as reference implementations and are **not compiled by default** to avoid requiring React dependencies for the core library.
+This directory contains example UI implementations that demonstrate how to integrate EthervoxAI core modules with popular frontend frameworks. These are provided as reference implementations and are **not compiled by default** to avoid requiring React dependencies for the core library.
 
-## Dashboard Components
+## Available Examples
 
-### Web Dashboard (React)
-- **File**: `dashboard/DashboardWeb.tsx`
-- **Framework**: React 18+
-- **Description**: Full-featured web dashboard with comprehensive controls
+### Web Dashboard (`DashboardWeb.tsx`)
+- **Framework**: React + React DOM
+- **Purpose**: Full-featured web browser interface for EthervoxAI
+- **Features**: Desktop-optimized layout with comprehensive controls and embedded CSS
+- **Dependencies**: Requires React 18.2+ and React DOM
 
-### Mobile Dashboard (React Native)
-- **File**: `dashboard/DashboardMobile.tsx` 
-- **Framework**: React Native 0.72+
-- **Description**: Mobile-optimized dashboard interface
+### Web Dashboard Simple (`DashboardWebSimple.tsx`)
+- **Framework**: React + React DOM  
+- **Purpose**: Simplified web interface using inline styles
+- **Features**: Basic dashboard functionality with React inline styles (no external CSS)
+- **Dependencies**: Requires React 18.2+ and React DOM
 
-## Building Examples
+### Mobile Dashboard (`DashboardMobile.tsx`) 
+- **Framework**: React Native
+- **Purpose**: Mobile app interface for EthervoxAI
+- **Features**: Touch-optimized interface for iOS/Android
+- **Dependencies**: Requires React Native 0.72+ (includes React 18.2.0)
 
-The examples are excluded from the default build process. To compile them:
+## Setup Instructions
 
-### 1. Install React Dependencies
+### Important: React vs React Native Conflict
+You cannot install both React DOM and React Native in the same project due to version conflicts. Choose one approach:
+
+### Option 1: Web Dashboard Setup
 ```bash
-# For Web Dashboard
+# Install React DOM dependencies
 npm install react@^18.2.0 react-dom@^18.2.0
-npm install --save-dev @types/react@^18.2.0 @types/react-dom@^18.2.0
+npm install --save-dev @types/react @types/react-dom
 
-# For Mobile Dashboard (additional)
-npm install react-native@^0.72.0
-npm install --save-dev @types/react-native@^0.72.0
+# Build and type-check web dashboard
+npm run build:web
+npm run typecheck:web
 ```
 
-### 2. Build Examples
+### Option 2: Mobile Dashboard Setup  
 ```bash
-# Type check examples
-npm run typecheck:ui
+# Install React Native dependencies
+npm install react@18.2.0 react-native@^0.72.0
+npm install --save-dev @types/react-native
 
-# Build examples (after installing React)
-npm run build:ui
+# Build and type-check mobile dashboard
+npm run build:mobile
+npm run typecheck:mobile
+```
 
-# Build everything (core + examples)
-npm run build:all
+### Switching Between Web and Mobile
+To switch from one to the other:
+```bash
+# Remove existing React dependencies
+npm uninstall react react-dom react-native @types/react @types/react-dom @types/react-native
+
+# Install the dependencies for your target platform (see above)
 ```
 
 ## Usage
@@ -49,6 +66,7 @@ import { multilingualRuntime, localLLMStack, privacyDashboard } from '../../../m
 
 // Use in your React components
 import { DashboardWeb } from './dashboard/DashboardWeb';
+import { DashboardWebSimple } from './dashboard/DashboardWebSimple';
 import { DashboardMobile } from './dashboard/DashboardMobile';
 ```
 

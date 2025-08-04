@@ -7,8 +7,10 @@
   "scripts": {
     "build": "npm run build:core",
     "build:core": "tsc",
-    "build:ui": "tsc --project tsconfig.ui.json",
-    "build:all": "npm run build:core && npm run build:ui",
+    "build:web": "tsc --project tsconfig.web.json",
+    "build:mobile": "tsc --project tsconfig.mobile.json",
+    "build:ui": "npm run build:web",
+    "build:all": "npm run build:core && npm run build:web",
     "build:watch": "tsc --watch",
     "dev": "npm run build:watch",
     "start": "node dist/index.js",
@@ -21,7 +23,8 @@
     "test:coverage": "jest --coverage",
     "clean": "rimraf dist",
     "typecheck": "tsc --noEmit",
-    "typecheck:ui": "tsc --project tsconfig.ui.json --noEmit"
+    "typecheck:web": "tsc --project tsconfig.web.json --noEmit",
+    "typecheck:mobile": "tsc --project tsconfig.mobile.json --noEmit"
   },
   "keywords": [
     "voice-assistant",
@@ -39,6 +42,8 @@
     "@eslint/js": "^9.0.0",
     "@types/jest": "^29.5.0",
     "@types/node": "^22.0.0",
+    "@types/react": "^19.1.9",
+    "@types/react-dom": "^19.1.7",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",

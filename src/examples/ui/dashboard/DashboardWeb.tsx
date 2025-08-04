@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { multilingualRuntime, LanguageProfile } from '../../modules/multilingualRuntime';
-import { localLLMStack, LLMModel, LLMResponse } from '../../modules/localLLMStack';
-import { privacyDashboard, PrivacySettings, CloudQuery, DeviceStatus } from '../../modules/privacyDashboard';
+import { multilingualRuntime, LanguageProfile } from '../../../modules/multilingualRuntime';
+import { localLLMStack, LLMModel, LLMResponse } from '../../../modules/localLLMStack';
+import { privacyDashboard, PrivacySettings, CloudQuery, DeviceStatus } from '../../../modules/privacyDashboard';
 
 interface DashboardState {
   languageProfiles: LanguageProfile[];
@@ -409,7 +409,7 @@ export const DashboardWeb: React.FC = () => {
         {activeTab === 'privacy' && renderPrivacyTab()}
       </main>
 
-      <style jsx>{`
+      <style>{`
         .dashboard-web {
           min-height: 100vh;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
