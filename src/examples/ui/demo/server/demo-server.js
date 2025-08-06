@@ -3,7 +3,60 @@
  * 
  * Local web server that hosts both web and mobile UI demos
  * Allows users to experience the EthervoxAI dashboard interfaces
+ * 
+ * Cross-platform support: Windows, Linux, Raspberry Pi with optimizations
  */
+
+const os = require('os');
+const fs = require('fs');
+
+// Platform detection
+const isRaspberryPi = (() => {
+  if (process.platform !== 'linux') return false;
+  
+  try {
+    if (fs.existsSync('/proc/device-tree/model')) {
+      const model = fs.readFileSync('/proc/device-tree/model', 'utf8');
+      return model.toLowerCase().includes('raspberry pi');
+    }
+    
+    const cpuInfo = fs.readFileSync('/proc/cpuinfo', 'utf8');
+    return cpuInfo.includes('BCM') || cpuInfo.includes('ARM');
+  } catch {
+    return false;
+  }
+})();
+
+// System information for optimization
+const systemInfo = {
+  platform: process.platform,
+  arch: process.arch,
+  isRaspberryPi,
+  totalMemory: Math.round(os.totalmem() / 1024 / 1024), // MB
+  nodeVersion: process.version,
+  isLowMemory: os.totalmem() < 1024 * 1024 * 1024, // Less than 1GB
+  isARM: process.arch.startsWith('arm')
+};
+
+// Apply Raspberry Pi optimizations
+if (isRaspberryPi) {
+  console.log('🍓 Raspberry Pi detected - applying optimizations...');
+  console.log(`   Memory: ${systemInfo.totalMemory}MB total`);
+  console.log(`   Architecture: ${systemInfo.arch}`);
+  
+  // Memory optimizations
+  if (systemInfo.isLowMemory) {
+    process.env.NODE_OPTIONS = '--max-old-space-size=512';
+    console.log('   Applied low-memory optimizations');
+  }
+  
+  // Set garbage collection to be more aggressive on RPi
+  if (global.gc) {
+    setInterval(() => {
+      if (global.gc) global.gc();
+    }, 30000); // GC every 30 seconds
+  }
+}
 
 // Check dependencies first
 try {
@@ -14,7 +67,18 @@ try {
   console.error('Please install dependencies first:');
   console.error('  npm install express cors');
   console.error('');
-  console.error('Or run the master launcher: launch-ui-demo-master.bat');
+  
+  if (isRaspberryPi) {
+    console.error('🍓 Raspberry Pi users:');
+    console.error('  - Use: sudo npm install --unsafe-perm if needed');
+    console.error('  - Ensure enough free space: df -h');
+    console.error('  - Or run: ./launch-ui-demo-master.sh (auto-installs)');
+  } else if (process.platform === 'win32') {
+    console.error('Or run the master launcher: launch-ui-demo-master.bat');
+  } else {
+    console.error('Or run the master launcher: ./launch-ui-demo-master.sh');
+  }
+  
   process.exit(1);
 }
 
@@ -27,9 +91,34 @@ class UIDemo {
   constructor() {
     this.app = express();
     this.port = process.env.PORT || 3000;
+    
+    // Store system info for demo purposes
+    this.systemInfo = systemInfo;
+    
     this.setupMiddleware();
     this.setupRoutes();
     this.setupStaticFiles();
+    
+    // Raspberry Pi specific setup
+    if (isRaspberryPi) {
+      this.setupRaspberryPiOptimizations();
+    }
+  }
+  
+  setupRaspberryPiOptimizations() {
+    console.log('🔧 Configuring Raspberry Pi optimizations...');
+    
+    // Reduce keep-alive timeout for better memory management
+    this.app.use((req, res, next) => {
+      res.setTimeout(30000); // 30 second timeout
+      next();
+    });
+    
+    // Add RPi-specific headers
+    this.app.use((req, res, next) => {
+      res.set('X-Powered-By', 'EthervoxAI-RPi');
+      next();
+    });
   }
 
   setupMiddleware() {
@@ -271,6 +360,11 @@ class UIDemo {
 
         <div class="footer">
             <p>🚀 Running on localhost:${this.port} | Built with ❤️ for privacy-conscious users</p>
+            <p style="margin-top: 10px; font-size: 0.8em; opacity: 0.6;">
+                Platform: ${this.systemInfo.isRaspberryPi ? '🍓 Raspberry Pi' : '💻 ' + this.systemInfo.platform} | 
+                ${this.systemInfo.arch} | 
+                Node.js ${this.systemInfo.nodeVersion}
+            </p>
         </div>
     </div>
     
@@ -292,7 +386,7 @@ class UIDemo {
   }
 
   generateDemoData() {
-    return {
+    const data = {
       timestamp: new Date().toISOString(),
       version: '1.0.0',
       status: 'running',
@@ -302,8 +396,32 @@ class UIDemo {
         'Local LLM Processing', 
         'Privacy Controls',
         'Real-time Updates'
-      ]
+      ],
+      system: {
+        platform: this.systemInfo.platform,
+        architecture: this.systemInfo.arch,
+        nodeVersion: this.systemInfo.nodeVersion,
+        totalMemory: this.systemInfo.totalMemory,
+        isRaspberryPi: this.systemInfo.isRaspberryPi
+      }
     };
+    
+    if (this.systemInfo.isRaspberryPi) {
+      data.system.raspberryPi = {
+        optimized: true,
+        memoryConstrained: this.systemInfo.isLowMemory,
+        gcEnabled: !!global.gc
+      };
+      
+      // Add RPi model if available
+      try {
+        if (fs.existsSync('/proc/device-tree/model')) {
+          data.system.raspberryPi.model = fs.readFileSync('/proc/device-tree/model', 'utf8').replace(/\0/g, '');
+        }
+      } catch {}
+    }
+    
+    return data;
   }
 
   getLanguageProfiles() {

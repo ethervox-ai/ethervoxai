@@ -1,11 +1,13 @@
-# EthervoxAI UI Demo - Launcher Options Summary
+# EthervoxAI UI Demo - Cross-Platform Launcher Guide
 
 ## 🚀 Available Launchers
 
-The EthervoxAI UI Demo provides multiple ways to start the demo server, each designed for different scenarios and user preferences. **All batch files now automatically detect PowerShell and switch to CMD for optimal compatibility.**
+The EthervoxAI UI Demo provides multiple ways to start the demo server across all platforms: **Windows**, **Linux**, and **Raspberry Pi**. Each launcher is optimized for its target platform with automatic environment detection and system-specific optimizations.
 
-### 1. **launch-ui-demo-master.bat** ⭐ **(RECOMMENDED)**
-- **Purpose**: Complete automated setup and launch
+### **🪟 Windows Launchers**
+
+### 1. **launch-ui-demo-master.bat** ⭐ **(RECOMMENDED FOR WINDOWS)**
+- **Purpose**: Complete automated setup and launch for Windows
 - **Features**: 
   - ✅ Automatically detects PowerShell and switches to CMD
   - ✅ Automatically loads Node.js environment
@@ -16,27 +18,40 @@ The EthervoxAI UI Demo provides multiple ways to start the demo server, each des
 - **Best for**: First-time users, complete automation
 - **Works in**: PowerShell (auto-switches), CMD, Windows Terminal
 
-### 2. **run-ui-demo.bat**
-- **Purpose**: Node.js environment wrapper
-- **Features**:
-  - ✅ PowerShell detection and auto-switch to CMD
-  - ✅ Loads Node.js environment using cmd /c
-  - ✅ Runs the demo with proper PATH
-  - ✅ Error handling and troubleshooting tips
-- **Usage**: `.\run-ui-demo.bat`  
-- **Best for**: Users who already have dependencies installed
-- **Works in**: PowerShell (auto-switches), CMD, Windows Terminal
+### **🐧 Linux/Raspberry Pi Launchers**
 
-### 3. **start-ui-demo.bat**
-- **Purpose**: Basic launcher with environment check
+### 2. **launch-ui-demo-master.sh** ⭐ **(RECOMMENDED FOR LINUX/RPi)**
+- **Purpose**: Complete automated setup and launch for Linux/Raspberry Pi
 - **Features**:
-  - ✅ PowerShell detection and auto-switch to CMD
-  - ✅ Loads Node.js environment
-  - ✅ Basic error checking
-  - ✅ Version reporting
-- **Usage**: `.\start-ui-demo.bat`
-- **Best for**: Standard usage when environment is set up
-- **Works in**: PowerShell (auto-switches), CMD, Windows Terminal
+  - ✅ Automatic Raspberry Pi detection and optimization
+  - ✅ Memory optimization for low-memory systems
+  - ✅ ARM architecture compatibility checks
+  - ✅ Installs dependencies with platform-specific settings
+  - ✅ Node.js version verification and recommendations
+- **Usage**: `./launch-ui-demo-master.sh`
+- **Best for**: First-time users on Linux/RPi, complete automation
+- **Raspberry Pi Features**:
+  - 🍓 Detects Pi model and applies appropriate optimizations
+  - 💾 Memory constraint handling for Pi Zero/1
+  - ⚡ ARM64 vs ARM32 architecture detection
+  - 🔧 Lightweight mode for resource-constrained systems
+
+### **🔀 Cross-Platform Launchers**
+
+### 3. **launch-ui-demo.js** ⭐ **(CROSS-PLATFORM NODE.JS)**
+- **Purpose**: Universal Node.js launcher with intelligent platform detection
+- **Features**:
+  - ✅ Automatic platform detection (Windows/Linux/macOS/RPi)
+  - ✅ Raspberry Pi model identification and optimization
+  - ✅ Memory usage monitoring and optimization
+  - ✅ Cross-platform dependency checking and installation
+  - ✅ Graceful shutdown handling
+- **Usage**: `node launch-ui-demo.js`
+- **Best for**: Developers, cross-platform use, automated deployment
+- **Raspberry Pi Intelligence**:
+  - 🧠 Detects Pi model from `/proc/device-tree/model`
+  - 📊 Memory analysis and automatic optimization
+  - 🔧 Platform-specific error troubleshooting
 
 ### 4. **launch-ui-demo.js**
 - **Purpose**: Node.js launcher script
