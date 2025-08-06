@@ -71,3 +71,71 @@ temp/
 # Package lock files (optional - uncomment if you want to exclude them)
 # package-lock.json
 # yarn.lock
+
+# EthervoxAI Runtime Files
+# =======================
+
+# Downloaded AI Models (can be very large - 1GB to 10GB+)
+models/
+*.ggml
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.pth
+
+# Model cache and storage directories
+.ethervoxai/
+~/.ethervoxai/
+cache/
+model-cache/
+model_cache/
+
+# Audit logs and runtime logs
+audit-logs/
+audit_logs/
+ethervoxai-audit.log
+ethervoxai-audit-*.log
+inference-logs/
+inference_logs/
+
+# Testing artifacts
+test-models/
+test_models/
+test-outputs/
+test_outputs/
+benchmark-results/
+benchmark_results/
+performance-logs/
+performance_logs/
+
+# Model download artifacts
+*.tmp
+*.download
+*.part
+model-downloads/
+downloads/
+
+# Runtime configuration (may contain sensitive paths)
+runtime-config.json
+local-config.json
+user-preferences.json
+
+# Model metadata and checksums (generated at runtime)
+model-checksums.json
+model-metadata.json
+model-registry.json
+
+# Inference engine temporary files
+llama-cpp-temp/
+inference-temp/
+tokenizer-cache/
+
+# Platform detection cache
+platform-cache.json
+capabilities-cache.json
+
+# Demo server uploads and temporary files
+uploads/
+demo-uploads/
+demo-temp/

@@ -164,3 +164,71 @@ ethervoxai/
 5. **Optionally install React** for UI components
 
 All dependency conflicts and deprecation warnings have been resolved! 🎉
+
+## 🔒 Keeping Models & Runtime Files Out of Version Control
+
+### What's Excluded from Git
+
+EthervoxAI automatically excludes the following from version control:
+
+**AI Models & Cache (can be 1-10GB+):**
+- `models/` - Downloaded AI models
+- `.ethervoxai/` - User model cache directory
+- `*.ggml`, `*.gguf`, `*.bin` - Model files
+- `model-cache/` - Temporary model storage
+
+**Runtime Logs & Audit Data:**
+- `audit-logs/` - Privacy audit logs
+- `ethervoxai-audit.log` - Main audit log
+- `inference-logs/` - AI inference logs
+- `benchmark-results/` - Performance test data
+
+**Testing Artifacts:**
+- `test-models/` - Models downloaded during testing
+- `test-outputs/` - Test result files
+- `performance-logs/` - Benchmark data
+
+### Why This Matters
+
+- **Repository Size**: AI models can be 1-10GB each
+- **Privacy**: Audit logs may contain sensitive data
+- **Performance**: Large files slow down git operations
+- **Collaboration**: Runtime files are user-specific
+
+### Manual Cleanup (if needed)
+
+If you accidentally committed large files:
+
+```bash
+# Remove large files from git history (DANGEROUS - backup first!)
+git filter-branch --tree-filter 'rm -rf models/ .ethervoxai/' HEAD
+
+# Or use BFG Repo-Cleaner (recommended)
+bfg --delete-folders models,audit-logs
+git reflog expire --expire=now --all && git gc --prune=now --aggressive
+```
+
+### Global .gitignore (Optional)
+
+For additional protection across all projects:
+
+```bash
+# Create global gitignore
+git config --global core.excludesfile ~/.gitignore_global
+
+# Add to ~/.gitignore_global
+echo "*.ggml" >> ~/.gitignore_global
+echo "*.gguf" >> ~/.gitignore_global
+echo ".ethervoxai/" >> ~/.gitignore_global
+echo "audit-logs/" >> ~/.gitignore_global
+```
+
+### Verification
+
+Check what's ignored:
+```bash
+git status --ignored
+git check-ignore -v models/ .ethervoxai/ *.ggml
+```
+
+The `.gitignore` file is comprehensive and will prevent any model files, audit logs, or testing artifacts from being accidentally committed to GitHub.
