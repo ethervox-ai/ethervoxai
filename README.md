@@ -167,8 +167,15 @@ const privacy = privacyDashboard.getPrivacySettings();
 
 ### Available Models
 
-- **mistral-lite**: General conversation and Q&A
-- **tinyllama**: Lightweight model for simple queries
+EthervoxAI now supports real local AI models via the integrated ModelManager:
+
+- **tinyllama-1.1b-chat-q4**: Lightweight model (669MB) - Works on any system, perfect for Raspberry Pi
+- **phi-2-2.7b-q4**: Microsoft's efficient model (1.6GB) - Optimized for ARM processors  
+- **mistral-7b-instruct-v0.1-q4**: High-quality instruction model (4.1GB) - Excellent for conversations
+- **llama2-7b-chat-q4**: Meta's popular chat model (3.9GB) - General purpose conversations
+- **llama2-13b-chat-q4**: Larger model for high-end systems (7.3GB) - Enhanced capabilities
+
+The system automatically recommends the best model for your hardware and downloads it on first use.
 
 ## 📚 Module Documentation
 

@@ -3,13 +3,17 @@
  *
  * Modular local LLM stack for intent parsing, response generation,
  * and optional routing to external models while preserving privacy.
+ *
+ * Updated to integrate with ModelManager and InferenceEngine
  */
+import { ModelInfo } from './modelManager';
 export interface LLMModel {
     name: string;
     type: 'local' | 'external';
     capabilities: string[];
     memoryLimit: number;
     tokenLimit: number;
+    modelInfo?: ModelInfo;
 }
 export interface IntentParseResult {
     intent: string;
@@ -23,6 +27,11 @@ export interface LLMResponse {
     source: 'local' | 'external';
     model: string;
     tokensUsed: number;
+    inferenceStats?: {
+        tokensPerSecond: number;
+        totalTime: number;
+        promptTokens: number;
+    };
 }
 export interface RoutingRule {
     condition: string;
@@ -35,7 +44,12 @@ export declare class LocalLLMStack {
     private routingRules;
     private intentParser;
     private currentModel;
+    private isInitialized;
     constructor();
+    /**
+     * Initialize the Local LLM Stack with real AI models
+     */
+    initialize(): Promise<void>;
     /**
      * Initialize default local models for MVP
      */
@@ -57,6 +71,10 @@ export declare class LocalLLMStack {
      */
     generateLocalResponse(text: string, intent: IntentParseResult): Promise<LLMResponse>;
     /**
+     * Generate fallback response when real inference is unavailable
+     */
+    private generateFallbackResponse;
+    /**
      * Route query to external LLM if needed
      */
     routeToExternalLLM(text: string, intent: IntentParseResult, userConsent: boolean): Promise<LLMResponse | null>;
@@ -72,6 +90,10 @@ export declare class LocalLLMStack {
      * Register external LLM plugin
      */
     registerExternalPlugin(name: string, plugin: any): void;
+    /**
+     * Update local models registry from ModelManager catalog
+     */
+    private updateLocalModelsFromCatalog;
     /**
      * Update routing rules
      */

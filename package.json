@@ -16,6 +16,7 @@
     "start": "node dist/index.js",
     "demo": "node scripts/demo/launch-demo.js",
     "demo:ui": "node src/examples/ui/demo/launch-ui-demo.js",
+    "demo:ai": "npm run build && node src/test-ai-integration.js",
     "demo:windows": "node dist/demo/windows-desktop.js",
     "demo:windows:dev": "npm run build && node dist/demo/windows-desktop.js",
     "lint": "eslint src/**/*.{ts,tsx} --fix",
@@ -54,7 +55,7 @@
     "jest": "^29.7.0",
     "rimraf": "^6.0.0",
     "ts-jest": "^29.2.0",
-    "typescript": "^5.5.0",
+    "typescript": "^5.8.3",
     "typescript-eslint": "^8.0.0"
   },
   "peerDependencies": {
@@ -81,10 +82,12 @@
   },
   "homepage": "https://github.com/mkostersitz/ethervoxai#readme",
   "dependencies": {
+    "axios": "^1.11.0",
     "node-powershell": "^5.0.1",
     "node-wav-player": "^1.0.0",
     "play-sound": "^1.1.6",
-    "say": "^0.16.0"
+    "say": "^0.16.0",
+    "socket.io": "^4.7.0"
   },
   "optionalDependencies": {
     "mic": "^2.1.2",

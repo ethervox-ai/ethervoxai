@@ -3,7 +3,13 @@
  * 
  * Modular local LLM stack for intent parsing, response generation,
  * and optional routing to external models while preserving privacy.
+ * 
+ * Updated to integrate with ModelManager and InferenceEngine
  */
+
+import { modelManager, ModelInfo } from './modelManager';
+import { inferenceEngine, InferenceResponse } from './inferenceEngine';
+import { platformDetector } from './platformDetector';
 
 export interface LLMModel {
   name: string;
@@ -11,6 +17,7 @@ export interface LLMModel {
   capabilities: string[];
   memoryLimit: number;
   tokenLimit: number;
+  modelInfo?: ModelInfo;  // Reference to actual model metadata
 }
 
 export interface IntentParseResult {
@@ -26,6 +33,11 @@ export interface LLMResponse {
   source: 'local' | 'external';
   model: string;
   tokensUsed: number;
+  inferenceStats?: {
+    tokensPerSecond: number;
+    totalTime: number;
+    promptTokens: number;
+  };
 }
 
 export interface RoutingRule {
@@ -39,11 +51,50 @@ export class LocalLLMStack {
   private externalPlugins: Map<string, any> = new Map();
   private routingRules: RoutingRule[] = [];
   private intentParser: any;
-  private currentModel = 'mistral-lite';
+  private currentModel = 'mistral-7b-instruct-v0.1-q4';  // Updated to use real model name
+  private isInitialized = false;
 
   constructor() {
     this.initializeDefaultModels();
     this.initializeDefaultRoutingRules();
+  }
+
+  /**
+   * Initialize the Local LLM Stack with real AI models
+   */
+  async initialize(): Promise<void> {
+    if (this.isInitialized) return;
+
+    console.log('🚀 Initializing Local LLM Stack...');
+    
+    try {
+      // Get system capabilities and recommended models
+      const capabilities = await platformDetector.getCapabilities();
+      const recommendedModels = await modelManager.getRecommendedModels();
+      
+      console.log(`📊 System Performance Tier: ${capabilities.performanceTier}`);
+      console.log(`💾 Available Memory: ${capabilities.availableMemory}MB`);
+      console.log(`🧠 Recommended Models: ${recommendedModels.map(m => m.name).join(', ')}`);
+      
+      // Use the best recommended model as default
+      if (recommendedModels.length > 0) {
+        this.currentModel = recommendedModels[0].name;
+        console.log(`🎯 Selected default model: ${this.currentModel}`);
+      }
+      
+      // Initialize inference engine with selected model
+      await inferenceEngine.initialize(this.currentModel);
+      
+      // Update local models registry with real models
+      await this.updateLocalModelsFromCatalog();
+      
+      console.log('✅ Local LLM Stack initialized successfully');
+      this.isInitialized = true;
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize Local LLM Stack:', error);
+      throw error;
+    }
   }
 
   /**
@@ -178,18 +229,64 @@ export class LocalLLMStack {
     text: string, 
     intent: IntentParseResult
   ): Promise<LLMResponse> {
+    if (!this.isInitialized) {
+      await this.initialize();
+    }
+
     const model = this.localModels.get(this.currentModel);
     
     if (!model) {
       throw new Error(`Local model ${this.currentModel} not found`);
     }
 
-    // Placeholder for actual LLM inference
-    // In production, this would use GGUF models via llama.cpp or similar
+    try {
+      console.log(`🧠 Generating local response for: "${text}"`);
+      
+      // Use the real inference engine for generation
+      const inferenceResponse = await inferenceEngine.complete(text, {
+        temperature: 0.7,
+        contextLength: 2048
+      });
+      
+      return {
+        text: inferenceResponse.text,
+        confidence: intent.confidence,
+        source: 'local',
+        model: this.currentModel,
+        tokensUsed: inferenceResponse.tokensGenerated,
+        inferenceStats: {
+          tokensPerSecond: inferenceResponse.tokensPerSecond,
+          totalTime: inferenceResponse.timings.totalTime,
+          promptTokens: inferenceResponse.promptTokens
+        }
+      };
+      
+    } catch (error) {
+      console.warn('❌ Real inference failed, falling back to demo responses:', error);
+      
+      // Fallback to demo responses if real inference fails
+      return this.generateFallbackResponse(text, intent);
+    }
+  }
+
+  /**
+   * Generate fallback response when real inference is unavailable
+   */
+  private generateFallbackResponse(text: string, intent: IntentParseResult): LLMResponse {
     let responseText = '';
     let tokensUsed = 0;
 
     switch (intent.intent) {
+      case 'greeting':
+        responseText = 'Hello! I\'m EthervoxAI, your privacy-focused voice assistant running locally on your device.';
+        tokensUsed = 18;
+        break;
+      
+      case 'question':
+        responseText = 'I\'m here to help answer your questions while keeping your data private and secure.';
+        tokensUsed = 16;
+        break;
+      
       case 'weather':
         responseText = `I'll help you check the weather${intent.entities.location ? ` in ${intent.entities.location}` : ''}.`;
         tokensUsed = 15;
@@ -311,6 +408,44 @@ export class LocalLLMStack {
    */
   registerExternalPlugin(name: string, plugin: any): void {
     this.externalPlugins.set(name, plugin);
+  }
+
+  /**
+   * Update local models registry from ModelManager catalog
+   */
+  private async updateLocalModelsFromCatalog(): Promise<void> {
+    const catalog = modelManager.getDefaultModelCatalog();
+    const recommendedModels = await modelManager.getRecommendedModels();
+    
+    // Clear existing demo models
+    this.localModels.clear();
+    
+    // Add real models from catalog
+    for (const modelInfo of catalog) {
+      const isRecommended = recommendedModels.some(r => r.name === modelInfo.name);
+      
+      const llmModel: LLMModel = {
+        name: modelInfo.name,
+        type: 'local',
+        capabilities: modelInfo.tags.includes('chat') ? ['conversation', 'qa'] :
+                     modelInfo.tags.includes('instruct') ? ['instruction-following', 'qa', 'summarization'] :
+                     modelInfo.tags.includes('code') ? ['code-generation', 'code-review'] :
+                     ['general-purpose', 'qa'],
+        memoryLimit: modelInfo.requiredMemory,
+        tokenLimit: modelInfo.contextLength,
+        modelInfo: modelInfo
+      };
+      
+      this.localModels.set(modelInfo.name, llmModel);
+      
+      // Set the first recommended model as current
+      if (isRecommended && !this.currentModel.includes('-instruct-v0.1-q4')) {
+        this.currentModel = modelInfo.name;
+      }
+    }
+    
+    console.log(`📋 Updated local models registry: ${this.localModels.size} models available`);
+    console.log(`🎯 Current model: ${this.currentModel}`);
   }
 
   /**

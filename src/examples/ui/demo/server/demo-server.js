@@ -85,19 +85,31 @@ try {
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
-const fs = require('fs');
+const http = require('http');
+const { Server } = require('socket.io');
 
 class UIDemo {
   constructor() {
     this.app = express();
+    this.server = http.createServer(this.app);
+    this.io = new Server(this.server, {
+      cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+      }
+    });
     this.port = process.env.PORT || 3000;
     
     // Store system info for demo purposes
     this.systemInfo = systemInfo;
     
+    // Track active downloads
+    this.activeDownloads = new Map();
+    
     this.setupMiddleware();
     this.setupRoutes();
     this.setupStaticFiles();
+    this.setupWebSocket();
     
     // Raspberry Pi specific setup
     if (isRaspberryPi) {
@@ -188,6 +200,26 @@ class UIDemo {
     this.app.post('/api/query', (req, res) => {
       const { query, language } = req.body;
       res.json(this.processQuery(query, language));
+    });
+
+    // Model management endpoints
+    this.app.get('/api/models/available', (req, res) => {
+      res.json(this.getAvailableModels());
+    });
+
+    this.app.get('/api/models/recommended', (req, res) => {
+      res.json(this.getRecommendedModels());
+    });
+
+    this.app.post('/api/models/download', (req, res) => {
+      const { modelName } = req.body;
+      this.startModelDownload(modelName, res);
+    });
+
+    this.app.get('/api/models/download-status/:modelName', (req, res) => {
+      const { modelName } = req.params;
+      const status = this.activeDownloads.get(modelName) || { status: 'not_found' };
+      res.json(status);
     });
 
     // 404 handler
@@ -513,8 +545,250 @@ class UIDemo {
     return responses[Math.floor(Math.random() * responses.length)];
   }
 
+  setupWebSocket() {
+    this.io.on('connection', (socket) => {
+      console.log(`🔌 Client connected: ${socket.id}`);
+      
+      socket.on('subscribe_download_progress', (modelName) => {
+        console.log(`📡 Client ${socket.id} subscribed to download progress for ${modelName}`);
+        socket.join(`download_${modelName}`);
+      });
+      
+      socket.on('disconnect', () => {
+        console.log(`🔌 Client disconnected: ${socket.id}`);
+      });
+    });
+  }
+
+  getAvailableModels() {
+    return [
+      {
+        id: 'tinyllama-1.1b-chat-q4',
+        name: 'TinyLlama 1.1B Chat (Q4)',
+        displayName: 'TinyLlama 1.1B',
+        size: '669MB',
+        sizeBytes: 701685760,
+        description: 'Lightweight model perfect for any system, including Raspberry Pi',
+        status: 'available',
+        capabilities: ['conversation', 'simple-qa'],
+        performance: { speed: 'very-fast', accuracy: 'good' },
+        tags: ['lightweight', 'raspberry-pi', 'beginner-friendly'],
+        requirements: {
+          minMemory: '1GB',
+          minStorage: '1GB',
+          recommendedFor: ['raspberry-pi', 'low-end-systems']
+        }
+      },
+      {
+        id: 'phi-2-2.7b-q4',
+        name: 'Microsoft Phi-2 2.7B (Q4)',
+        displayName: 'Microsoft Phi-2 2.7B',
+        size: '1.6GB',
+        sizeBytes: 1717986918,
+        description: 'High-quality small model from Microsoft, optimized for ARM devices',
+        status: 'available',
+        capabilities: ['conversation', 'instruction-following', 'reasoning'],
+        performance: { speed: 'fast', accuracy: 'very-high' },
+        tags: ['microsoft', 'arm-optimized', 'efficient'],
+        requirements: {
+          minMemory: '3GB',
+          minStorage: '2GB',
+          recommendedFor: ['arm-devices', 'mid-range-systems']
+        }
+      },
+      {
+        id: 'mistral-7b-instruct-v0.1-q4',
+        name: 'Mistral 7B Instruct v0.1 (Q4)',
+        displayName: 'Mistral 7B Instruct',
+        size: '4.1GB',
+        sizeBytes: 4398046511,
+        description: 'Excellent instruction following model with high-quality responses',
+        status: 'available',
+        capabilities: ['conversation', 'instruction-following', 'qa', 'summarization'],
+        performance: { speed: 'medium', accuracy: 'excellent' },
+        tags: ['instruction-tuned', 'high-quality', 'general-purpose'],
+        requirements: {
+          minMemory: '6GB',
+          minStorage: '5GB',
+          recommendedFor: ['high-end-systems', 'workstations']
+        }
+      },
+      {
+        id: 'llama2-7b-chat-q4',
+        name: 'Llama 2 7B Chat (Q4)',
+        displayName: 'Llama 2 7B Chat',
+        size: '3.9GB',
+        sizeBytes: 4181721088,
+        description: 'Popular general-purpose chat model from Meta',
+        status: 'available',
+        capabilities: ['conversation', 'qa', 'creative-writing'],
+        performance: { speed: 'medium', accuracy: 'high' },
+        tags: ['meta', 'popular', 'chat-optimized'],
+        requirements: {
+          minMemory: '5GB',
+          minStorage: '4GB',
+          recommendedFor: ['mid-to-high-end-systems']
+        }
+      },
+      {
+        id: 'llama2-13b-chat-q4',
+        name: 'Llama 2 13B Chat (Q4)',
+        displayName: 'Llama 2 13B Chat',
+        size: '7.3GB',
+        sizeBytes: 7836082816,
+        description: 'High-capability model for systems with sufficient memory',
+        status: 'available',
+        capabilities: ['conversation', 'qa', 'reasoning', 'creative-writing'],
+        performance: { speed: 'slow', accuracy: 'excellent' },
+        tags: ['meta', 'large-model', 'high-capability'],
+        requirements: {
+          minMemory: '10GB',
+          minStorage: '8GB',
+          recommendedFor: ['high-end-systems', 'servers']
+        }
+      }
+    ];
+  }
+
+  getRecommendedModels() {
+    const systemMemoryGB = Math.round(this.systemInfo.totalMemory / 1024);
+    const models = this.getAvailableModels();
+    const recommended = [];
+
+    // Ultra performance tier (16GB+)
+    if (systemMemoryGB >= 16) {
+      recommended.push({
+        ...models.find(m => m.id === 'llama2-13b-chat-q4'),
+        reason: 'High-performance system can handle larger models',
+        priority: 1
+      });
+    }
+    
+    // High/Medium performance tier (8GB+)
+    if (systemMemoryGB >= 8) {
+      recommended.push({
+        ...models.find(m => m.id === 'mistral-7b-instruct-v0.1-q4'),
+        reason: 'Excellent instruction following, efficient for your system',
+        priority: 2
+      });
+      recommended.push({
+        ...models.find(m => m.id === 'llama2-7b-chat-q4'),
+        reason: 'Good balance of capability and performance',
+        priority: 3
+      });
+    }
+    
+    // Medium performance tier (4GB+)
+    if (systemMemoryGB >= 4) {
+      recommended.push({
+        ...models.find(m => m.id === 'phi-2-2.7b-q4'),
+        reason: 'Microsoft\'s efficient model, great for ARM processors',
+        priority: 4
+      });
+    }
+    
+    // Always include lightweight option
+    recommended.push({
+      ...models.find(m => m.id === 'tinyllama-1.1b-chat-q4'),
+      reason: 'Lightweight option that works on any system',
+      priority: 5
+    });
+
+    return recommended.sort((a, b) => a.priority - b.priority);
+  }
+
+  async startModelDownload(modelName, res) {
+    if (this.activeDownloads.has(modelName)) {
+      return res.status(409).json({ 
+        error: 'Download already in progress',
+        status: this.activeDownloads.get(modelName)
+      });
+    }
+
+    const model = this.getAvailableModels().find(m => m.id === modelName);
+    if (!model) {
+      return res.status(404).json({ error: 'Model not found' });
+    }
+
+    // Initialize download status
+    const downloadStatus = {
+      modelId: modelName,
+      modelName: model.displayName,
+      status: 'initializing',
+      progress: 0,
+      downloadedBytes: 0,
+      totalBytes: model.sizeBytes,
+      speed: 0,
+      eta: 0,
+      startTime: Date.now()
+    };
+
+    this.activeDownloads.set(modelName, downloadStatus);
+    
+    // Start the simulated download
+    this.simulateModelDownload(modelName, model);
+    
+    res.json({
+      message: 'Download started',
+      modelId: modelName,
+      modelName: model.displayName,
+      size: model.size
+    });
+  }
+
+  async simulateModelDownload(modelId, model) {
+    const downloadStatus = this.activeDownloads.get(modelId);
+    const totalBytes = model.sizeBytes;
+    const chunkSize = Math.floor(totalBytes / 200); // 200 updates for smooth progress
+    let downloadedBytes = 0;
+    const startTime = Date.now();
+
+    downloadStatus.status = 'downloading';
+    this.io.to(`download_${modelId}`).emit('download_progress', downloadStatus);
+
+    const downloadInterval = setInterval(() => {
+      // Simulate variable download speed
+      const speedVariation = 0.7 + Math.random() * 0.6; // 0.7x to 1.3x speed
+      const currentChunkSize = Math.floor(chunkSize * speedVariation);
+      downloadedBytes = Math.min(downloadedBytes + currentChunkSize, totalBytes);
+
+      const elapsed = (Date.now() - startTime) / 1000;
+      const progress = (downloadedBytes / totalBytes) * 100;
+      const speed = downloadedBytes / elapsed; // bytes per second
+      const remainingBytes = totalBytes - downloadedBytes;
+      const eta = remainingBytes > 0 ? remainingBytes / speed : 0;
+
+      downloadStatus.progress = progress;
+      downloadStatus.downloadedBytes = downloadedBytes;
+      downloadStatus.speed = speed;
+      downloadStatus.eta = eta;
+
+      // Emit progress to subscribed clients
+      this.io.to(`download_${modelId}`).emit('download_progress', downloadStatus);
+
+      if (downloadedBytes >= totalBytes) {
+        clearInterval(downloadInterval);
+        downloadStatus.status = 'completed';
+        downloadStatus.progress = 100;
+        downloadStatus.eta = 0;
+        
+        this.io.to(`download_${modelId}`).emit('download_progress', downloadStatus);
+        this.io.to(`download_${modelId}`).emit('download_complete', {
+          modelId,
+          modelName: model.displayName,
+          totalTime: elapsed
+        });
+
+        // Clean up after a delay
+        setTimeout(() => {
+          this.activeDownloads.delete(modelId);
+        }, 5000);
+      }
+    }, 100); // Update every 100ms for smooth progress
+  }
+
   start() {
-    this.app.listen(this.port, () => {
+    this.server.listen(this.port, () => {
       console.log('🚀 EthervoxAI UI Demo Server Started');
       console.log('=====================================');
       console.log(`📍 Demo Home: http://localhost:${this.port}`);
