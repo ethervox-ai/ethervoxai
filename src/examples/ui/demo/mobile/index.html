@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>EthervoxAI Mobile Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: white;
+            overflow-x: hidden;
+            height: 100vh;
+        }
+        
+        .mobile-container {
+            max-width: 375px;
+            margin: 20px auto;
+            background: #1a1a1a;
+            border-radius: 25px;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(102, 126, 234, 0.3);
+            position: relative;
+            height: calc(100vh - 40px);
+        }
+        
+        .mobile-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 50px 20px 20px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .mobile-header::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 140px;
+            height: 25px;
+            background: #000;
+            border-radius: 15px;
+        }
+        
+        .mobile-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .mobile-status {
+            font-size: 0.8em;
+            opacity: 0.9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .mobile-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            height: calc(100% - 150px);
+        }
+        
+        .tab-bar {
+            display: flex;
+            background: #2a2a2a;
+            margin: -20px -20px 20px;
+            padding: 0;
+        }
+        
+        .tab-item {
+            flex: 1;
+            padding: 15px 10px;
+            text-align: center;
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab-item.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        
+        .tab-item:active {
+            background: rgba(102, 126, 234, 0.1);
+        }
+        
+        .tab-content {
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .card {
+            background: #2a2a2a;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border: 1px solid #333;
+        }
+        
+        .card-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.8em;
+            opacity: 0.9;
+        }
+        
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #333;
+        }
+        
+        .list-item:last-child {
+            border-bottom: none;
+        }
+        
+        .item-info {
+            flex: 1;
+        }
+        
+        .item-name {
+            font-weight: 500;
+            margin-bottom: 3px;
+        }
+        
+        .item-details {
+            font-size: 0.85em;
+            color: #888;
+        }
+        
+        .badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.7em;
+            font-weight: 500;
+        }
+        
+        .badge-active {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+        
+        .badge-loading {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+        
+        .badge-available {
+            background: rgba(102, 126, 234, 0.2);
+            color: #667eea;
+        }
+        
+        .toggle-setting {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #333;
+        }
+        
+        .toggle-setting:last-child {
+            border-bottom: none;
+        }
+        
+        .toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: #444;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        
+        .toggle.active {
+            background: #10b981;
+        }
+        
+        .toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+        
+        .toggle.active::after {
+            transform: translateX(20px);
+        }
+        
+        .voice-interface {
+            text-align: center;
+            padding: 20px 0;
+        }
+        
+        .voice-button {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            font-size: 2em;
+            cursor: pointer;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .voice-button:active {
+            transform: scale(0.95);
+        }
+        
+        .voice-button.listening {
+            animation: pulseListen 1.5s infinite;
+        }
+        
+        @keyframes pulseListen {
+            0%, 100% { transform: scale(1); box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3); }
+            50% { transform: scale(1.1); box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6); }
+        }
+        
+        .voice-status {
+            font-size: 0.9em;
+            color: #888;
+            margin-bottom: 15px;
+        }
+        
+        .query-input {
+            width: 100%;
+            padding: 12px;
+            background: #333;
+            border: 1px solid #444;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+        
+        .query-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .query-button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.9em;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        
+        .query-button:active {
+            transform: translateY(1px);
+        }
+        
+        .response-card {
+            background: #333;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            border-left: 3px solid #667eea;
+            display: none;
+        }
+        
+        .response-card.visible {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .response-text {
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        
+        .response-meta {
+            font-size: 0.8em;
+            color: #888;
+        }
+        
+        .back-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.8em;
+            z-index: 1000;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #444;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Desktop view adjustments */
+        @media (min-width: 768px) {
+            .mobile-container {
+                box-shadow: 0 0 50px rgba(102, 126, 234, 0.2);
+            }
+            
+            body {
+                background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+            }
+            
+            .back-button {
+                position: fixed;
+                top: 30px;
+                right: 30px;
+                background: rgba(102, 126, 234, 0.8);
+                padding: 10px 20px;
+                border-radius: 8px;
+                font-size: 0.9em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="back-button" onclick="window.location.href='/'">← Demo Home</button>
+    
+    <div class="mobile-container">
+        <div class="mobile-header">
+            <div class="mobile-title">🧠 EthervoxAI</div>
+            <div class="mobile-status">
+                <div class="status-dot"></div>
+                <span>Local AI Active</span>
+            </div>
+        </div>
+        
+        <div class="mobile-content">
+            <div class="tab-bar">
+                <button class="tab-item active" onclick="showTab('home')">🏠</button>
+                <button class="tab-item" onclick="showTab('languages')">🌐</button>
+                <button class="tab-item" onclick="showTab('models')">🧠</button>
+                <button class="tab-item" onclick="showTab('privacy')">🔐</button>
+            </div>
+            
+            <!-- Home Tab -->
+            <div id="home" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="mobile-languages">3</div>
+                        <div class="stat-label">Languages</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="mobile-models">2</div>
+                        <div class="stat-label">AI Models</div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">🎤 Voice Assistant</div>
+                    <div class="voice-interface">
+                        <button id="voice-button" class="voice-button" onclick="toggleVoiceInput()">🎤</button>
+                        <div id="voice-status" class="voice-status">Tap to speak</div>
+                        
+                        <input type="text" id="mobile-query" class="query-input" placeholder="Or type your question...">
+                        <button class="query-button" onclick="processMobileQuery()">Ask AI</button>
+                        
+                        <div id="mobile-response" class="response-card">
+                            <div id="mobile-response-text" class="response-text"></div>
+                            <div id="mobile-response-meta" class="response-meta"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Languages Tab -->
+            <div id="languages" class="tab-content">
+                <div class="card">
+                    <div class="card-title">🌐 Language Support</div>
+                    <div id="mobile-language-list">
+                        <!-- Languages will be loaded here -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Models Tab -->
+            <div id="models" class="tab-content">
+                <div class="card">
+                    <div class="card-title">🧠 AI Models</div>
+                    <div id="mobile-model-list">
+                        <!-- Models will be loaded here -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Privacy Tab -->
+            <div id="privacy" class="tab-content">
+                <div class="card">
+                    <div class="card-title">🔐 Privacy Controls</div>
+                    <div id="mobile-privacy-settings">
+                        <!-- Privacy settings will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentTab = 'home';
+        let isListening = false;
+        let demoData = {};
+        
+        // Initialize the mobile demo
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadDemoData();
+            updateMobileUI();
+        });
+        
+        async function loadDemoData() {
+            try {
+                const [languages, models, privacy] = await Promise.all([
+                    fetch('/api/languages').then(r => r.json()),
+                    fetch('/api/models').then(r => r.json()),  
+                    fetch('/api/privacy').then(r => r.json())
+                ]);
+                
+                demoData = { languages, models, privacy };
+            } catch (error) {
+                console.error('Failed to load demo data:', error);
+                // Use fallback data
+                demoData = {
+                    languages: [
+                        { id: 'en-US', name: 'English (US)', confidence: 0.95, status: 'active' },
+                        { id: 'es-LA', name: 'Spanish (LA)', confidence: 0.88, status: 'active' },
+                        { id: 'zh-CN', name: 'Mandarin', confidence: 0.82, status: 'loading' }
+                    ],
+                    models: [
+                        { id: 'mistral-lite', name: 'Mistral Lite', size: '4.1GB', status: 'loaded' },
+                        { id: 'tinyllama', name: 'TinyLlama', size: '1.2GB', status: 'loaded' }
+                    ],
+                    privacy: { mode: 'balanced', cloudFallback: false, auditLogging: true }
+                };
+            }
+        }
+        
+        function updateMobileUI() {
+            updateMobileStats();
+            updateMobileLanguageList();
+            updateMobileModelList();
+            updateMobilePrivacySettings();
+        }
+        
+        function updateMobileStats() {
+            const activeLanguages = demoData.languages.filter(l => l.status === 'active').length;
+            const loadedModels = demoData.models.filter(m => m.status === 'loaded').length;
+            
+            document.getElementById('mobile-languages').textContent = activeLanguages;
+            document.getElementById('mobile-models').textContent = loadedModels;
+        }
+        
+        function updateMobileLanguageList() {
+            const container = document.getElementById('mobile-language-list');
+            container.innerHTML = demoData.languages.map(lang => `
+                <div class="list-item">
+                    <div class="item-info">
+                        <div class="item-name">${lang.name}</div>
+                        <div class="item-details">${Math.round(lang.confidence * 100)}% confidence</div>
+                    </div>
+                    <div class="badge badge-${lang.status}">${lang.status}</div>
+                </div>
+            `).join('');
+        }
+        
+        function updateMobileModelList() {
+            const container = document.getElementById('mobile-model-list');
+            container.innerHTML = demoData.models.map(model => `
+                <div class="list-item">
+                    <div class="item-info">
+                        <div class="item-name">${model.name}</div>
+                        <div class="item-details">${model.size}</div>
+                    </div>
+                    <div class="badge badge-${model.status}">${model.status}</div>
+                </div>
+            `).join('');
+        }
+        
+        function updateMobilePrivacySettings() {
+            const container = document.getElementById('mobile-privacy-settings');
+            const settings = [
+                { label: 'Cloud Fallback', key: 'cloudFallback', value: demoData.privacy.cloudFallback },
+                { label: 'Audit Logging', key: 'auditLogging', value: demoData.privacy.auditLogging },
+                { label: 'Local Processing', key: 'localProcessing', value: true },
+                { label: 'Data Encryption', key: 'encryption', value: true }
+            ];
+            
+            container.innerHTML = settings.map(setting => `
+                <div class="toggle-setting">
+                    <span>${setting.label}</span>
+                    <div class="toggle ${setting.value ? 'active' : ''}" onclick="toggleMobileSetting('${setting.key}')"></div>
+                </div>
+            `).join('');
+        }
+        
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all tab items
+            document.querySelectorAll('.tab-item').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+            
+            currentTab = tabName;
+        }
+        
+        function toggleVoiceInput() {
+            const button = document.getElementById('voice-button');
+            const status = document.getElementById('voice-status');
+            
+            if (!isListening) {
+                // Start listening
+                isListening = true;
+                button.classList.add('listening');
+                button.innerHTML = '🛑';
+                status.textContent = 'Listening... (Demo mode)';
+                
+                // Simulate listening for 3 seconds
+                setTimeout(() => {
+                    stopVoiceInput();
+                    simulateVoiceQuery();
+                }, 3000);
+            } else {
+                stopVoiceInput();
+            }
+        }
+        
+        function stopVoiceInput() {
+            const button = document.getElementById('voice-button');
+            const status = document.getElementById('voice-status');
+            
+            isListening = false;
+            button.classList.remove('listening');
+            button.innerHTML = '🎤';
+            status.textContent = 'Tap to speak';
+        }
+        
+        function simulateVoiceQuery() {
+            const queries = [
+                "What's the weather like today?",
+                "Tell me about privacy settings",
+                "How many languages do you support?",
+                "What AI models are available?"
+            ];
+            
+            const randomQuery = queries[Math.floor(Math.random() * queries.length)];
+            document.getElementById('mobile-query').value = randomQuery;
+            processMobileQuery();
+        }
+        
+        async function processMobileQuery() {
+            const input = document.getElementById('mobile-query');
+            const responseCard = document.getElementById('mobile-response');
+            const responseText = document.getElementById('mobile-response-text');
+            const responseMeta = document.getElementById('mobile-response-meta');
+            
+            if (!input.value.trim()) return;
+            
+            // Show loading
+            responseText.innerHTML = '<span class="loading"></span> Processing...';
+            responseCard.classList.add('visible');
+            
+            try {
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: input.value, language: 'en-US' })
+                });
+                
+                const result = await response.json();
+                
+                // Show response
+                responseText.textContent = result.text;
+                responseMeta.innerHTML = `
+                    ${Math.round(result.confidence * 100)}% confidence • 
+                    ${result.source} • 
+                    ${Math.round(result.processingTime)}ms
+                `;
+                
+            } catch (error) {
+                console.error('Query processing failed:', error);
+                responseText.textContent = 'Sorry, there was an error processing your query.';
+                responseMeta.textContent = 'Error occurred';
+            }
+        }
+        
+        function toggleMobileSetting(key) {
+            if (demoData.privacy.hasOwnProperty(key)) {
+                demoData.privacy[key] = !demoData.privacy[key];
+            }
+            updateMobilePrivacySettings();
+        }
+        
+        // Touch interactions
+        document.addEventListener('touchstart', function(e) {
+            if (e.target.classList.contains('voice-button')) {
+                e.target.style.transform = 'scale(0.95)';
+            }
+        });
+        
+        document.addEventListener('touchend', function(e) {
+            if (e.target.classList.contains('voice-button')) {
+                e.target.style.transform = 'scale(1)';
+            }
+        });
+        
+        // Allow Enter key to submit query
+        document.getElementById('mobile-query').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                processMobileQuery();
+            }
+        });
+    </script>
+</body>
+</html>

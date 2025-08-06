@@ -8,12 +8,19 @@ if defined __PSLockDownPolicy (
     exit /b %errorlevel%
 )
 
-REM Simple Node.js launcher that ensures proper environment setup
+echo ========================================
+echo  EthervoxAI UI Demo
+echo ========================================
+echo.
 
 REM Initialize Node.js environment
 if exist "C:\Program Files\nodejs\nodevars.bat" (
     call "C:\Program Files\nodejs\nodevars.bat"
     echo Node.js environment initialized.
+    echo Node.js version: %NODE_VERSION%
+    echo npm version: 
+    npm --version
+    echo.
 ) else (
     echo ERROR: Node.js environment not found at C:\Program Files\nodejs\nodevars.bat
     echo Please ensure Node.js is properly installed
@@ -21,11 +28,20 @@ if exist "C:\Program Files\nodejs\nodevars.bat" (
     exit /b 1
 )
 
+echo Starting EthervoxAI UI Demo Server...
+echo.
+
 REM Run the demo launcher
-node launch-demo.js
+node launch-ui-demo.js
 
 if %errorlevel% neq 0 (
-    echo ERROR: Failed to start demo
+    echo.
+    echo ERROR: Failed to start UI demo
+    echo Make sure Node.js is installed and try again
     pause
     exit /b %errorlevel%
 )
+
+echo.
+echo Demo server stopped.
+pause

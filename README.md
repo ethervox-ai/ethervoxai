@@ -59,9 +59,41 @@ npm install
 # Build the project
 npm run build
 
-# Run the demo
+# Run the core demo
 npm run demo
+
+# Run the UI demo (web and mobile interfaces)
+npm run demo:ui
 ```
+
+### UI Demo Experience
+
+Experience the EthervoxAI dashboard interfaces without requiring the full AI stack:
+
+**Option 1: NPM Script (Recommended)**
+```bash
+npm run demo:ui
+```
+
+**Option 2: Direct Launch (Windows)**
+```bash
+# Navigate to demo directory
+cd src/examples/ui/demo
+
+# Run the master launcher (handles Node.js environment)
+.\launch-ui-demo-master.bat
+```
+
+**Option 3: Manual Launch**
+```bash
+# Ensure Node.js environment is loaded first
+cmd /c "C:\Program Files\nodejs\nodevars.bat" && node src/examples/ui/demo/launch-ui-demo.js
+```
+
+Once started, access the demos at:
+- **Demo Home**: http://localhost:3000
+- **Web Dashboard**: http://localhost:3000/web-demo  
+- **Mobile Interface**: http://localhost:3000/mobile-demo
 
 ### Optional UI Dependencies
 

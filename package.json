@@ -15,6 +15,7 @@
     "dev": "npm run build:watch",
     "start": "node dist/index.js",
     "demo": "node scripts/demo/launch-demo.js",
+    "demo:ui": "node src/examples/ui/demo/launch-ui-demo.js",
     "demo:windows": "node dist/demo/windows-desktop.js",
     "demo:windows:dev": "npm run build && node dist/demo/windows-desktop.js",
     "lint": "eslint src/**/*.{ts,tsx} --fix",

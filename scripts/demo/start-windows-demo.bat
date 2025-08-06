@@ -1,4 +1,13 @@
 @echo off
+
+REM Auto-switch from PowerShell to CMD for better compatibility
+REM Check for PowerShell-specific automatic variables
+if defined __PSLockDownPolicy (
+    echo Detected PowerShell execution environment - switching to CMD for better compatibility...
+    cmd.exe /c "%~f0" %*
+    exit /b %errorlevel%
+)
+
 echo =====================================
 echo  EthervoxAI Windows Desktop Demo
 echo =====================================

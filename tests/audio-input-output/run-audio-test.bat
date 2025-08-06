@@ -9,7 +9,10 @@ if exist "C:\Program Files\nodejs\nodevars.bat" (
     call "C:\Program Files\nodejs\nodevars.bat"
     echo Node.js environment initialized.
 ) else (
-    echo WARNING: Node.js environment script not found
+    echo ERROR: Node.js environment not found at C:\Program Files\nodejs\nodevars.bat
+    echo Please ensure Node.js is properly installed
+    pause
+    exit /b 1
 )
 
 REM Build the project first
