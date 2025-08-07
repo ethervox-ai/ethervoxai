@@ -12,6 +12,10 @@ AI model downloaded from Hugging Face Hub. It showcases:
 
 Prerequisites:
     pip install transformers torch huggingface-hub accelerate
+    
+    # Optional but recommended for faster model downloads:
+    pip install huggingface_hub[hf_xet]
+    # OR: pip install hf_xet
 
 Usage:
     python examples/real_model_example.py
@@ -40,13 +44,21 @@ logger = logging.getLogger(__name__)
 
 # Check for required dependencies
 REQUIRED_PACKAGES = ["transformers", "torch", "huggingface_hub"]
+OPTIONAL_PACKAGES = ["hf_xet"]  # For faster downloads
 missing_packages = []
+missing_optional = []
 
 for package in REQUIRED_PACKAGES:
     try:
         __import__(package)
     except ImportError:
         missing_packages.append(package)
+
+for package in OPTIONAL_PACKAGES:
+    try:
+        __import__(package)
+    except ImportError:
+        missing_optional.append(package)
 
 if missing_packages:
     print("❌ Missing required packages for real model usage:")
@@ -57,6 +69,13 @@ if missing_packages:
     print("\n💡 For full AI capabilities, install:")
     print("   pip install transformers torch huggingface-hub accelerate")
     sys.exit(1)
+
+if missing_optional:
+    print("💡 Optional packages for better performance:")
+    for pkg in missing_optional:
+        print(f"   • {pkg} (for faster model downloads)")
+    print(f"   Install with: pip install {' '.join(missing_optional)}")
+    print()
 
 # Import AI libraries
 try:
@@ -80,6 +99,84 @@ from ethervoxai import local_llm_stack
 from ethervoxai.platform_detector import platform_detector
 from ethervoxai.model_manager import model_manager
 
+class CustomStoppingCriteria(StoppingCriteria):
+    """Custom stopping criteria to prevent repetitive or unwanted text"""
+    
+    def __init__(self, tokenizer, stop_sequences=None):
+        self.tokenizer = tokenizer
+        self.stop_sequences = stop_sequences or [
+            "\n\n",  # Double newlines
+            "Human:",  # Prevent the model from generating human responses
+            "AI:",     # Prevent AI: prefixes
+            "User:",   # Prevent User: prefixes
+        ]
+        # Convert stop sequences to token IDs
+        self.stop_token_ids = []
+        for seq in self.stop_sequences:
+            tokens = tokenizer.encode(seq, add_special_tokens=False)
+            if tokens:
+                self.stop_token_ids.append(tokens)
+    
+    def __call__(self, input_ids, scores, **kwargs):
+        # Check if any stop sequence appears at the end
+        for stop_tokens in self.stop_token_ids:
+            if len(input_ids[0]) >= len(stop_tokens):
+                if input_ids[0][-len(stop_tokens):].tolist() == stop_tokens:
+                    return True
+        return False
+
+def clean_response(text: str) -> str:
+    """Clean up the AI response to remove common artifacts"""
+    if not text:
+        return text
+    
+    # Remove common conversation prefixes that the model might generate
+    prefixes_to_remove = ["AI:", "Assistant:", "Bot:", "Human:", "User:", "Response:"]
+    for prefix in prefixes_to_remove:
+        if text.startswith(prefix):
+            text = text[len(prefix):].strip()
+    
+    # Split by common separators and take the first meaningful part
+    separators = ["\n\nHuman:", "\n\nUser:", "\n\nAI:", "\n\nAssistant:", "\n\n\n"]
+    for separator in separators:
+        if separator in text:
+            text = text.split(separator)[0]
+    
+    # Remove excessive repetition (if a phrase repeats more than 2 times)
+    words = text.split()
+    if len(words) > 6:  # Only check longer responses
+        # Check for repeating 3-word patterns
+        for i in range(len(words) - 8):
+            phrase = " ".join(words[i:i+3])
+            # Count how many times this 3-word phrase appears consecutively
+            count = 0
+            j = i
+            while j <= len(words) - 3 and " ".join(words[j:j+3]) == phrase:
+                count += 1
+                j += 3
+            
+            # If phrase repeats more than twice, cut it off
+            if count > 2:
+                text = " ".join(words[:i + 3])
+                break
+    
+    # Remove trailing incomplete sentences (if it ends abruptly)
+    if text and not text.endswith(('.', '!', '?', '"', "'", ':')):
+        # Find the last complete sentence
+        sentences = text.split('.')
+        if len(sentences) > 1:
+            # Keep all complete sentences
+            text = '.'.join(sentences[:-1]) + '.'
+    
+    # Final cleanup
+    text = text.strip()
+    
+    # Remove any trailing special characters except punctuation
+    while text and text[-1] in ['|', '<', '>', '{', '}', '[', ']', '`']:
+        text = text[:-1].strip()
+    
+    return text
+
 class RealModelInference:
     """Real AI model inference using transformers"""
     
@@ -100,28 +197,59 @@ class RealModelInference:
         
         try:
             print("📥 Downloading tokenizer...")
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                model_name,
+                resume_download=True,  # Resume interrupted downloads
+                force_download=False   # Use cached if available
+            )
             
-            # Add padding token if missing
+            # Add padding token if missing - temporarily use eos_token
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
             
-            print("📥 Downloading model...")
+            # Add chat template if it doesn't exist (for DialoGPT)
+            if not hasattr(self.tokenizer, 'chat_template') or self.tokenizer.chat_template is None:
+                # DialoGPT expects conversational format
+                self.tokenizer.chat_template = "{{ bos_token }}{{ messages[0]['content'] }}{{ eos_token }}"
+            
+            print("📥 Downloading model (this may take several minutes)...")
+            print("⏳ Please wait for download to complete before inference starts...")
+            
+            # Ensure model is fully downloaded before proceeding
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
                 torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
                 device_map="auto" if self.device == "cuda" else None,
-                low_cpu_mem_usage=True
+                low_cpu_mem_usage=True,
+                resume_download=True,  # Resume interrupted downloads
+                force_download=False   # Use cached if available
             )
             
             if self.device == "cpu":
                 self.model = self.model.to(self.device)
             
+            # Now properly set up the pad token to avoid attention mask warnings
+            if self.tokenizer.pad_token == self.tokenizer.eos_token:
+                # Try to use a different existing token for padding
+                if hasattr(self.tokenizer, 'unk_token') and self.tokenizer.unk_token is not None:
+                    self.tokenizer.pad_token = self.tokenizer.unk_token
+                    print(f"🔧 Set pad_token to unk_token: {self.tokenizer.pad_token}")
+                elif hasattr(self.tokenizer, 'bos_token') and self.tokenizer.bos_token is not None:
+                    self.tokenizer.pad_token = self.tokenizer.bos_token
+                    print(f"🔧 Set pad_token to bos_token: {self.tokenizer.pad_token}")
+                else:
+                    # Last resort: add a new padding token and resize embeddings
+                    print("🔧 Adding new pad token to avoid attention mask warnings...")
+                    self.tokenizer.add_special_tokens({'pad_token': '<pad>'})
+                    self.model.resize_token_embeddings(len(self.tokenizer))
+                    print(f"🔧 Added new pad_token: {self.tokenizer.pad_token}")
+            
             self.model_name = model_name
             self.is_loaded = True
             
-            print(f"✅ Model loaded successfully!")
+            print(f"✅ Model download and loading complete!")
             print(f"📊 Model parameters: ~{self.model.num_parameters() / 1e6:.1f}M")
+            print("🚀 Ready for inference - all downloads finished!")
             
         except Exception as e:
             print(f"❌ Failed to load model: {e}")
@@ -135,28 +263,74 @@ class RealModelInference:
             return "❌ Model not loaded"
         
         try:
-            # Encode the input
-            inputs = self.tokenizer.encode(prompt, return_tensors="pt").to(self.device)
+            # Format prompt for conversation models
+            formatted_prompt = prompt + self.tokenizer.eos_token
             
-            # Generate response
+            # Encode the input with attention mask
+            inputs = self.tokenizer(
+                formatted_prompt, 
+                return_tensors="pt", 
+                padding=True,
+                truncation=True,
+                max_length=512
+            ).to(self.device)
+            
+            # Store the original input length to extract only new tokens
+            input_length = inputs['input_ids'].shape[1]
+            
+            # Create custom stopping criteria
+            stopping_criteria = StoppingCriteriaList([
+                CustomStoppingCriteria(self.tokenizer)
+            ])
+            
+            # Generate response with better parameters and stopping criteria
             with torch.no_grad():
                 outputs = self.model.generate(
-                    inputs,
-                    max_length=inputs.shape[1] + max_length,
-                    num_return_sequences=1,
-                    temperature=0.7,
+                    input_ids=inputs['input_ids'],
+                    attention_mask=inputs['attention_mask'],
+                    max_new_tokens=max_length,  # Use max_new_tokens instead of max_length
+                    min_length=input_length + 5,  # Reduced minimum to allow shorter responses
+                    temperature=0.7,  # Slightly lower temperature for more focused responses
                     do_sample=True,
-                    pad_token_id=self.tokenizer.eos_token_id
+                    top_p=0.85,  # Slightly more focused sampling
+                    repetition_penalty=1.2,  # Higher repetition penalty to reduce loops
+                    pad_token_id=self.tokenizer.eos_token_id,
+                    eos_token_id=self.tokenizer.eos_token_id,
+                    stopping_criteria=stopping_criteria,  # Add stopping criteria
+                    num_return_sequences=1
                 )
             
-            # Decode the response
-            response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            # Extract only the new tokens (response part)
+            # This avoids string-based prompt removal which can cut off response text
+            new_tokens = outputs[0][input_length:]
+            response = self.tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
             
-            # Remove the original prompt from the response
-            if response.startswith(prompt):
-                response = response[len(prompt):].strip()
+            # Clean the response to remove artifacts
+            response = clean_response(response)
             
-            return response
+            # If response is empty or too short, try with different parameters
+            if len(response) < 3:
+                print("🔄 First generation too short, trying with relaxed parameters...")
+                # Try with forced generation but still use cleaning
+                outputs = self.model.generate(
+                    input_ids=inputs['input_ids'],
+                    attention_mask=inputs['attention_mask'],
+                    max_new_tokens=min(50, max_length),  # Limit max length for fallback
+                    min_length=input_length + 8,
+                    temperature=0.9,  # Higher temperature for more creativity
+                    do_sample=True,
+                    top_p=0.9,
+                    repetition_penalty=1.1,
+                    pad_token_id=self.tokenizer.eos_token_id,
+                    eos_token_id=self.tokenizer.eos_token_id,
+                    stopping_criteria=stopping_criteria
+                )
+                # Extract only the new tokens from the second attempt
+                new_tokens = outputs[0][input_length:]
+                response = self.tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+                response = clean_response(response)
+            
+            return response if response else "I'm thinking... (response generation needs tuning)"
             
         except Exception as e:
             return f"❌ Generation failed: {e}"
@@ -168,22 +342,44 @@ class RealModelInference:
             return
         
         try:
-            # Set up streaming
+            # Format prompt for conversation
+            formatted_prompt = prompt + self.tokenizer.eos_token
+            
+            # Set up streaming with timeout to prevent hanging
             streamer = TextIteratorStreamer(
                 self.tokenizer, 
                 skip_prompt=True, 
-                skip_special_tokens=True
+                skip_special_tokens=True,
+                timeout=1.0  # Add timeout to prevent hanging
             )
             
-            inputs = self.tokenizer.encode(prompt, return_tensors="pt").to(self.device)
+            # Encode with attention mask
+            inputs = self.tokenizer(
+                formatted_prompt, 
+                return_tensors="pt", 
+                padding=True,
+                truncation=True,
+                max_length=512
+            ).to(self.device)
             
-            # Generation parameters
+            # Create stopping criteria for streaming too
+            stopping_criteria = StoppingCriteriaList([
+                CustomStoppingCriteria(self.tokenizer)
+            ])
+            
+            # Generation parameters with improved settings
             generation_kwargs = {
-                "input_ids": inputs,
-                "max_length": inputs.shape[1] + max_length,
-                "temperature": 0.7,
+                "input_ids": inputs['input_ids'],
+                "attention_mask": inputs['attention_mask'],
+                "max_new_tokens": max_length,
+                "min_length": inputs['input_ids'].shape[1] + 5,  # Reduced minimum
+                "temperature": 0.7,  # Slightly lower for more focused responses
                 "do_sample": True,
+                "top_p": 0.85,  # More focused sampling
+                "repetition_penalty": 1.2,  # Higher to reduce repetition
                 "pad_token_id": self.tokenizer.eos_token_id,
+                "eos_token_id": self.tokenizer.eos_token_id,
+                "stopping_criteria": stopping_criteria,
                 "streamer": streamer
             }
             
@@ -191,11 +387,54 @@ class RealModelInference:
             thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
             thread.start()
             
-            # Stream the results
-            for new_text in streamer:
-                yield new_text
-                await asyncio.sleep(0.01)  # Small delay for smooth streaming
+            # Stream the results with simple, effective cleaning
+            full_response = ""
+            word_count = 0
+            last_few_words = []
             
+            try:
+                for new_text in streamer:
+                    if new_text and new_text.strip():  # Only process non-empty tokens
+                        full_response += new_text
+                        
+                        # Simple stop phrase detection
+                        stop_phrases = ["Human:", "User:", "AI:", "Assistant:"]
+                        should_stop = any(phrase in full_response for phrase in stop_phrases)
+                        if should_stop:
+                            break
+                        
+                        # Track words for repetition detection
+                        words = new_text.split()
+                        for word in words:
+                            if word.strip():
+                                last_few_words.append(word.strip().lower())
+                                word_count += 1
+                                
+                                # Keep only last 6 words for comparison
+                                if len(last_few_words) > 6:
+                                    last_few_words.pop(0)
+                                
+                                # Simple repetition check: if last 3 words repeat
+                                if (len(last_few_words) >= 6 and 
+                                    last_few_words[-3:] == last_few_words[-6:-3]):
+                                    should_stop = True
+                                    break
+                        
+                        if should_stop:
+                            break
+                        
+                        # Yield the token and pause briefly
+                        yield new_text
+                        await asyncio.sleep(0.01)
+                        
+                        # Safety: stop after reasonable length
+                        if word_count > 100:  # Prevent runaway generation
+                            break
+                            
+            except Exception as inner_e:
+                yield f"❌ Streaming error: {inner_e}"
+            
+            # Wait for generation thread to complete
             thread.join()
             
         except Exception as e:
@@ -233,12 +472,17 @@ async def demonstrate_real_model():
     if capabilities.total_memory < 4000:  # Less than 4GB
         model_name = "microsoft/DialoGPT-small"
         print("📦 Selected model: DialoGPT-small (optimized for low memory)")
+        print("💾 Expected download: ~117MB")
     elif capabilities.total_memory < 8000:  # Less than 8GB
         model_name = "microsoft/DialoGPT-medium"
         print("📦 Selected model: DialoGPT-medium (balanced performance)")
+        print("💾 Expected download: ~345MB")
     else:  # 8GB or more
         model_name = "microsoft/DialoGPT-large"
         print("📦 Selected model: DialoGPT-large (best quality)")
+        print("💾 Expected download: ~1.75GB")
+    
+    print("💡 Tip: Install 'pip install hf_xet' for faster downloads!")
     
     # Initialize real model inference
     real_model = RealModelInference()
@@ -256,13 +500,18 @@ async def demonstrate_real_model():
     
     print(f"⚡ Model loaded in {load_time:.1f} seconds")
     
-    # Test conversations
+    # Ensure all downloads are complete before starting inference
+    print("\n⏳ Preparing for inference (ensuring all downloads complete)...")
+    await asyncio.sleep(2)  # Give any background downloads time to finish
+    print("🚀 Starting AI conversations...\n")
+    
+    # Test conversations with better prompts for DialoGPT
     test_prompts = [
-        "Hello! How are you?",
-        "What's the weather like?",
-        "Can you help me with programming?",
-        "Tell me a joke",
-        "What is artificial intelligence?"
+        "Hello! How are you today?",
+        "What can you tell me about the weather?",
+        "I need help with a programming problem. Can you assist?",
+        "Can you tell me a funny joke?",
+        "Explain artificial intelligence in simple terms."
     ]
     
     print("\n💬 Testing Real AI Conversations")
@@ -363,11 +612,17 @@ async def quick_model_test():
     if success:
         print("✅ Model loaded successfully!")
         
-        # Single test
+        # Single test with better prompt
         prompt = "The future of AI is"
         print(f"\nPrompt: {prompt}")
-        response = real_model.generate_response(prompt, max_length=30)
+        response = real_model.generate_response(prompt, max_length=50)
         print(f"Response: {response}")
+        
+        # Test a conversational prompt
+        conv_prompt = "Hello! How are you?"
+        print(f"\nConversational test: {conv_prompt}")
+        conv_response = real_model.generate_response(conv_prompt, max_length=40)
+        print(f"Response: {conv_response}")
         
         real_model.cleanup()
         print("🎉 Quick test complete!")
@@ -392,16 +647,20 @@ def check_system_requirements():
         print(f"💾 GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
     
     # Memory recommendation
-    import psutil
-    memory_gb = psutil.virtual_memory().total / 1024**3
-    print(f"🧠 System RAM: {memory_gb:.1f}GB")
-    
-    if memory_gb < 4:
-        print("⚠️  Recommendation: Use DialoGPT-small or GPT-2")
-    elif memory_gb < 8:
-        print("✅ Recommendation: DialoGPT-medium or small transformers")
-    else:
-        print("🚀 Recommendation: Can handle larger models like DialoGPT-large")
+    try:
+        import psutil
+        memory_gb = psutil.virtual_memory().total / 1024**3
+        print(f"🧠 System RAM: {memory_gb:.1f}GB")
+        
+        if memory_gb < 4:
+            print("⚠️  Recommendation: Use DialoGPT-small or GPT-2")
+        elif memory_gb < 8:
+            print("✅ Recommendation: DialoGPT-medium or small transformers")
+        else:
+            print("🚀 Recommendation: Can handle larger models like DialoGPT-large")
+    except ImportError:
+        print("🧠 System RAM: Unable to detect (install psutil for memory info)")
+        print("💡 Install psutil with: pip install psutil")
     
     print()
 

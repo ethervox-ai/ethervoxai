@@ -157,8 +157,17 @@ class TransformersBackend(AIBackend):
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
             self.model = AutoModelForCausalLM.from_pretrained(model_name)
             
+            # Fix attention mask warnings by setting proper pad token
             if self.tokenizer.pad_token is None:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
+                # Try to use a different existing token for padding
+                if hasattr(self.tokenizer, 'unk_token') and self.tokenizer.unk_token is not None:
+                    self.tokenizer.pad_token = self.tokenizer.unk_token
+                elif hasattr(self.tokenizer, 'bos_token') and self.tokenizer.bos_token is not None:
+                    self.tokenizer.pad_token = self.tokenizer.bos_token
+                else:
+                    # Add a new padding token and resize embeddings
+                    self.tokenizer.add_special_tokens({'pad_token': '<pad>'})
+                    self.model.resize_token_embeddings(len(self.tokenizer))
             
             self.model.to(self.device)
             self.is_initialized = True
