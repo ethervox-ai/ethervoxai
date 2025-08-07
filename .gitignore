@@ -96,6 +96,8 @@ audit-logs/
 audit_logs/
 ethervoxai-audit.log
 ethervoxai-audit-*.log
+ethervoxai-runtime.log
+ethervoxai_demo.log
 inference-logs/
 inference_logs/
 
@@ -139,3 +141,9 @@ capabilities-cache.json
 uploads/
 demo-uploads/
 demo-temp/
+
+# Internal Documentation and notes
+IMPLEMENTATION_NOTES.md
+IMPLEMENTATION_COMPLETE.md
+PYTHON_COMPLETE.md
+REAL_MODEL_INTEGRATION_COMPLETE.md

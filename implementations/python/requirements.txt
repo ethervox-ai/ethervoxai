@@ -1,0 +1,77 @@
+# EthervoxAI Python Implementation - Complete Dependencies
+# Core runtime dependencies
+psutil>=5.9.0           # System information and process management
+aiohttp>=3.8.0          # Async HTTP client for model downloads
+aiofiles>=23.0.0        # Async file operations
+tqdm>=4.65.0            # Progress bars for downloads
+typing-extensions>=4.5.0  # Type hints compatibility
+
+# Development and testing dependencies
+pytest>=7.0.0           # Testing framework
+pytest-asyncio>=0.21.0  # Async testing support
+
+# Real AI model integration (uncomment to enable)
+# huggingface-hub>=0.19.0 # Model downloading from Hugging Face
+# transformers>=4.35.0   # Transformer models and tokenizers
+# torch>=2.0.0          # PyTorch for model inference
+# accelerate>=0.24.0    # Hardware acceleration utilities
+# ctransformers>=0.2.27 # C++ backends for faster inference
+
+# Alternative lightweight AI backends
+# llama-cpp-python>=0.2.11  # Python bindings for llama.cpp
+# onnxruntime>=1.16.0       # ONNX runtime for optimized inference
+
+# Optional enhanced features (uncomment as needed)
+# Data processing and validation
+# pydantic>=2.0.0       # Data validation and serialization
+# orjson>=3.8.0         # Fast JSON parsing
+
+# Scientific computing (for future ML optimizations)
+# numpy>=1.24.0         # Numerical computing
+# scipy>=1.10.0         # Scientific computing
+
+# Hardware detection (advanced features)
+# GPUtil>=1.4.0         # GPU detection and management
+# cpufeature>=0.2.0     # Advanced CPU feature detection
+
+# Configuration and logging
+# PyYAML>=6.0           # YAML configuration files
+# colorlog>=6.7.0       # Colored logging output
+
+# Production deployment
+# uvloop>=0.17.0        # High-performance event loop (Linux/macOS only)
+# httpx>=0.24.0         # Alternative HTTP client
+
+# Development dependencies (install separately with pip install -e ".[dev]")
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.0
+# black>=23.0.0
+# mypy>=1.4.0
+# flake8>=6.0.0
+# coverage>=7.2.0
+
+# ====================================================================
+# REAL AI MODEL INTEGRATION (OPTIONAL)
+# ====================================================================
+# 
+# For examples/real_model_example.py and examples/advanced_real_model.py
+# Install these separately based on your needs:
+#
+# Basic AI Integration:
+# pip install transformers torch huggingface-hub
+#
+# Full AI Capabilities:
+# pip install transformers torch huggingface-hub accelerate openai llama-cpp-python
+#
+# Individual packages:
+# huggingface-hub>=0.20.0      # Hugging Face model hub access
+# transformers>=4.35.0         # Transformer models (DialoGPT, GPT-2, etc.)
+# torch>=2.0.0                 # PyTorch backend for neural networks
+# accelerate>=0.25.0           # Model acceleration and optimization
+# openai>=1.0.0                # OpenAI API client (requires API key)
+# llama-cpp-python>=0.2.0      # Local LLaMA model support
+# ctransformers>=0.2.0         # C++ transformer implementations
+#
+# Note: These dependencies are large (1-5GB) and optional.
+# The basic EthervoxAI examples work without them.
+# ====================================================================
