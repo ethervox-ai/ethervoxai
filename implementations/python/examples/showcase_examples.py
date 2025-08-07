@@ -3,7 +3,9 @@
 🤖 EthervoxAI Examples Showcase
 
 This script provides an interactive menu to run all available Python examples
-and demonstrates the progression from simple mock AI to real AI models.
+and demonstrates the progression from sim    print("🌐 Online Resources:")
+    print("   • GitHub: https://github.com/ethervox-ai/ethervoxai")
+    print("   • Documentation: See docs/ folder") mock AI to real AI models.
 
 Usage:
     python showcase_examples.py

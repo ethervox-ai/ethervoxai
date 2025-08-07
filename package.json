@@ -75,12 +75,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/mkostersitz/ethervoxai.git"
+    "url": "https://github.com/ethervox-ai/ethervoxai.git"
   },
   "bugs": {
-    "url": "https://github.com/mkostersitz/ethervoxai/issues"
+    "url": "https://github.com/ethervox-ai/ethervoxai/issues"
   },
-  "homepage": "https://github.com/mkostersitz/ethervoxai#readme",
+  "homepage": "https://github.com/ethervox-ai/ethervoxai#readme",
   "dependencies": {
     "axios": "^1.11.0",
     "node-powershell": "^5.0.1",

@@ -50,7 +50,7 @@ ethervoxai/
 
 ```bash
 # Clone the repository
-git clone https://github.com/mkostersitz/ethervoxai.git
+git clone https://github.com/ethervox-ai/ethervoxai.git
 cd ethervoxai
 
 # Install dependencies
@@ -238,7 +238,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 For questions, issues, or contributions, please:
 
 1. Check the [documentation](docs/)
-2. Search existing [issues](https://github.com/mkostersitz/ethervoxai/issues)
+2. Search existing [issues](https://github.com/ethervox-ai/ethervoxai/issues)
 3. Create a new issue if needed
 
 ---

@@ -59,4 +59,4 @@ Welcome to the EthervoxAI modular architecture documentation. This folder contai
 
 ---
 
-For questions or contributions, visit the [EthervoxAI GitHub repo](https://github.com/mkostersitz/ethervoxai).
+For questions or contributions, visit the [EthervoxAI GitHub repo](https://github.com/ethervox-ai/ethervoxai).
