@@ -12,6 +12,9 @@
 #include "esp32_platform_detector.h"
 #include "inference_engine.h"
 #include "config.h"
+#ifdef ELEGOO_EL_SM_012
+#include "elegoo_el_sm_012_config.h"
+#endif
 
 using namespace ethervoxai;
 
@@ -38,6 +41,25 @@ void setup() {
     Serial.begin(115200);
     delay(1000);
     
+#ifdef ELEGOO_EL_SM_012
+    // Initialize ELEGOO EL-SM-012 module-specific hardware
+    initElegooModule();
+    
+    // Display ELEGOO module information
+    ElegooCapabilities elegoo_caps = getElegooCapabilities();
+    Serial.printf("🔧 Module: %s v%s (Rev %d)\n", 
+                  elegoo_caps.board_name, 
+                  elegoo_caps.board_version, 
+                  elegoo_caps.revision);
+    Serial.printf("💾 Flash: %d MB, SRAM: %d KB\n", 
+                  elegoo_caps.flash_size_mb, 
+                  elegoo_caps.sram_size_kb);
+    if (elegoo_caps.has_psram) {
+        Serial.printf("🧠 PSRAM: %d KB\n", elegoo_caps.psram_size_kb);
+    }
+    Serial.println("=====================================");
+#endif
+    
     // Welcome message
     Serial.println("🚀 EthervoxAI ESP32 - Privacy-First AI");
     Serial.println("=====================================");
@@ -59,6 +81,9 @@ void setup() {
     // Setup complete
     systemInitialized = true;
     Serial.println("✅ EthervoxAI ESP32 ready!");
+#ifdef ELEGOO_EL_SM_012
+    Serial.println("🔧 ELEGOO EL-SM-012 optimizations enabled");
+#endif
     Serial.println("🔒 All processing happens locally on device");
     Serial.println();
 }
