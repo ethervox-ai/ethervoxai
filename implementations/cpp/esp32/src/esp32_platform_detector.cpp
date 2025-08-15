@@ -7,6 +7,9 @@
 
 #include "esp32_platform_detector.h"
 #include "config.h"
+#ifdef ELEGOO_EL_SM_012
+#include "elegoo_el_sm_012_config.h"
+#endif
 #include <Arduino.h>
 #include <esp_system.h>
 #include <WiFi.h>
@@ -113,6 +116,11 @@ uint8_t ESP32PlatformDetector::detectChipRevision() {
 }
 
 String ESP32PlatformDetector::detectBoardType() {
+#ifdef ELEGOO_EL_SM_012
+    // ELEGOO EL-SM-012 module detection
+    LOG_INFO("🔧 Detected ELEGOO EL-SM-012 module");
+    return BOARD_TYPE_STRING;
+#else
     // Try to detect common development boards
     // This is a simplified detection - in practice, you might read
     // board-specific GPIO pins or check for specific hardware
@@ -130,6 +138,7 @@ String ESP32PlatformDetector::detectBoardType() {
             return "ESP32-Generic";
         }
     }
+#endif
 }
 
 uint32_t ESP32PlatformDetector::detectTotalMemory() {
