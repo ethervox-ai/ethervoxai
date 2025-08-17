@@ -326,7 +326,72 @@ npm config get registry
 npm list -g --depth=0
 
 # Test build tools (try compiling a native module)
+# Option 1: Install globally with admin privileges (Windows)
+# Run PowerShell as Administrator, then:
+# npm install -g node-gyp
+
+# Option 2: Install locally in project (recommended)
+npm install node-gyp --save-dev
+
+# Option 3: Use npx to run without installing
+npx node-gyp --version
+```
+
+**Windows-Specific Build Tools Test:**
+```powershell
+# Run as Administrator if needed
+# Check if Visual Studio Build Tools are available
+where cl
+# Should show path to MSVC compiler
+
+# Test Python availability for node-gyp
+python --version
+# or
+py --version
+
+# Alternative: Test without installing node-gyp globally
+npx --yes node-gyp --version
+```
+
+**Raspbian/Linux-Specific Build Tools Test:**
+```bash
+# Option 1: Fix npm permissions (recommended for Raspbian)
+# Set npm to use a different directory for global packages
+mkdir ~/.npm-global
+npm config set prefix '~/.npm-global'
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
+source ~/.bashrc
+
+# Now try installing node-gyp globally
 npm install -g node-gyp
+
+# Option 2: Use sudo (not recommended but works)
+sudo npm install -g node-gyp
+
+# Option 3: Install locally in project (safest)
+npm install node-gyp --save-dev
+
+# Option 4: Use npx without installation
+npx node-gyp --version
+
+# Verify build tools are available
+gcc --version
+make --version
+python3 --version
+
+# Check if development headers are installed
+dpkg -l | grep python3-dev
+dpkg -l | grep build-essential
+
+# Sample Output
+```bash
+ii  libpython3-dev:arm64                 3.11.2-1+b1                             arm64        header files and a static library for Python (default)
+ii  python3-dev                          3.11.2-1+b1                             arm64        header files and a static library for Python (default)
+ii  build-essential                      12.9                                    arm64        Informational list of build-essential packages
+```
+
+# Test compilation capabilities
+node -e "console.log(process.platform, process.arch)"
 ```
 
 ## 📋 Minimum System Requirements
@@ -395,13 +460,7 @@ ls
 ## Installation Steps
 
 ### 1. Prerequisites
-```bash
-# Verify Node.js installation (16+ required, 18+ recommended)
-node --version
-
-# Verify npm installation
-npm --version
-```
+See above for detailed pre-requistes
 
 ### 2. Install Core Dependencies
 ```bash
@@ -492,6 +551,72 @@ The warnings you encountered have been fixed by:
 - Using modern `@eslint/js` instead of deprecated `@humanwhocodes/*`
 - Updating rimraf to v6 (from deprecated v3/v5)
 - Removing problematic transitive dependencies
+
+### Fixing Current Deprecation Warnings (Raspberry Pi/Linux)
+
+If you're seeing these specific warnings:
+```
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+```
+
+**Quick Fix - Update Dependencies:**
+```bash
+# Clear npm cache
+npm cache clean --force
+
+# Remove node_modules and package-lock.json
+rm -rf node_modules package-lock.json
+
+# Update package.json with fixed versions
+npm install rimraf@^6.0.1
+
+# Force update to newer glob version
+npm install glob@^10.3.0 --save-dev
+
+# Reinstall everything
+npm install
+```
+
+**Raspberry Pi Audio Library Alternatives:**
+If you're having issues with audio packages on Raspberry Pi, use these alternatives:
+
+```bash
+# Replace problematic audio packages with Raspberry Pi optimized versions
+npm uninstall node-wav-player play-sound speaker mic
+
+# Install Raspberry Pi compatible alternatives
+npm install --save-optional \
+  node-aplay@^2.0.0 \
+  node-record-lpcm16@^1.0.1 \
+  alsa-utils@^1.2.0 \
+  node-portaudio@^2.0.0
+
+# For text-to-speech on Raspberry Pi
+npm install espeak-tts@^1.0.0
+
+# Verify ALSA is working
+aplay -l
+amixer scontrols
+```
+
+**Complete Clean Installation (if issues persist):**
+```bash
+# Backup your changes
+git stash
+
+# Complete clean slate
+rm -rf node_modules package-lock.json ~/.npm/_cacache
+
+# Update npm itself
+npm install -g npm@latest
+
+# Fresh install with latest packages
+npm install
+
+# Restore your changes
+git stash pop
+```
 
 ### Alternative Package Managers
 ```bash
