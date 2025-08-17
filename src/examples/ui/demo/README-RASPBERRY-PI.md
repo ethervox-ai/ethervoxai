@@ -14,7 +14,7 @@ EthervoxAI UI Demo is fully optimized for Raspberry Pi, providing privacy-first 
 ### 1. **One-Command Setup** (Recommended)
 ```bash
 cd src/examples/ui/demo
-./launch-ui-demo-master.sh
+./run-ui-demo.sh  
 ```
 
 This script will:

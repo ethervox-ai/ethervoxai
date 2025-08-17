@@ -600,6 +600,83 @@ aplay -l
 amixer scontrols
 ```
 
+### Raspberry Pi 5 Bluetooth Speaker Audio Issues
+
+If you're getting these specific errors on Raspberry Pi 5:
+```
+[AudioManager] ❌ Audio playback failed with wav-player: WAV player requires audio buffer, not text
+[AudioManager] ❌ Fallback play-sound also failed: Play-sound requires audio file, not text
+❌ Unexpected error: spawn festival ENOENT
+```
+
+**Complete Solution:**
+
+**1. Install Required TTS Dependencies:**
+```bash
+# Run the automated setup script
+bash scripts/setup/setup-raspberry-pi-audio.sh
+
+# Or install manually:
+sudo apt update
+sudo apt install -y espeak espeak-ng libttspico-utils festival festvox-kallpc16k
+sudo apt install -y alsa-utils pulseaudio pulseaudio-module-bluetooth
+```
+
+**2. Configure Bluetooth Audio:**
+```bash
+# Pair your Bluetooth speaker
+sudo bluetoothctl
+# In bluetoothctl:
+scan on
+pair [YOUR_SPEAKER_MAC]
+connect [YOUR_SPEAKER_MAC]
+trust [YOUR_SPEAKER_MAC]
+exit
+
+# Set as default audio device
+pactl list sinks short  # Find your Bluetooth device
+pactl set-default-sink [BLUETOOTH_SINK_NAME]
+```
+
+**3. Test Audio System:**
+```bash
+# Test TTS engines individually
+echo "Testing eSpeak" | espeak
+pico2wave -w test.wav "Testing Pico2Wave" && aplay test.wav && rm test.wav
+echo "Testing Festival" | festival --tts
+
+# Test Bluetooth speaker
+speaker-test -t wav -c 2
+
+# Run EthervoxAI audio test
+~/test_ethervoxai_audio.sh
+```
+
+**4. Use Raspberry Pi Optimized Audio Manager:**
+
+The project now includes a Raspberry Pi 5 optimized audio manager. Update your demo scripts to use:
+
+```javascript
+// Instead of CrossPlatformAudioManager, use:
+const { RaspberryPiAudioManager } = require('./src/modules/raspberryPiAudio');
+
+const audioManager = new RaspberryPiAudioManager({
+    preferredOutput: 'espeak',
+    fallbackChain: ['espeak', 'pico2wave', 'festival'],
+    enableLogging: true
+});
+
+// This will properly convert text to speech and route to Bluetooth
+await audioManager.playText("Hello from Raspberry Pi 5!");
+```
+
+**5. Run the Raspberry Pi Demo:**
+```bash
+# Build and run the optimized demo
+npm run build
+node scripts/demo/raspberry-pi-audio-demo.js
+```
+
 **Complete Clean Installation (if issues persist):**
 ```bash
 # Backup your changes
