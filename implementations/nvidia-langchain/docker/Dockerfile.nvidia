@@ -1,0 +1,105 @@
+# NVIDIA LangChain Implementation Docker Image
+# Multi-stage build for optimized production deployment
+
+# Build stage
+FROM nvidia/cuda:12.1-devel-ubuntu22.04 as builder
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV CUDA_VISIBLE_DEVICES=all
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-dev \
+    build-essential \
+    cmake \
+    git \
+    wget \
+    curl \
+    software-properties-common \
+    pkg-config \
+    libnccl2 \
+    libnccl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install virtualenv
+RUN python3 -m virtualenv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy requirements first for better caching
+COPY requirements-nvidia.txt /tmp/requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Install PyTorch with CUDA support
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Production stage
+FROM nvidia/cuda:12.1-runtime-ubuntu22.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV CUDA_VISIBLE_DEVICES=all
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    libnccl2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Create app directory
+WORKDIR /app
+
+# Create non-root user for security
+RUN groupadd -r ethervox && useradd -r -g ethervox ethervox
+RUN chown -R ethervox:ethervox /app
+
+# Copy application code
+COPY --chown=ethervox:ethervox src/ ./src/
+COPY --chown=ethervox:ethervox examples/ ./examples/
+COPY --chown=ethervox:ethervox configs/ ./configs/
+
+# Copy entrypoint script
+COPY --chown=ethervox:ethervox docker/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
+
+# Create directories for models and cache
+RUN mkdir -p /app/models /app/cache /app/logs
+RUN chown -R ethervox:ethervox /app/models /app/cache /app/logs
+
+# Switch to non-root user
+USER ethervox
+
+# Expose ports
+EXPOSE 8000 8001 8002
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python3 -c "import torch; print('CUDA available:', torch.cuda.is_available())" || exit 1
+
+# Set entrypoint
+ENTRYPOINT ["./entrypoint.sh"]
+
+# Default command
+CMD ["python3", "-m", "src.api.server"]
+
+# Labels for metadata
+LABEL maintainer="EthervoxAI Team"
+LABEL version="1.0.0"
+LABEL description="NVIDIA-accelerated LangChain implementation for EthervoxAI"
+LABEL cuda.version="12.1"
+LABEL python.version="3.10"
