@@ -534,7 +534,8 @@ class VoiceInteractionDemo {
         try {
             if (process.platform === 'linux') {
                 // Simple beep
-                await execAsync('speaker-test -t sine -f 1000 -l 1 & sleep 0.1 && killall speaker-test');
+                // mkostersitz: turning this off for now. sounds like a feedback loop
+                // await execAsync('speaker-test -t sine -f 1000 -l 1 & sleep 0.1 && killall speaker-test');
             }
         } catch (error) {
             // Ignore sound errors
