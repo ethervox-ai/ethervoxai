@@ -68,12 +68,12 @@ class EnhancedWakeWordDetector {
 
             const stage4 = await this.checkSyllablePattern(audioData);
             
-            // Calculate final confidence score
+            // Calculate final confidence score - weighted more toward energy and spectral
             const finalConfidence = (
-                stage1.confidence * 0.2 +
-                stage2.confidence * 0.3 +
-                stage3.confidence * 0.2 +
-                stage4.confidence * 0.3
+                stage1.confidence * 0.3 +  // Energy (was 0.2)
+                stage2.confidence * 0.4 +  // Spectral (was 0.3) 
+                stage3.confidence * 0.2 +  // Duration (was 0.2)
+                stage4.confidence * 0.1    // Syllables (was 0.3) - less weight
             );
 
             const detected = finalConfidence >= this.sensitivity;
@@ -312,16 +312,31 @@ class EnhancedWakeWordDetector {
             // Check if we found approximately 4 syllables
             const expectedSyllables = this.expectedPattern.syllables;
             const syllableCount = peaks.length;
-            const syllableMatch = Math.abs(syllableCount - expectedSyllables) <= 2; // Allow ±2 variance
             
-            // Score based on syllable count accuracy
-            const syllableScore = syllableMatch ? 
-                Math.max(0, 1 - Math.abs(syllableCount - expectedSyllables) / expectedSyllables) : 0;
+            // More forgiving syllable matching - allow 2-6 syllables
+            const syllableMatch = syllableCount >= 2 && syllableCount <= 6;
+            
+            // Score based on how close to 4 syllables, but give some points for any speech-like pattern
+            let syllableScore;
+            if (syllableCount === 0) {
+                syllableScore = 0.1; // Minimal score for no detected syllables
+            } else if (syllableCount >= 2 && syllableCount <= 6) {
+                // Good range - score based on closeness to 4
+                const closenessTo4 = 1 - Math.abs(syllableCount - 4) / 4;
+                syllableScore = 0.4 + (closenessTo4 * 0.6); // 0.4-1.0 range
+            } else {
+                syllableScore = 0.2; // Some score for speech activity
+            }
+            
+            if (this.enableLogging) {
+                console.log(`     Syllables detected: ${syllableCount} (expected: ~4, acceptable: 2-6)`);
+                console.log(`     Energy peaks found: ${peaks.length}`);
+            }
             
             return {
-                passed: syllableMatch,
+                passed: syllableMatch || syllableScore >= 0.3, // Pass if reasonable syllable pattern
                 confidence: syllableScore,
-                reason: syllableMatch ? 'good_syllable_pattern' : 'syllable_mismatch',
+                reason: syllableMatch ? 'good_syllable_pattern' : 'acceptable_speech_pattern',
                 syllableCount,
                 expectedSyllables,
                 peaks: peaks.length
