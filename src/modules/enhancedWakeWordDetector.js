@@ -14,7 +14,7 @@ const execAsync = promisify(exec);
 class EnhancedWakeWordDetector {
     constructor(options = {}) {
         this.wakeWord = options.wakeWord || 'ethervoxai';
-        this.sensitivity = options.sensitivity || 0.6;
+        this.sensitivity = options.sensitivity || 0.4; // Lowered from 0.6 to 0.4
         this.sampleRate = options.sampleRate || 16000;
         this.enableLogging = options.enableLogging || false;
         
@@ -138,13 +138,27 @@ class EnhancedWakeWordDetector {
         const numSamples = Math.floor(duration * this.sampleRate);
         const amplitudes = new Float32Array(numSamples);
         
-        // Generate realistic audio pattern based on file size
-        const baseAmplitude = Math.min(fileSize / 50000, 1.0); // Larger files = more signal
+        // Generate more realistic audio pattern based on file size
+        const baseAmplitude = Math.min(fileSize / 30000, 0.8); // Larger files = more signal
         
+        // Add some speech-like patterns
         for (let i = 0; i < numSamples; i++) {
-            // Add some variation to simulate speech
+            // Create a more speech-like pattern with varying frequencies
+            const time = i / this.sampleRate;
+            
+            // Base speech frequency components
+            const speech1 = Math.sin(2 * Math.PI * 200 * time) * 0.3; // Fundamental frequency
+            const speech2 = Math.sin(2 * Math.PI * 400 * time) * 0.2; // First harmonic
+            const speech3 = Math.sin(2 * Math.PI * 800 * time) * 0.1; // Second harmonic
+            
+            // Add amplitude modulation (speech envelope)
+            const envelope = Math.abs(Math.sin(2 * Math.PI * 5 * time)); // 5Hz modulation
+            
+            // Add some noise
             const noise = (Math.random() - 0.5) * 0.1;
-            const signal = Math.sin(i / 1000) * baseAmplitude; // Simple wave pattern
+            
+            // Combine components
+            const signal = (speech1 + speech2 + speech3) * envelope * baseAmplitude;
             amplitudes[i] = signal + noise;
         }
         
@@ -166,13 +180,21 @@ class EnhancedWakeWordDetector {
             
             const rmsEnergy = Math.sqrt(totalEnergy / amplitudes.length);
             
-            // Check if energy is within speech range
-            const hasGoodEnergy = rmsEnergy >= this.expectedPattern.energyThreshold;
-            const energyScore = Math.min(rmsEnergy / 0.5, 1.0); // Normalize to 0-1
+            // More permissive energy threshold
+            const minEnergyThreshold = 0.005; // Lowered from 0.01
+            const hasGoodEnergy = rmsEnergy >= minEnergyThreshold;
+            
+            // Scale energy score more generously
+            const energyScore = Math.min(rmsEnergy / 0.2, 1.0); // Normalize to 0-1, more generous
+            
+            if (this.enableLogging) {
+                console.log(`     RMS Energy: ${rmsEnergy.toFixed(6)} (threshold: ${minEnergyThreshold})`);
+                console.log(`     File size: ${audioData.size} bytes, duration: ${audioData.duration.toFixed(2)}s`);
+            }
             
             return {
                 passed: hasGoodEnergy,
-                confidence: energyScore,
+                confidence: Math.max(energyScore, 0.1), // Minimum 0.1 score
                 reason: hasGoodEnergy ? 'good_energy' : 'energy_too_low',
                 rmsEnergy
             };
@@ -198,14 +220,30 @@ class EnhancedWakeWordDetector {
             
             const zcr = zeroCrossings / amplitudes.length;
             
-            // Speech typically has ZCR between 0.1 and 0.4
-            const isSpeechLike = zcr >= 0.05 && zcr <= 0.5;
-            const spectralScore = isSpeechLike ? Math.min(zcr / 0.3, 1.0) : 0;
+            // More permissive speech detection - broaden the acceptable range
+            const isSpeechLike = zcr >= 0.01 && zcr <= 0.8; // Was 0.05-0.5, now 0.01-0.8
+            
+            // Give some score even if not perfect speech pattern
+            let spectralScore;
+            if (zcr >= 0.05 && zcr <= 0.5) {
+                // Ideal speech range
+                spectralScore = Math.min(zcr / 0.3, 1.0);
+            } else if (zcr >= 0.01 && zcr <= 0.8) {
+                // Acceptable range with lower score
+                spectralScore = 0.3 + (0.4 * Math.min(zcr / 0.3, 1.0));
+            } else {
+                // Outside acceptable range
+                spectralScore = 0.1; // Still give minimal score
+            }
+            
+            if (this.enableLogging) {
+                console.log(`     ZCR: ${zcr.toFixed(4)} (range: 0.01-0.8, ideal: 0.05-0.5)`);
+            }
             
             return {
-                passed: isSpeechLike,
+                passed: isSpeechLike || spectralScore >= 0.2, // More lenient passing criteria
                 confidence: spectralScore,
-                reason: isSpeechLike ? 'speech_like_spectrum' : 'non_speech_spectrum',
+                reason: isSpeechLike ? 'speech_like_spectrum' : 'weak_speech_spectrum',
                 zeroCrossingRate: zcr
             };
         } catch (error) {

@@ -135,7 +135,7 @@ class VoiceInteractionDemo {
         if (EnhancedWakeWordDetector) {
             this.wakeWordDetector = new EnhancedWakeWordDetector({
                 wakeWord: 'ethervoxai',
-                sensitivity: 0.6,
+                sensitivity: 0.4, // Lowered for better detection
                 sampleRate: this.audioConfig.sampleRate,
                 enableLogging: true
             });
