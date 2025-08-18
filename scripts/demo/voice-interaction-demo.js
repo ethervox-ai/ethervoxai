@@ -21,7 +21,7 @@ const readline = require('readline');
 const execAsync = promisify(exec);
 
 // Import EthervoxAI modules
-let RaspberryPiAudioManager, multilingualRuntime, localLLMStack, privacyDashboard;
+let RaspberryPiAudioManager, multilingualRuntime, localLLMStack, privacyDashboard, EnhancedWakeWordDetector;
 
 try {
     // Try to load the built modules
@@ -41,11 +41,19 @@ try {
     console.log('   Using simulation mode for demo purposes');
 }
 
+// Try to load enhanced wake word detector
+try {
+    ({ EnhancedWakeWordDetector } = require(path.join(__dirname, '..', '..', 'src', 'modules', 'enhancedWakeWordDetector')));
+} catch (error) {
+    console.log('⚠️  Enhanced wake word detector not found, using fallback');
+}
+
 class VoiceInteractionDemo {
     constructor() {
         this.isListening = false;
         this.isProcessing = false;
         this.audioManager = null;
+        this.wakeWordDetector = null;
         this.conversationHistory = [];
         this.wakeWords = ['ethervox', 'hey ethervox', 'ethervox ai'];
         
@@ -62,7 +70,9 @@ class VoiceInteractionDemo {
             totalInteractions: 0,
             successfulRecognitions: 0,
             averageResponseTime: 0,
-            languages: new Set()
+            languages: new Set(),
+            wakeWordDetections: 0,
+            falsePositives: 0
         };
     }
 
@@ -72,6 +82,9 @@ class VoiceInteractionDemo {
         
         // Initialize audio manager
         await this.initializeAudioManager();
+        
+        // Initialize wake word detector
+        await this.initializeWakeWordDetector();
         
         // Initialize AI modules
         await this.initializeAIModules();
@@ -114,6 +127,24 @@ class VoiceInteractionDemo {
         
         // Test audio capabilities
         await this.testAudioCapabilities();
+    }
+
+    async initializeWakeWordDetector() {
+        console.log('\n🎯 Initializing wake word detector...');
+        
+        if (EnhancedWakeWordDetector) {
+            this.wakeWordDetector = new EnhancedWakeWordDetector({
+                wakeWord: 'ethervoxai',
+                sensitivity: 0.6,
+                sampleRate: this.audioConfig.sampleRate,
+                enableLogging: true
+            });
+            console.log('✅ Enhanced wake word detector initialized');
+            console.log(`   Wake word: "${this.wakeWordDetector.getConfig().wakeWord}"`);
+            console.log(`   Sensitivity: ${this.wakeWordDetector.getConfig().sensitivity}`);
+        } else {
+            console.log('⚠️  Enhanced wake word detector not available, using fallback');
+        }
     }
 
     async initializeAIModules() {
@@ -201,6 +232,7 @@ class VoiceInteractionDemo {
         console.log(`🔊 Audio Playback: ${caps.playback ? '✅ Available' : '❌ Not Available'}`);
         console.log(`🗣️  Text-to-Speech: ${caps.tts ? '✅ Available' : '❌ Not Available'}`);
         console.log(`👂 Voice Activity Detection: ${caps.vad ? '✅ Available' : '❌ Not Available'}`);
+        console.log(`🎯 Wake Word Detection: ${this.wakeWordDetector ? '✅ Enhanced' : '⚠️  Basic Fallback'}`);
         console.log(`🧠 AI Inference: ${multilingualRuntime ? '✅ Available' : '⚠️  Simulation Mode'}`);
         console.log(`🔒 Privacy Controls: ${privacyDashboard ? '✅ Available' : '⚠️  Simulation Mode'}`);
         
@@ -237,11 +269,13 @@ class VoiceInteractionDemo {
                 
                 // Record audio chunk
                 const audioFile = await this.recordAudioChunk();
+                console.log(`   Recorded audio chunk: ${audioFile}`);
                 
                 // Process for wake word
                 const wakeWordDetected = await this.detectWakeWord(audioFile);
                 
                 if (wakeWordDetected) {
+                    console.log('🚨 WAKE WORD DETECTED! Processing command...');
                     await this.handleWakeWordDetection(audioFile);
                 } else {
                     // Clean up audio file
@@ -274,19 +308,41 @@ class VoiceInteractionDemo {
 
     async detectWakeWord(audioFile) {
         try {
+            // Use enhanced wake word detector if available
+            if (this.wakeWordDetector) {
+                console.log('🔍 Running enhanced wake word analysis...');
+                const result = await this.wakeWordDetector.detectWakeWord(audioFile);
+                
+                if (result.detected) {
+                    console.log(`🎯 Wake word detected! (confidence: ${(result.confidence * 100).toFixed(1)}%)`);
+                    this.stats.wakeWordDetections++;
+                    return true;
+                } else {
+                    console.log(`   No wake word detected (confidence: ${(result.confidence * 100).toFixed(1)}%, reason: ${result.reason})`);
+                    return false;
+                }
+            }
+            
+            // Fallback to basic detection
+            return this.detectWakeWordFallback(audioFile);
+            
+        } catch (error) {
+            console.error('Error in wake word detection:', error);
+            return this.detectWakeWordFallback(audioFile);
+        }
+    }
+
+    async detectWakeWordFallback(audioFile) {
+        try {
             // Simple wake word detection using audio analysis
             const stats = await fs.promises.stat(audioFile);
             
             // Check if file has content (basic activity detection)
+            console.log(`   Audio file size: ${stats.size} bytes`);
             if (stats.size < 1000) {
+                console.log('   Audio too quiet/empty - no wake word detection');
                 return false; // Too quiet/empty
             }
-            
-            // In a real implementation, this would:
-            // 1. Load the audio file
-            // 2. Extract features (MFCC, etc.)
-            // 3. Run through a trained wake word model
-            // 4. Return confidence score
             
             // For demo purposes, simulate wake word detection
             // In real implementation, you'd use speech-to-text or wake word model
@@ -295,18 +351,25 @@ class VoiceInteractionDemo {
             // Simulate processing time
             await this.sleep(200);
             
-            // Random wake word detection for demo (replace with real detection)
-            const detected = Math.random() > 0.7; // 30% chance for demo
+            // Enhanced wake word detection based on audio file size
+            // Larger files are more likely to contain speech
+            const sizeBonus = Math.min(stats.size / 10000, 0.5); // Bonus up to 0.5 for larger files
+            const baseChance = 0.4; // 40% base chance
+            const totalChance = baseChance + sizeBonus;
+            
+            const detected = Math.random() < totalChance;
             
             if (detected) {
                 console.log('🎯 Wake word detected!');
                 return true;
+            } else {
+                console.log('   No wake word detected in this chunk');
             }
             
             return false;
             
         } catch (error) {
-            console.error('Error in wake word detection:', error);
+            console.error('Error in fallback wake word detection:', error);
             return false;
         }
     }
@@ -465,14 +528,11 @@ class VoiceInteractionDemo {
         if (localLLMStack) {
             // Use real local LLM if available
             try {
-                const llmResponse = await localLLMStack.generateResponse(transcription, {
-                    intent: intent,
-                    language: language,
-                    conversationHistory: this.conversationHistory.slice(-5) // Last 5 interactions
-                });
-                response = llmResponse.response;
+                const llmResponse = await localLLMStack.processQuery(transcription, false);
+                response = llmResponse.text;
             } catch (error) {
-                console.log('⚠️  Local LLM error, using fallback response');
+                console.log('⚠️  Local LLM error, using fallback response:', error.message);
+                console.error('Full error details:', error);
                 response = this.generateFallbackResponse(intent, transcription);
             }
         } else {
@@ -573,6 +633,7 @@ class VoiceInteractionDemo {
         console.log(`Total Interactions: ${this.stats.totalInteractions}`);
         console.log(`Successful Recognitions: ${this.stats.successfulRecognitions}`);
         console.log(`Success Rate: ${this.stats.totalInteractions > 0 ? Math.round((this.stats.successfulRecognitions / this.stats.totalInteractions) * 100) : 0}%`);
+        console.log(`Wake Word Detections: ${this.stats.wakeWordDetections}`);
         console.log(`Average Response Time: ${Math.round(this.stats.averageResponseTime)}ms`);
         console.log(`Languages Detected: ${Array.from(this.stats.languages).join(', ') || 'None'}`);
         console.log('');
@@ -696,16 +757,16 @@ async function showInteractiveMenu() {
     const demo = new VoiceInteractionDemo();
     await demo.initialize();
     
-    console.log('\n🎛️  EthervoxAI Voice Interaction Demo Menu');
-    console.log('=========================================');
-    console.log('1. Start Real Voice Interaction');
-    console.log('2. Run Voice Simulation');
-    console.log('3. Test Audio Capabilities');
-    console.log('4. Show System Information');
-    console.log('5. Exit');
-    console.log('');
-    
-    rl.prompt();
+        console.log('\n🎛️  EthervoxAI Voice Interaction Demo Menu');
+        console.log('=========================================');
+        console.log('1. Start Real Voice Interaction');
+        console.log('2. Run Voice Simulation');
+        console.log('3. Test Audio Capabilities');
+        console.log('4. Show System Information');
+        console.log('5. Debug: Force Wake Word Detection');
+        console.log('6. Adjust Wake Word Sensitivity');
+        console.log('7. Exit');
+        console.log('');    rl.prompt();
     
     rl.on('line', async (input) => {
         const choice = input.trim();
@@ -737,13 +798,48 @@ async function showInteractiveMenu() {
                 break;
                 
             case '5':
+                console.log('\nDebug: Forcing wake word detection...');
+                try {
+                    // Create a dummy audio file for testing
+                    const dummyAudioFile = '/tmp/dummy_wake_test.wav';
+                    await demo.handleWakeWordDetection(dummyAudioFile);
+                } catch (error) {
+                    console.error('Debug wake word test error:', error);
+                }
+                break;
+                
+            case '6':
+                console.log('\nAdjusting wake word sensitivity...');
+                if (demo.wakeWordDetector) {
+                    const currentSensitivity = demo.wakeWordDetector.getConfig().sensitivity;
+                    console.log(`Current sensitivity: ${currentSensitivity}`);
+                    console.log('Enter new sensitivity (0.1-1.0, lower = more sensitive):');
+                    
+                    rl.question('New sensitivity: ', (answer) => {
+                        const newSensitivity = parseFloat(answer);
+                        if (newSensitivity >= 0.1 && newSensitivity <= 1.0) {
+                            demo.wakeWordDetector.setSensitivity(newSensitivity);
+                            console.log(`✅ Sensitivity updated to ${newSensitivity}`);
+                        } else {
+                            console.log('❌ Invalid sensitivity. Must be between 0.1 and 1.0');
+                        }
+                        console.log('\nPress any key to return to menu...');
+                        rl.prompt();
+                    });
+                    return; // Don't prompt again immediately
+                } else {
+                    console.log('❌ Enhanced wake word detector not available');
+                }
+                break;
+                
+            case '7':
                 console.log('Goodbye!');
                 demo.stop();
                 rl.close();
                 return;
                 
             default:
-                console.log('Invalid choice. Please select 1-5.');
+                console.log('Invalid choice. Please select 1-7.');
         }
         
         console.log('\nPress any key to return to menu...');
