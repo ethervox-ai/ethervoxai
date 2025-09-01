@@ -71,9 +71,9 @@ Thumbs.db
 tmp/
 temp/
 
-# Package lock files (optional - uncomment if you want to exclude them)
-# package-lock.json
-# yarn.lock
+# Package lock files (keep tracked for reproducible builds)
+!package-lock.json
+!yarn.lock
 
 # EthervoxAI Runtime Files
 # =======================
