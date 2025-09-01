@@ -20,11 +20,32 @@ implementations/
 │   ├── ethervoxai/     # Core modules
 │   ├── examples/       # MCU examples
 │   └── boards/         # Board-specific code
+├── nvidia-langchain/   # NVIDIA LangChain integration
+│   ├── src/            # NVIDIA-specific sources
+│   ├── configs/        # Model configurations
+│   └── examples/       # NVIDIA examples
 └── shared/             # Shared resources
     ├── models/         # Model catalog and metadata
     ├── protocols/      # Protocol definitions
     └── tests/          # Cross-language tests
 ```
+
+## 🔒 Private Android Implementation
+
+The Android implementation has been moved to a separate **private repository** for enhanced security and focused development:
+
+📱 **Repository**: `ethervox-ai/ethervoxai-android` (Private)
+
+### Why Private?
+- **Enhanced Security**: Mobile-specific security considerations
+- **Team Access Control**: Granular permissions for mobile development
+- **Platform Optimization**: Android-specific CI/CD and tooling
+- **Focused Development**: Dedicated workflows for mobile releases
+
+### Access Information
+- **Team Members**: Contact your team lead for repository access
+- **External Contributors**: Submit request to `android-access@ethervox.ai`
+- **Documentation**: See [ANDROID_MIGRATION.md](ANDROID_MIGRATION.md) for details
 
 ## Implementation Philosophy
 
@@ -83,6 +104,17 @@ implementations/
 - Hardware abstraction layer
 - Binary model formats
 - Power management integration
+
+### Android Implementation
+**Strengths**: Native mobile integration, Material Design, device optimization
+**Use Cases**: Android phones/tablets, Android Auto, mobile AI
+**Optimizations**:
+- TensorFlow Lite integration
+- Material Design 3 UI
+- Background services with battery optimization
+- Privacy-first mobile experience
+- Local model management with download progress
+- Voice interaction optimized for mobile
 
 ## Cross-Language Features
 

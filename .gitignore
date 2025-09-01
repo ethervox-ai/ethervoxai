@@ -157,4 +157,9 @@ INTERNAL_*.md
 .pio/
 org-*.md
 package-lock.json
-{
+
+# Private implementations moved to separate repositories
+# ===================================================
+
+# Android implementation (moved to private repo)
+implementations/android/
