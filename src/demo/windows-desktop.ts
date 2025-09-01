@@ -68,6 +68,13 @@ export class WindowsDesktopDemo extends EventEmitter {
       enableLogging: true,
       preferredOutput: 'native'
     });
+    // Allow override via env for troubleshooting (e.g., EVX_AUDIO_OUT=tts-only|powershell-tts|wav-player|play-sound|native)
+    const preferred = process.env.EVX_AUDIO_OUT as any;
+    if (preferred) {
+      try {
+        this.audioManager.setPreferredOutput(preferred);
+      } catch {}
+    }
     this.setupEventHandlers();
   }
 

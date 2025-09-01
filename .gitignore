@@ -48,6 +48,9 @@ dist/
 build/
 out/
 
+# TypeScript incremental build info
+*.tsbuildinfo
+
 # OS generated files
 .DS_Store
 .DS_Store?
@@ -153,3 +156,5 @@ INTERNAL-*.md
 INTERNAL_*.md
 .pio/
 org-*.md
+package-lock.json
+{

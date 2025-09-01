@@ -6,7 +6,7 @@
 import { EventEmitter } from 'events';
 
 interface AudioManagerConfig {
-  preferredOutput: 'native' | 'wav-player' | 'play-sound' | 'tts-only';
+  preferredOutput: 'native' | 'wav-player' | 'play-sound' | 'tts-only' | 'powershell-tts';
   fallbackChain: string[];
   enableLogging: boolean;
 }
@@ -20,8 +20,8 @@ export class CrossPlatformAudioManager extends EventEmitter {
     super();
     
     this.config = {
-      preferredOutput: 'native',
-      fallbackChain: ['native', 'wav-player', 'play-sound', 'tts-only'],
+  preferredOutput: 'native',
+  fallbackChain: ['native', 'powershell-tts', 'wav-player', 'play-sound', 'tts-only'],
       enableLogging: true,
       ...config
     };
@@ -117,10 +117,8 @@ export class CrossPlatformAudioManager extends EventEmitter {
   private tryInitializePowerShellTTS(): void {
     try {
       if (process.platform === 'win32') {
-        const ps = require('node-powershell');
         this.availableOutputs.set('powershell-tts', {
           type: 'powershell-tts',
-          ps: ps,
           playAudio: this.playWithPowerShellTTS.bind(this),
           description: 'PowerShell TTS'
         });
@@ -143,6 +141,20 @@ export class CrossPlatformAudioManager extends EventEmitter {
 
     this.log('⚠️ No audio output methods available - running in silent mode');
     this.currentOutput = null;
+  }
+
+  /**
+   * Force a specific preferred output method if available
+   */
+  public setPreferredOutput(output: 'native' | 'wav-player' | 'play-sound' | 'tts-only' | 'powershell-tts'): boolean {
+    if (this.availableOutputs.has(output)) {
+      this.currentOutput = output;
+      const meta = this.availableOutputs.get(output);
+      this.log(`🎯 Preferred audio output set to: ${meta.description}`);
+      return true;
+    }
+    this.log(`⚠️ Requested output "${output}" not available on this platform`);
+    return false;
   }
 
   /**
@@ -197,14 +209,29 @@ export class CrossPlatformAudioManager extends EventEmitter {
     if (typeof text !== 'string') {
       throw new Error('Native TTS requires text input');
     }
+    const { spawn } = require('child_process');
+    const vol = Number(process.env.EVX_TTS_VOLUME ?? 100);
+    const rate = Number(process.env.EVX_TTS_RATE ?? 0);
+    const psScript = [
+      'Add-Type -AssemblyName System.Speech',
+      '$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer',
+      '$synth.SetOutputToDefaultAudioDevice()',
+      `$synth.Volume = ${isNaN(vol) ? 100 : Math.max(0, Math.min(100, vol))}`,
+      `$synth.Rate = ${isNaN(rate) ? 0 : Math.max(-10, Math.min(10, rate))}`,
+      `$text = @'`,
+      `${text}`,
+      `'@`,
+      '$synth.Speak($text)'
+    ].join('\n');
 
-    const { exec } = require('child_process');
-    const command = `powershell -Command "Add-Type -AssemblyName System.Speech; $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; $synth.Speak('${text.replace(/'/g, "''")}');"`;
-    
     return new Promise((resolve, reject) => {
-      exec(command, (error: any, stdout: any, stderr: any) => {
-        if (error) reject(error);
-        else resolve();
+      const ps = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript]);
+      let stderr = '';
+      ps.stderr.on('data', (d: Buffer) => (stderr += d.toString()));
+      ps.on('error', (err: any) => reject(err));
+      ps.on('close', (code: number) => {
+        if (code === 0) resolve();
+        else reject(new Error(stderr || `PowerShell exited with code ${code}`));
       });
     });
   }
@@ -283,21 +310,31 @@ export class CrossPlatformAudioManager extends EventEmitter {
     if (typeof text !== 'string') {
       throw new Error('PowerShell TTS requires text input');
     }
+    const { spawn } = require('child_process');
+    const vol = Number(process.env.EVX_TTS_VOLUME ?? 100);
+    const rate = Number(process.env.EVX_TTS_RATE ?? 0);
+    const psScript = [
+      'Add-Type -AssemblyName System.Speech',
+      '$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer',
+      '$synth.SetOutputToDefaultAudioDevice()',
+      `$synth.Volume = ${isNaN(vol) ? 100 : Math.max(0, Math.min(100, vol))}`,
+      `$synth.Rate = ${isNaN(rate) ? 0 : Math.max(-10, Math.min(10, rate))}`,
+      `$text = @'`,
+      `${text}`,
+      `'@`,
+      '$synth.Speak($text)'
+    ].join('\n');
 
-    const ps = new (this.availableOutputs.get('powershell-tts').ps)({
-      executionPolicy: 'Bypass',
-      noProfile: true
+    return new Promise((resolve, reject) => {
+      const ps = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript]);
+      let stderr = '';
+      ps.stderr.on('data', (d: Buffer) => (stderr += d.toString()));
+      ps.on('error', (err: any) => reject(err));
+      ps.on('close', (code: number) => {
+        if (code === 0) resolve();
+        else reject(new Error(stderr || `PowerShell exited with code ${code}`));
+      });
     });
-
-    try {
-      ps.addCommand(`Add-Type -AssemblyName System.Speech`);
-      ps.addCommand(`$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer`);
-      ps.addCommand(`$synth.Speak("${text.replace(/"/g, '`"')}")`);
-      
-      await ps.invoke();
-    } finally {
-      ps.dispose();
-    }
   }
 
   /**
