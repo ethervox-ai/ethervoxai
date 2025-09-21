@@ -1,0 +1,81 @@
+# EthervoxAI MVP Python Implementation - Complete Dependencies
+# Core runtime dependencies
+psutil>=5.9.0                  # System information and process management
+aiohttp>=3.8.0                 # Async HTTP client for model downloads
+aiofiles>=23.0.0               # Async file operations
+tqdm>=4.65.0                   # Progress bars for downloads
+typing-extensions>=4.5.0       # Type hints compatibility
+
+# Audio processing and speech recognition
+sounddevice>=0.4.6             # Cross-platform audio I/O
+soundfile>=0.12.1              # Audio file I/O
+numpy>=1.24.0                  # Numerical computing for audio processing
+scipy>=1.10.0                  # Scientific computing for audio
+pyaudio>=0.2.11                # Alternative audio interface
+speech-recognition>=3.10.0     # Speech recognition wrapper
+pydub>=0.25.1                  # Audio manipulation
+webrtcvad>=2.0.10              # Voice activity detection
+
+# Wake word detection
+pvporcupine>=3.0.0             # Picovoice Porcupine wake word engine
+openwakeword>=0.5.1            # Open-source wake word detection
+
+# Text-to-speech
+pyttsx3>=2.90                  # Cross-platform TTS
+gTTS>=2.4.0                    # Google Text-to-Speech
+
+# AI model integration
+huggingface-hub>=0.19.0        # Model downloading from Hugging Face
+transformers>=4.35.0           # Transformer models and tokenizers
+torch>=2.0.0                   # PyTorch for model inference
+accelerate>=0.24.0             # Hardware acceleration utilities
+ctransformers>=0.2.27          # C++ backends for faster inference
+sentence-transformers>=2.2.2   # Sentence embeddings
+llama-cpp-python>=0.2.11       # Python bindings for llama.cpp
+onnxruntime>=1.16.0            # ONNX runtime for optimized inference
+
+# Local STT models
+openai-whisper>=20231117       # Whisper speech-to-text
+
+# Data processing and validation
+pydantic>=2.0.0                # Data validation and serialization
+orjson>=3.8.0                  # Fast JSON parsing
+
+# Configuration and logging
+PyYAML>=6.0                    # YAML configuration files
+colorlog>=6.7.0                # Colored logging output
+
+# UI Framework (FastAPI + web interface)
+fastapi>=0.104.0               # Modern web framework
+uvicorn>=0.24.0                # ASGI server
+jinja2>=3.1.0                  # Template engine
+python-multipart>=0.0.6       # File upload support
+websockets>=12.0               # WebSocket support for real-time UI
+
+# Database for settings and data
+sqlite3                        # Built-in SQLite (no install needed)
+datasets>=2.14.0               # For handling training data
+
+# Multi-language support
+langdetect>=1.0.9              # Language detection
+polyglot>=16.07.04             # Multi-language processing
+
+# Privacy and security
+cryptography>=41.0.0           # Encryption utilities
+
+# Development and testing dependencies
+pytest>=7.4.0                  # Testing framework
+pytest-asyncio>=0.21.0         # Async testing support
+black>=23.0.0                  # Code formatting
+mypy>=1.4.0                    # Type checking
+flake8>=6.0.0                  # Linting
+
+# Optional enhanced features
+GPUtil>=1.4.0                  # GPU detection and management
+cpufeature>=0.2.0              # Advanced CPU feature detection
+
+# Windows specific (conditional install)
+# pywin32>=306; sys_platform == "win32"
+
+# Linux specific audio (conditional install)
+# python-alsa>=1.1.6; sys_platform == "linux"
