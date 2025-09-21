@@ -162,4 +162,4 @@ If you have questions about this Code of Conduct, please:
 
 **Together, we can build a more private and inclusive AI future.** 🚀🔒
 
-*Last updated: January 2025*
+*Last updated: August 2025*

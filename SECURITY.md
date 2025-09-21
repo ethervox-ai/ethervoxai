@@ -276,4 +276,4 @@ By participating in our security program, researchers agree to:
 
 **🔒 Security is a journey, not a destination. Let's build a safer AI future together.**
 
-*Last updated: January 2025*
+*Last updated: August 2025*

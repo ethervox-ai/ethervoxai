@@ -415,31 +415,11 @@ EthervoxAI is designed with privacy as a core principle:
 - 📋 Multi-modal AI (vision, audio, text) integration
 - 📋 Commercial licensing and enterprise features
 
-## 🤝 Contributing
+## 🤝 Contributing to EthervoxAI
+
+*By contributing, you agree your work is released under [CC BY-NC-SA 4.0](LICENSE). Commercial redistribution of your work is prohibited without approval.*
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Development Environment Setup
-```bash
-# Clone and setup development environment
-git clone https://github.com/ethervox-ai/ethervoxai.git
-cd ethervoxai
-npm install
-npm run build
-
-# Run development tests
-npm run test
-npm run lint
-npm run typecheck
-
-# Test audio functionality
-npm run test:audio
-```
-
-### Multi-Language Contributions
-- **Protocol Consistency**: Follow `specs/ethervoxai-protocol.md` for cross-language compatibility
-- **Implementation Testing**: Test across multiple platforms and implementations
-- **Documentation**: Update docs for all affected language implementations
 
 ## 📄 License & Legal
 
@@ -453,8 +433,8 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 - 📋 License and copyright notice required
 
 **Additional Legal Documentation:**
-- [Code of Conduct](org-CODE_OF_CONDUCT.md)
-- [Security Policy](org-SECURITY.md)  
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security Policy](SECURITY.md)  
 - [Legal Documentation](docs/legal.md)
 - [License Comparison](docs/license-comparison.md)
 

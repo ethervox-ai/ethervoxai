@@ -48,6 +48,9 @@ dist/
 build/
 out/
 
+# TypeScript incremental build info
+*.tsbuildinfo
+
 # OS generated files
 .DS_Store
 .DS_Store?
@@ -68,9 +71,9 @@ Thumbs.db
 tmp/
 temp/
 
-# Package lock files (optional - uncomment if you want to exclude them)
-# package-lock.json
-# yarn.lock
+# Package lock files (keep tracked for reproducible builds)
+!package-lock.json
+!yarn.lock
 
 # EthervoxAI Runtime Files
 # =======================
@@ -150,6 +153,7 @@ REAL_MODEL_INTEGRATION_COMPLETE.md
 implementations/python/AI_RESPONSE_STATUS.md
 implementations/python/REAL_MODEL_IMPROVEMENTS.md
 INTERNAL-*.md
+<<<<<<< HEAD
 .pio/
 docs/INTERNAL_AI-INTEGRATION-SUMMARY.md
 docs/INTERNAL_BUG_FIX_COMPLETE.md
@@ -157,3 +161,15 @@ docs/INTERNAL_README_WINDOWS_DEMO.md
 docs/INTERNAL_WINDOWS_DESKTOP_DEMO.md
 docs/INTERNAL_REFACTORING-SUMMARY.md
 docs/INTERNAL_MULTI-LANGUAGE-STRATEGY.md
+=======
+INTERNAL_*.md
+.pio/
+org-*.md
+package-lock.json
+
+# Private implementations moved to separate repositories
+# ===================================================
+
+# Android implementation (moved to private repo)
+implementations/android/
+>>>>>>> adb2855380b923fb4a5786acdc70450e196d3c03
