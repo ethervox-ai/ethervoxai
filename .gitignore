@@ -1,55 +1,7 @@
-# Node.js dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variables file
-.env
-.env.test
-.env.production
-.env.local
-
-# Logs
-logs
-*.log
-
 # Build outputs
 dist/
 build/
 out/
-
-# TypeScript incremental build info
-*.tsbuildinfo
 
 # OS generated files
 .DS_Store
@@ -71,80 +23,6 @@ Thumbs.db
 tmp/
 temp/
 
-# Package lock files (keep tracked for reproducible builds)
-!package-lock.json
-!yarn.lock
-
-# EthervoxAI Runtime Files
-# =======================
-
-# Downloaded AI Models (can be very large - 1GB to 10GB+)
-models/
-*.ggml
-*.gguf
-*.bin
-*.safetensors
-*.pt
-*.pth
-
-# Model cache and storage directories
-.ethervoxai/
-~/.ethervoxai/
-cache/
-model-cache/
-model_cache/
-
-# Audit logs and runtime logs
-audit-logs/
-audit_logs/
-ethervoxai-audit.log
-ethervoxai-audit-*.log
-ethervoxai-runtime.log
-ethervoxai_demo.log
-inference-logs/
-inference_logs/
-
-# Testing artifacts
-test-models/
-test_models/
-test-outputs/
-test_outputs/
-benchmark-results/
-benchmark_results/
-performance-logs/
-performance_logs/
-
-# Model download artifacts
-*.tmp
-*.download
-*.part
-model-downloads/
-downloads/
-
-# Runtime configuration (may contain sensitive paths)
-runtime-config.json
-local-config.json
-user-preferences.json
-
-# Model metadata and checksums (generated at runtime)
-model-checksums.json
-model-metadata.json
-model-registry.json
-
-# Inference engine temporary files
-llama-cpp-temp/
-inference-temp/
-tokenizer-cache/
-
-# Platform detection cache
-platform-cache.json
-capabilities-cache.json
-
-# Demo server uploads and temporary files
-uploads/
-demo-uploads/
-demo-temp/
-
 # Implementation and Internal Documentation and notes
 IMPLEMENTATION_NOTES.md
 IMPLEMENTATION_COMPLETE.md
@@ -153,23 +31,4 @@ REAL_MODEL_INTEGRATION_COMPLETE.md
 implementations/python/AI_RESPONSE_STATUS.md
 implementations/python/REAL_MODEL_IMPROVEMENTS.md
 INTERNAL-*.md
-<<<<<<< HEAD
-.pio/
-docs/INTERNAL_AI-INTEGRATION-SUMMARY.md
-docs/INTERNAL_BUG_FIX_COMPLETE.md
-docs/INTERNAL_README_WINDOWS_DEMO.md
-docs/INTERNAL_WINDOWS_DESKTOP_DEMO.md
-docs/INTERNAL_REFACTORING-SUMMARY.md
-docs/INTERNAL_MULTI-LANGUAGE-STRATEGY.md
-=======
 INTERNAL_*.md
-.pio/
-org-*.md
-package-lock.json
-
-# Private implementations moved to separate repositories
-# ===================================================
-
-# Android implementation (moved to private repo)
-implementations/android/
->>>>>>> adb2855380b923fb4a5786acdc70450e196d3c03
