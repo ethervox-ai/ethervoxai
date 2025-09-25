@@ -1,0 +1,299 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop, 'feature/**', 'hotfix/**' ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  cpp-quality:
+    name: C++ Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          clang-format \
+          clang-tidy \
+          cppcheck \
+          iwyu \
+          cmake \
+          ninja-build
+
+    - name: Check C++ formatting
+      run: |
+        echo "=== C++ Format Check ==="
+        find src include -name "*.cpp" -o -name "*.hpp" -o -name "*.h" -o -name "*.c" | \
+        xargs clang-format --dry-run --Werror --style=file
+
+    - name: Run clang-tidy
+      run: |
+        echo "=== C++ Static Analysis ==="
+        cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+        
+        # Run clang-tidy on source files
+        find src -name "*.cpp" | head -20 | xargs clang-tidy \
+          -p build \
+          --checks='-*,readability-*,modernize-*,performance-*,bugprone-*' \
+          --warnings-as-errors=false
+
+    - name: Run cppcheck
+      run: |
+        echo "=== C++ Security and Bug Analysis ==="
+        cppcheck --enable=all --std=c++17 --platform=unix64 \
+          --suppress=missingIncludeSystem \
+          --suppress=unusedFunction \
+          --suppress=unmatchedSuppression \
+          --error-exitcode=1 \
+          --xml --xml-version=2 \
+          src/ include/ 2> cppcheck-report.xml || true
+        
+        # Convert XML to readable format
+        if [ -f cppcheck-report.xml ]; then
+          echo "Cppcheck found issues:"
+          cat cppcheck-report.xml
+        fi
+
+    - name: Include What You Use (IWYU)
+      run: |
+        echo "=== Include Analysis ==="
+        # Run IWYU on a subset of files to check include hygiene
+        find src -name "*.cpp" | head -10 | while read file; do
+          echo "Checking includes in $file"
+          iwyu_tool.py -p build "$file" || true
+        done
+
+    - name: Upload C++ analysis results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: cpp-analysis-${{ github.sha }}
+        path: |
+          cppcheck-report.xml
+          build/compile_commands.json
+        retention-days: 15
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Run Semgrep
+      uses: returntocorp/semgrep-action@v1
+      with:
+        config: >-
+          p/security-audit
+          p/secrets
+          p/owasp-top-ten
+        generateSarif: "1"
+
+    - name: Upload Semgrep results to GitHub Advanced Security
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: semgrep.sarif
+
+    - name: Secret scanning with TruffleHog
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: ${{ github.event.repository.default_branch }}
+        head: HEAD
+        extra_args: --debug --only-verified
+
+  dependency-check:
+    name: Dependency Security Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js for Dashboard
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: dashboard/package-lock.json
+
+    - name: Audit NPM dependencies
+      working-directory: dashboard
+      run: |
+        npm audit --audit-level high
+        npm outdated || true
+
+    - name: Check for known vulnerabilities
+      uses: pyupio/safety@2.3.5
+      with:
+        api-key: ${{ secrets.SAFETY_API_KEY }}
+        scan: requirements
+
+    - name: OWASP Dependency Check
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: 'EtherVoxAI'
+        path: '.'
+        format: 'ALL'
+        args: >
+          --enableRetired
+          --enableExperimental
+          --failOnCVSS 7
+
+    - name: Upload dependency check results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: dependency-check-report-${{ github.sha }}
+        path: reports/
+        retention-days: 30
+
+  documentation-check:
+    name: Documentation Quality
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Check markdown files
+      uses: DavidAnson/markdownlint-cli2-action@v16
+      with:
+        globs: '**/*.md'
+        config: '.markdownlint.json'
+
+    - name: Check broken links
+      uses: gaurav-nelson/github-action-markdown-link-check@v1
+      with:
+        use-quiet-mode: 'yes'
+        use-verbose-mode: 'yes'
+        config-file: '.markdown-link-check.json'
+
+    - name: Spell check
+      uses: crate-ci/typos@master
+      with:
+        files: '*.md docs/ dashboard/README.md'
+
+    - name: Check README completeness
+      run: |
+        echo "=== README Completeness Check ==="
+        required_sections=("Installation" "Usage" "Contributing" "License")
+        
+        for section in "${required_sections[@]}"; do
+          if grep -qi "## $section\|# $section" README.md; then
+            echo "✓ Found $section section"
+          else
+            echo "❌ Missing $section section"
+            exit 1
+          fi
+        done
+
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install license checker
+      run: npm install -g license-checker
+
+    - name: Check NPM licenses
+      working-directory: dashboard
+      run: |
+        echo "=== NPM License Check ==="
+        license-checker --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD" --production
+
+    - name: Check for license headers
+      run: |
+        echo "=== Source File License Headers ==="
+        missing_headers=0
+        
+        # Check C++ files
+        find src include -name "*.cpp" -o -name "*.hpp" -o -name "*.h" | while read file; do
+          if ! head -10 "$file" | grep -q "Copyright\|License\|SPDX"; then
+            echo "Missing license header: $file"
+            ((missing_headers++))
+          fi
+        done
+        
+        # Check JavaScript files
+        find dashboard/src -name "*.js" -o -name "*.vue" -o -name "*.ts" | while read file; do
+          if ! head -10 "$file" | grep -q "Copyright\|License\|SPDX"; then
+            echo "Missing license header: $file"
+            ((missing_headers++))
+          fi
+        done
+        
+        if [ $missing_headers -gt 0 ]; then
+          echo "Found $missing_headers files missing license headers"
+          # Don't fail for now, just report
+        fi
+
+  code-metrics:
+    name: Code Metrics
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'
+
+    - name: Install analysis tools
+      run: |
+        pip install radon lizard tokei
+        sudo apt-get install -y cloc
+
+    - name: Generate code metrics
+      run: |
+        echo "=== Code Metrics Report ===" > metrics-report.txt
+        echo "Generated: $(date)" >> metrics-report.txt
+        echo "" >> metrics-report.txt
+        
+        echo "## Lines of Code (cloc)" >> metrics-report.txt
+        cloc src/ include/ dashboard/src/ --exclude-dir=node_modules >> metrics-report.txt
+        echo "" >> metrics-report.txt
+        
+        echo "## Cyclomatic Complexity (radon)" >> metrics-report.txt
+        find . -name "*.py" | head -5 | xargs radon cc -s || echo "No Python files found" >> metrics-report.txt
+        echo "" >> metrics-report.txt
+        
+        echo "## Code Complexity (lizard)" >> metrics-report.txt
+        lizard src/ -l cpp --sort cyclomatic_complexity | head -20 >> metrics-report.txt
+        echo "" >> metrics-report.txt
+        
+        echo "## File Statistics" >> metrics-report.txt
+        echo "Total files: $(find . -type f | wc -l)" >> metrics-report.txt
+        echo "C++ files: $(find . -name "*.cpp" -o -name "*.hpp" -o -name "*.h" | wc -l)" >> metrics-report.txt
+        echo "JavaScript/Vue files: $(find . -name "*.js" -o -name "*.vue" -o -name "*.ts" | wc -l)" >> metrics-report.txt
+
+    - name: Upload metrics report
+      uses: actions/upload-artifact@v4
+      with:
+        name: code-metrics-${{ github.sha }}
+        path: metrics-report.txt
+        retention-days: 30

@@ -1,0 +1,201 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop, 'feature/**', 'hotfix/**' ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build-desktop:
+    name: Build Desktop Platforms
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            cmake_preset: linux-release
+          - os: windows-latest
+            platform: windows
+            cmake_preset: windows-release
+          - os: macos-latest
+            platform: macos
+            cmake_preset: macos-release
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Setup CMake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: '3.20'
+
+    - name: Install Linux dependencies
+      if: matrix.platform == 'linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          libasound2-dev \
+          libcurl4-openssl-dev \
+          libssl-dev \
+          pkg-config \
+          ninja-build
+
+    - name: Install Windows dependencies
+      if: matrix.platform == 'windows'
+      run: |
+        choco install ninja
+        # Windows SDK and MSVC are pre-installed on GitHub runners
+
+    - name: Install macOS dependencies
+      if: matrix.platform == 'macos'
+      run: |
+        brew install ninja pkg-config
+
+    - name: Configure CMake
+      run: cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -G Ninja
+
+    - name: Build
+      run: cmake --build build --config ${{ env.BUILD_TYPE }} -j$(nproc)
+
+    - name: Run unit tests
+      working-directory: build
+      run: ctest --output-on-failure -C ${{ env.BUILD_TYPE }}
+
+    - name: Package artifacts
+      run: |
+        cmake --build build --target package
+        mkdir -p artifacts
+        cp build/EtherVoxAI-*.* artifacts/ || true
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ethervoxai-${{ matrix.platform }}-${{ github.sha }}
+        path: artifacts/
+        retention-days: 30
+
+  build-raspberry-pi:
+    name: Build Raspberry Pi
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: ['pi-zero', 'pi-4']
+        include:
+          - target: 'pi-zero'
+            cmake_preset: 'rpi-zero-release'
+            arch: 'armhf'
+          - target: 'pi-4'
+            cmake_preset: 'rpi-4-release'
+            arch: 'arm64'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Setup CMake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: '3.20'
+
+    - name: Install cross-compilation toolchain
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          gcc-arm-linux-gnueabihf \
+          g++-arm-linux-gnueabihf \
+          gcc-aarch64-linux-gnu \
+          g++-aarch64-linux-gnu \
+          ninja-build
+
+    - name: Configure CMake for Raspberry Pi
+      run: |
+        cmake -B build-${{ matrix.target }} \
+          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+          -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/raspberry-pi.cmake \
+          -DTARGET_PLATFORM=${{ matrix.target }} \
+          -G Ninja
+
+    - name: Build for Raspberry Pi
+      run: cmake --build build-${{ matrix.target }} --config ${{ env.BUILD_TYPE }}
+
+    - name: Package Raspberry Pi artifacts
+      run: |
+        mkdir -p artifacts-${{ matrix.target }}
+        cp build-${{ matrix.target }}/src/ethervoxai artifacts-${{ matrix.target }}/ || true
+        cp -r build-${{ matrix.target }}/dashboard/dist artifacts-${{ matrix.target }}/dashboard || true
+
+    - name: Upload Raspberry Pi artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ethervoxai-${{ matrix.target }}-${{ github.sha }}
+        path: artifacts-${{ matrix.target }}/
+        retention-days: 30
+
+  test-coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    needs: build-desktop
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup CMake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: '3.20'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          libasound2-dev \
+          libcurl4-openssl-dev \
+          libssl-dev \
+          pkg-config \
+          ninja-build \
+          gcov \
+          lcov
+
+    - name: Configure CMake with coverage
+      run: |
+        cmake -B build-coverage \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DENABLE_COVERAGE=ON \
+          -G Ninja
+
+    - name: Build with coverage
+      run: cmake --build build-coverage
+
+    - name: Run tests with coverage
+      working-directory: build-coverage
+      run: |
+        ctest --output-on-failure
+        lcov --capture --directory . --output-file coverage.info
+        lcov --remove coverage.info '/usr/*' --output-file coverage.info
+        lcov --list coverage.info
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: build-coverage/coverage.info
+        fail_ci_if_error: true
+        verbose: true
