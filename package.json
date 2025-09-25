@@ -1,0 +1,40 @@
+{
+  "name": "ethervoxai",
+  "version": "0.1.0",
+  "description": "Privacy-first, multilingual voice intelligence platform for edge hardware",
+  "main": "src/main.js",
+  "scripts": {
+    "build": "npm run build:core && npm run build:dashboard",
+    "build:core": "cmake --build build --config Release",
+    "build:dashboard": "cd dashboard && npm run build",
+    "dev": "npm run dev:dashboard",
+    "dev:dashboard": "cd dashboard && npm run dev",
+    "configure": "mkdir -p build && cd build && cmake ..",
+    "configure:rpi": "mkdir -p build && cd build && cmake -DTARGET_PLATFORM=RPI ..",
+    "configure:esp32": "mkdir -p build && cd build && cmake -DTARGET_PLATFORM=ESP32 ..",
+    "test": "npm run test:core && npm run test:dashboard",
+    "test:core": "cd build && ctest",
+    "test:dashboard": "cd dashboard && npm run test",
+    "clean": "rm -rf build && cd dashboard && rm -rf dist node_modules"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ethervox-ai/ethervoxai.git"
+  },
+  "keywords": [
+    "voice-ai",
+    "privacy",
+    "edge-computing",
+    "multilingual",
+    "iot",
+    "speech-recognition"
+  ],
+  "author": "EthervoxAI Team",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
