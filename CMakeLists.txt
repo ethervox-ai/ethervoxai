@@ -64,33 +64,49 @@ endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# Core library subdirectories
-add_subdirectory(src/core)
-add_subdirectory(src/audio)
-add_subdirectory(src/dialogue)
-add_subdirectory(src/platform)
-add_subdirectory(src/plugins)
+# Collect source files
+file(GLOB_RECURSE ETHERVOXAI_SOURCES 
+    "src/*.cpp"
+    "src/*.c"
+    "src/audio/*.cpp"
+    "src/audio/*.c"
+    "src/dialogue/*.cpp"
+    "src/dialogue/*.c" 
+    "src/platform/*.cpp"
+    "src/platform/*.c"
+    "src/plugins/*.cpp"
+    "src/plugins/*.c"
+)
 
-# Examples and tests
-if(BUILD_EXAMPLES)
+# Collect header files
+file(GLOB_RECURSE ETHERVOXAI_HEADERS
+    "include/*.h"
+    "include/*.hpp"
+    "src/*.h"
+    "src/*.hpp"
+)
+
+# Main executable target
+add_executable(ethervoxai ${ETHERVOXAI_SOURCES} ${ETHERVOXAI_HEADERS})
+
+# Platform-specific linking
+if(WIN32)
+    target_link_libraries(ethervoxai winmm ws2_32 crypt32)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(ethervoxai asound pthread curl ssl crypto)
+elseif(APPLE)
+    target_link_libraries(ethervoxai "-framework CoreAudio" "-framework AudioUnit" "-framework CoreFoundation" pthread curl)
+endif()
+
+# Optional: Examples and tests (if directories exist)
+if(BUILD_EXAMPLES AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples")
     add_subdirectory(examples)
 endif()
 
-if(BUILD_TESTS)
+if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
     enable_testing()
     add_subdirectory(tests)
 endif()
-
-# Main executable target
-add_executable(ethervoxai src/main.cpp)
-
-target_link_libraries(ethervoxai
-    ethervox_core
-    ethervox_audio
-    ethervox_dialogue
-    ethervox_platform
-    ethervox_plugins
-)
 
 # Installation
 install(TARGETS ethervoxai DESTINATION bin)
