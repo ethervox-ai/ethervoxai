@@ -1,0 +1,10 @@
+{
+  "low": 0,
+  "moderate": 0,
+  "high": 0,
+  "critical": 0,
+  "report-type": "full",
+  "advisories": [],
+  "whitelist": [],
+  "allowlist": []
+}

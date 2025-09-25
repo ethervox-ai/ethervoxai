@@ -1,0 +1,15 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^https://github\\.com/.*/(issues|pulls)/\\d+$"
+    },
+    {
+      "pattern": "^https://.*\\.example\\.com"
+    }
+  ],
+  "timeout": "30s",
+  "retryOn429": true,
+  "retryCount": 3,
+  "fallbackRetryDelay": "30s",
+  "aliveStatusCodes": [200, 206]
+}

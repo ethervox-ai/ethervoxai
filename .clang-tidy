@@ -1,0 +1,41 @@
+HeaderFilterRegex: '(src|include)/.*'
+Checks: >
+  -*,
+  readability-*,
+  modernize-*,
+  performance-*,
+  bugprone-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  -modernize-use-trailing-return-type,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-c-arrays,
+  -modernize-avoid-c-arrays
+CheckOptions:
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: camelCase
+  - key: readability-identifier-naming.VariableCase
+    value: camelCase
+  - key: readability-identifier-naming.ParameterCase
+    value: camelCase
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.ConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+  - key: performance-for-range-copy.WarnOnAllAutoCopies
+    value: true
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
