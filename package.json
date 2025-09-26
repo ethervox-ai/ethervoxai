@@ -30,7 +30,7 @@
     "speech-recognition"
   ],
   "author": "EthervoxAI Team",
-  "license": "Apache-2.0",
+  "license": "CC-BY-NC-SA-4.0",
   "devDependencies": {
     "@types/node": "^20.0.0"
   },
