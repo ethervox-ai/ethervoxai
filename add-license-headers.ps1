@@ -79,9 +79,15 @@ function Add-HeaderToFile {
 }
 
 # Process remaining C/C++ files
-$cFiles = Get-ChildItem -Path "src", "include", "sdk" -Recurse -Include "*.c", "*.cpp", "*.h", "*.hpp" -Exclude "node_modules" | Where-Object {
-    $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
-    return $content -and $content -notmatch "Copyright.*EthervoxAI Team"
+$cFiles = Get-ChildItem -Path "src", "include", "sdk" -Recurse -Include "*.c", "*.cpp", "*.h", "*.hpp" | Where-Object {
+    $_.FullName -notmatch "node_modules" -and
+    $_.FullName -notmatch "\.git" -and
+    $_.FullName -notmatch "build" -and
+    $_.FullName -notmatch "dist" -and
+    $(
+        $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
+        return $content -and $content -notmatch "Copyright.*EthervoxAI Team"
+    )
 }
 
 foreach ($file in $cFiles) {
@@ -95,9 +101,16 @@ foreach ($file in $cFiles) {
 }
 
 # Process JavaScript/Vue files
-$jsFiles = Get-ChildItem -Path "dashboard" -Recurse -Include "*.js", "*.vue", "*.ts" -Exclude "node_modules" | Where-Object {
-    $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
-    return $content -and $content -notmatch "Copyright.*EthervoxAI Team" -and $_.Name -notmatch "config"
+$jsFiles = Get-ChildItem -Path "dashboard" -Recurse -Include "*.js", "*.vue", "*.ts" | Where-Object {
+    $_.FullName -notmatch "node_modules" -and
+    $_.FullName -notmatch "\.git" -and
+    $_.FullName -notmatch "build" -and
+    $_.FullName -notmatch "dist" -and
+    $_.FullName -notmatch "\.nuxt" -and
+    $(
+        $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
+        return $content -and $content -notmatch "Copyright.*EthervoxAI Team" -and $_.Name -notmatch "config"
+    )
 }
 
 foreach ($file in $jsFiles) {
