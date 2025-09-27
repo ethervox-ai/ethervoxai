@@ -326,11 +326,49 @@ jobs:
         VERSION="${{ needs.validate-release.outputs.version }}"
         echo "Generating release notes for $VERSION"
         
-        # Create release notes
+        # Get the previous tag for changelog generation
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+        
+        # Create release notes with auto-generated changelog
         cat > release-notes.md << EOF
         # EtherVoxAI $VERSION
         
         ## What's Changed
+        
+        EOF
+        
+        # Generate changelog from commits if previous tag exists
+        if [[ -n "$PREVIOUS_TAG" ]]; then
+          echo "### Changes since $PREVIOUS_TAG" >> release-notes.md
+          echo "" >> release-notes.md
+          
+          # Get commits between tags, categorize them
+          git log $PREVIOUS_TAG..HEAD --oneline --format="format:%s" | while read -r commit; do
+            if [[ $commit =~ ^feat(\(.*\))?:.*|^add.*|^implement.* ]]; then
+              echo "- ✨ $commit" >> release-notes.md
+            elif [[ $commit =~ ^fix(\(.*\))?:.*|^bug.*|^resolve.* ]]; then
+              echo "- 🐛 $commit" >> release-notes.md
+            elif [[ $commit =~ ^docs(\(.*\))?:.*|^update.*README|^improve.*docs ]]; then
+              echo "- 📚 $commit" >> release-notes.md
+            elif [[ $commit =~ ^perf(\(.*\))?:.*|^optimize.*|^improve.*performance ]]; then
+              echo "- ⚡ $commit" >> release-notes.md
+            elif [[ $commit =~ ^refactor(\(.*\))?:.*|^restructure.*|^cleanup.* ]]; then
+              echo "- ♻️ $commit" >> release-notes.md
+            elif [[ $commit =~ ^test(\(.*\))?:.*|^add.*test|^update.*test ]]; then
+              echo "- 🧪 $commit" >> release-notes.md
+            elif [[ $commit =~ ^ci(\(.*\))?:.*|^github.*action|^workflow.* ]]; then
+              echo "- 🔧 $commit" >> release-notes.md
+            else
+              echo "- 📝 $commit" >> release-notes.md
+            fi
+          done
+          
+          echo "" >> release-notes.md
+        fi
+        
+        cat >> release-notes.md << EOF
+        
+        ## Platform Support
         
         This release includes builds for the following platforms:
         

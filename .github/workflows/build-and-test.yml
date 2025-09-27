@@ -40,6 +40,17 @@ jobs:
       with:
         cmake-version: '3.20'
 
+    - name: Cache CMake build directory
+      uses: actions/cache@v4
+      with:
+        path: |
+          build
+          ~/.cmake
+        key: ${{ runner.os }}-cmake-${{ env.BUILD_TYPE }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+        restore-keys: |
+          ${{ runner.os }}-cmake-${{ env.BUILD_TYPE }}-
+          ${{ runner.os }}-cmake-
+
     - name: Install Linux dependencies
       if: matrix.platform == 'linux'
       run: |
