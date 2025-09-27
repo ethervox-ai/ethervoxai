@@ -1,29 +1,32 @@
-# EtherVox SDK Documentation
+﻿# EtherVox SDK Documentation
 
-The EtherVox SDK provides a comprehensive framework for extending the EtherVox voice AI system with custom plugins, model routers, device profiles, and diagnostics tools.
+The EtherVox SDK provides a comprehensive framework for extending the EtherVox voice AI system with custom plugins,
+model routers, device profiles, and diagnostics tools.
 
 ## Overview
 
 The SDK enables developers to:
 
 - **Create Intent Plugins**: Build custom natural language understanding modules for domain-specific voice commands
-- **Develop Model Routers**: Implement intelligent routing between multiple LLM models based on request characteristics  
+- **Develop Model Routers**: Implement intelligent routing between multiple LLM models based on request characteristics
+ 
 - **Define Device Profiles**: Configure hardware-specific settings for different platforms and form factors
 - **Integrate Diagnostics**: Add comprehensive logging, monitoring, and performance tracking
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    EtherVox SDK                         │
-├─────────────────┬─────────────────┬─────────────────────┤
-│  Intent Plugins │  Model Router   │  Device Profiles    │
-│  ─────────────  │  ───────────    │  ──────────────     │
-│  • Custom NLU   │  • LLM Selection│  • Hardware Config  │
-│  • Entity Parse │  • Load Balance │  • GPIO Mapping     │
-│  • Multi-lang   │  • Fallback     │  • Audio Settings   │
-│  • Statistics   │  • Performance  │  • Power Management │
-└─────────────────┴─────────────────┴─────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚                    EtherVox SDK                         â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚  Intent Plugins â”‚  Model Router   â”‚  Device Profiles    â”‚
+â”‚  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€  â”‚  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€    â”‚
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€     â”‚
+â”‚  â€¢ Custom NLU   â”‚  â€¢ LLM Selectionâ”‚  â€¢ Hardware Config  â”‚
+â”‚  â€¢ Entity Parse â”‚  â€¢ Load Balance â”‚  â€¢ GPIO Mapping     â”‚
+â”‚  â€¢ Multi-lang   â”‚  â€¢ Fallback     â”‚  â€¢ Audio Settings   â”‚
+â”‚  â€¢ Statistics   â”‚  â€¢ Performance  â”‚  â€¢ Power Management â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ## Quick Start
@@ -120,19 +123,23 @@ profile.supports_edge_inference = true;
 ### Core Functions
 
 #### `int ethervox_sdk_init(ethervox_sdk_t* sdk)`
+
 Initialize the SDK instance with default settings.
 - **Parameters**: Pointer to SDK structure
 - **Returns**: 0 on success, -1 on failure
 
 #### `void ethervox_sdk_cleanup(ethervox_sdk_t* sdk)`  
+
 Clean up SDK resources and registered plugins.
 - **Parameters**: Pointer to initialized SDK structure
 
 #### `const char* ethervox_sdk_get_version_string(void)`
+
 Get SDK version as string (e.g., "1.0.0").
 - **Returns**: Version string
 
 #### `bool ethervox_sdk_is_compatible(uint32_t major, uint32_t minor)`
+
 Check version compatibility with required version.
 - **Parameters**: Required major and minor version numbers
 - **Returns**: true if compatible
@@ -140,16 +147,19 @@ Check version compatibility with required version.
 ### Intent Plugin Management
 
 #### `int ethervox_sdk_register_intent_plugin(ethervox_sdk_t* sdk, ethervox_intent_plugin_t* plugin)`
+
 Register a new intent recognition plugin.
 - **Parameters**: SDK instance, plugin structure
 - **Returns**: 0 on success, -1 on failure
 
 #### `ethervox_intent_plugin_t* ethervox_sdk_find_intent_plugin(ethervox_sdk_t* sdk, const char* name)`
+
 Find registered plugin by name.
 - **Parameters**: SDK instance, plugin name
 - **Returns**: Plugin pointer or NULL if not found
 
-#### `int ethervox_sdk_process_intent(ethervox_sdk_t* sdk, const ethervox_stt_input_t* input, ethervox_intent_result_t* result)`
+#### `int ethervox_sdk_process_intent(ethervox_sdk_t* sdk, const ethervox_stt_input_t* input,
+ethervox_intent_result_t* result)`
 Process input text through all registered plugins.
 - **Parameters**: SDK instance, input text structure, result structure
 - **Returns**: 0 on success, -1 if no plugin recognized intent
@@ -157,22 +167,26 @@ Process input text through all registered plugins.
 ### Model Router Management
 
 #### `int ethervox_sdk_add_model_config(ethervox_sdk_t* sdk, const ethervox_model_config_t* config)`
+
 Add model configuration to router.
 - **Parameters**: SDK instance, model configuration
 - **Returns**: 0 on success, -1 on failure
 
-#### `int ethervox_sdk_route_llm_request(ethervox_sdk_t* sdk, const ethervox_llm_request_t* request, ethervox_llm_response_t* response)`
+#### `int ethervox_sdk_route_llm_request(ethervox_sdk_t* sdk, const ethervox_llm_request_t* request,
+ethervox_llm_response_t* response)`
 Route LLM request to appropriate model.
 - **Parameters**: SDK instance, request structure, response structure  
 - **Returns**: 0 on success, -1 on failure
 
 ### Diagnostics
 
-#### `void ethervox_sdk_log(ethervox_sdk_t* sdk, ethervox_log_level_t level, const char* component, const char* format, ...)`
+#### `void ethervox_sdk_log(ethervox_sdk_t* sdk, ethervox_log_level_t level, const char* component, const char* format,
+...)`
 Log formatted message with specified level.
 - **Parameters**: SDK instance, log level, component name, format string and args
 
 #### `int ethervox_sdk_set_log_callback(ethervox_sdk_t* sdk, ethervox_log_callback_fn callback, void* user_data)`
+
 Set custom log callback function.
 - **Parameters**: SDK instance, callback function, user data pointer
 - **Returns**: 0 on success
@@ -180,6 +194,7 @@ Set custom log callback function.
 ## Data Structures
 
 ### Intent Plugin Structure
+
 ```c
 typedef struct ethervox_intent_plugin_t {
     char name[64];                              // Plugin name
@@ -201,6 +216,7 @@ typedef struct ethervox_intent_plugin_t {
 ```
 
 ### Model Configuration Structure
+
 ```c
 typedef struct {
     ethervox_model_type_t type;                 // Model type (OpenAI, HuggingFace, etc.)
@@ -215,6 +231,7 @@ typedef struct {
 ```
 
 ### Device Profile Structure  
+
 ```c
 typedef struct {
     char name[64];                              // Device name
@@ -261,18 +278,21 @@ typedef struct {
 The SDK includes comprehensive examples demonstrating various use cases:
 
 ### Intent Plugin Example
+
 - Smart home voice command recognition
 - Entity extraction (device, action, room, value)
 - Multi-language support
 - Performance statistics
 
 ### Model Router Example  
+
 - Intelligent routing between GPT-3.5, GPT-4, and local models
 - Request complexity analysis
 - Fallback and retry mechanisms
 - Performance optimization
 
 ### Device Profile Example
+
 - Pre-configured profiles for Raspberry Pi, ESP32, Desktop
 - Hardware-specific GPIO mappings
 - Audio configuration optimization
@@ -281,6 +301,7 @@ The SDK includes comprehensive examples demonstrating various use cases:
 ## Best Practices
 
 ### Plugin Development
+
 1. **Implement robust error handling** - Always validate inputs and handle edge cases
 2. **Optimize for performance** - Intent parsing should complete in < 100ms
 3. **Support multiple languages** - Use standardized language codes (ISO 639-1)
@@ -288,6 +309,7 @@ The SDK includes comprehensive examples demonstrating various use cases:
 5. **Use consistent naming** - Follow naming conventions for consistency
 
 ### Model Routing
+
 1. **Implement intelligent selection** - Route based on complexity, latency, cost
 2. **Add fallback mechanisms** - Handle model failures gracefully  
 3. **Monitor performance** - Track response times and success rates
@@ -295,6 +317,7 @@ The SDK includes comprehensive examples demonstrating various use cases:
 5. **Respect rate limits** - Handle API rate limiting appropriately
 
 ### Device Profiles  
+
 1. **Match hardware capabilities** - Configure settings appropriate for platform
 2. **Optimize for power** - Use appropriate sleep timeouts and power management
 3. **Document pin assignments** - Clearly specify GPIO usage
@@ -306,18 +329,21 @@ The SDK includes comprehensive examples demonstrating various use cases:
 ### Common Issues
 
 #### Plugin Not Recognized
+
 - Check plugin is properly registered with `ethervox_sdk_register_intent_plugin()`
 - Verify plugin name is unique
 - Ensure parse function returns 0 on success
 - Check supported language matches input language
 
 #### Model Routing Failures
+
 - Verify API keys are valid and not expired
 - Check network connectivity to model endpoints  
 - Ensure model configuration parameters are correct
 - Monitor timeout settings for slow models
 
 #### Device Profile Issues
+
 - Validate GPIO pin assignments don't conflict
 - Check hardware permissions (GPIO access may require root)
 - Verify audio device configuration matches hardware
@@ -342,6 +368,7 @@ ethervox_sdk_log(&sdk, ETHERVOX_LOG_DEBUG, "MyComponent",
 ## Integration Examples
 
 ### Web API Integration
+
 ```c
 // REST endpoint for intent processing
 int process_voice_command(const char* audio_data, char* response) {
@@ -360,6 +387,7 @@ int process_voice_command(const char* audio_data, char* response) {
 ```
 
 ### IoT Device Integration
+
 ```c
 // GPIO-based status indication
 void update_device_status(ethervox_sdk_t* sdk, bool recording) {
@@ -374,6 +402,7 @@ void update_device_status(ethervox_sdk_t* sdk, bool recording) {
 ```
 
 ### Multi-tenant Applications
+
 ```c
 // Separate SDK instances per tenant
 typedef struct {
@@ -394,6 +423,7 @@ tenant_context_t* create_tenant_context(const char* tenant_id) {
 ## Performance Considerations
 
 ### Memory Usage
+
 - SDK base overhead: ~50KB
 - Each intent plugin: ~5-10KB  
 - Model configurations: ~1KB each
@@ -401,12 +431,14 @@ tenant_context_t* create_tenant_context(const char* tenant_id) {
 - Device profile: ~2KB
 
 ### Processing Performance
+
 - Intent parsing: 10-100ms typical
 - Model routing decision: <10ms
 - LLM inference: 500-5000ms depending on model
 - Device profile loading: <1ms
 
 ### Optimization Tips
+
 1. **Limit active plugins** - Only register needed plugins
 2. **Use local models** - For low-latency requirements
 3. **Implement request caching** - Cache frequent responses  

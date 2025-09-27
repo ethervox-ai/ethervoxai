@@ -1,10 +1,11 @@
-# 🧭 EthervoxAI Ethical AI Guidelines
+﻿# ðŸ§­ EthervoxAI Ethical AI Guidelines
 
-EthervoxAI is built to demonstrate that advanced intelligence can coexist with humility, transparency, and respect for human agency. We uphold these principles to guide how voice technologies are developed and deployed.
+EthervoxAI is built to demonstrate that advanced intelligence can coexist with humility, transparency,
+and respect for human agency. We uphold these principles to guide how voice technologies are developed and deployed.
 
 ---
 
-## ✨ Core Values
+## âœ¨ Core Values
 
 - **Privacy by Design**  
   Local-first inference. No data is collected or transmitted without user consent.
@@ -23,7 +24,7 @@ EthervoxAI is built to demonstrate that advanced intelligence can coexist with h
 
 ---
 
-## ⚖️ Responsible Deployment
+## âš–ï¸ Responsible Deployment
 
 - **Avoid Surveillance Use Cases**  
   EthervoxAI is not intended for continuous or covert monitoring applications.
@@ -36,7 +37,7 @@ EthervoxAI is built to demonstrate that advanced intelligence can coexist with h
 
 ---
 
-## 💬 Commitments to the Community
+## ðŸ’¬ Commitments to the Community
 
 We will:
 
@@ -46,4 +47,4 @@ We will:
 
 Your feedback helps shape the responsible future of voice intelligence.
 
-📧 ethics@ethervox.ai
+ðŸ“§ ethics@ethervox.ai

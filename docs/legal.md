@@ -1,23 +1,26 @@
-# 🧾 EthervoxAI Legal Notice
+﻿# ðŸ§¾ EthervoxAI Legal Notice
 
-EthervoxAI is an open-source software platform for non-commercial use, licensed under the **Creative Commons BY-NC-SA 4.0 International License**.
+EthervoxAI is an open-source software platform for non-commercial use,
+licensed under the **Creative Commons BY-NC-SA 4.0 International License**.
 
 ---
 
-## 🔐 Intellectual Property
+## ðŸ” Intellectual Property
 
-- The name “EthervoxAI,” associated branding, and code artifacts are the property of Mike Kostersitz unless otherwise noted.
+- The name â€œEthervoxAI,â€ associated branding,
+and code artifacts are the property of Mike Kostersitz unless otherwise noted.
 - Contributors retain rights to their own work, which will be jointly governed under the same license terms.
 
 ---
 
-## 📛 Trademark Use
+## ðŸ“› Trademark Use
 
-You may not use EthervoxAI branding, logos, or trademarks in a way that implies endorsement, affiliation, or commercial licensing without written permission.
+You may not use EthervoxAI branding, logos, or trademarks in a way that implies endorsement, affiliation,
+or commercial licensing without written permission.
 
 ---
 
-## 🚫 Commercial Use
+## ðŸš« Commercial Use
 
 No individual or organization may:
 
@@ -25,12 +28,14 @@ No individual or organization may:
 - Redistribute modified versions for commercial profit
 
 For commercial licensing or exceptions, contact:  
-📧 licensing@ethervox.ai
+ðŸ“§ licensing@ethervox.ai
 
 ---
 
-## 🧑‍⚖️ Liability Disclaimer
+## ðŸ§‘â€âš–ï¸ Liability Disclaimer
 
-This project is provided “AS IS” without warranty. All risks associated with usage or deployment are borne by the user.
+This project is provided â€œAS ISâ€ without warranty.
+All risks associated with usage or deployment are borne by the user.
 
-We comply with applicable privacy laws and do not claim compliance for third-party integrations—please review their respective terms and policies.
+We comply with applicable privacy laws and do not claim compliance for third-party integrationsâ€”please review their
+respective terms and policies.

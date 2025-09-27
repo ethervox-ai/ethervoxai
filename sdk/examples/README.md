@@ -1,10 +1,11 @@
-# EtherVox SDK Examples
+﻿# EtherVox SDK Examples
 
 This directory contains comprehensive examples demonstrating how to extend EtherVox using the SDK.
 
 ## Examples Overview
 
 ### 1. Intent Plugin Example (`intent_plugin_example.c`)
+
 Demonstrates how to create custom intent recognition plugins for domain-specific commands.
 
 **Features:**
@@ -27,6 +28,7 @@ gcc -o intent_plugin_example intent_plugin_example.c ../ethervox_sdk.c
 ```
 
 ### 2. Model Router Example (`model_router_example.c`)
+
 Shows how to create intelligent routing between multiple LLM models based on request complexity.
 
 **Features:**
@@ -49,6 +51,7 @@ gcc -o model_router_example model_router_example.c ../ethervox_sdk.c
 ```
 
 ### 3. Device Profile Example (`device_profile_example.c`)
+
 Demonstrates device profile creation and hardware abstraction for different platforms.
 
 **Features:**
@@ -85,6 +88,7 @@ This will create executables for all three examples.
 ## Example Output
 
 ### Intent Plugin Example Output:
+
 ```
 === EtherVox SDK Intent Plugin Example ===
 
@@ -106,6 +110,7 @@ Plugin Statistics:
 ```
 
 ### Model Router Example Output:
+
 ```
 === EtherVox SDK Model Router Example ===
 
@@ -127,6 +132,7 @@ Trying model: llama-2-7b (attempt 1)
 ```
 
 ### Device Profile Example Output:
+
 ```
 === EtherVox SDK Device Profile Example ===
 
