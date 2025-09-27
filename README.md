@@ -1,56 +1,52 @@
-﻿# 🎙️ EtherVo## ✨ Key Fe### 🌍 ### 🔧 **Cross### 🔌 **Extensible Architecture**Platform Compatibility***Multilingual Support**tures
-
-### 🔒 **Privacy-First Design**
+﻿# EtherVoxAI
 
 > **Privacy-First, Multilingual Voice AI for the Ambient Intelligence Era**
 
-EtherVoxAI is an open-source voice AI platform designed for privacy-conscious users and developers who want to build 
-intelligent voice interfaces without compromising personal data. Built for cross-platform deployment from 
-microcontrollers to desktop systems.
+EtherVoxAI is an open-source voice AI platform designed for privacy-conscious users and developers who want to build intelligent voice interfaces without compromising personal data. Built for cross-platform deployment from microcontrollers to desktop systems.
 
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 [![Build Status](https://img.shields.io/badge/build-passing-green.svg)]()
 [![Platform Support](https://img.shields.io/badge/platforms-ESP32%20%7C%20RPi%20%7C%20Windows%20%7C%20Linux-blue.svg)]()
 [![Language Support](https://img.shields.io/badge/languages-English%20%7C%20Spanish%20%7C%20Chinese-orange.svg)]()
 
-## âœ¨ Key Features
+## Key Features
 
-### ðŸ”’ **Privacy-First Design**
+### Privacy-First Design
 
 - **Local-only processing** - Your voice data never leaves your device
 - **Optional cloud integration** - Connect to external APIs only when you choose
 - **Privacy dashboard** - Full visibility and control over data usage
 - **Zero telemetry** - No tracking, analytics, or data collection
 
-### ðŸŒ **Multilingual Support**
+### Multilingual Support
 
 - **Native support** for English, Spanish, and Chinese
 - **Automatic language detection** and switching
 - **Extensible language framework** for adding new languages
 - **Cultural context awareness** for better understanding
 
-### ðŸ”§ **Cross-Platform Compatibility**
+### Cross-Platform Compatibility
 
 - **Microcontrollers**: ESP32-S3, ESP32-C3
 - **Single Board Computers**: Raspberry Pi Pico, Zero, 4, 5
 - **Desktop Systems**: Windows 10/11, Linux distributions
 - **Edge Devices**: Optimized for resource-constrained environments
 
-### 🎯 **Intelligent Voice Processing**
+### Intelligent Voice Processing
 
 - **Advanced STT/TTS** with offline capabilities
 - **Intent recognition** with extensible plugin system
 - **Context-aware conversations** with memory management
 - **Noise suppression** and echo cancellation
 
-### ðŸ”Œ **Extensible Architecture**
+### Extensible Architecture
 
 - **Plugin system** for custom intents and integrations
 - **Model router** for intelligent LLM selection
 - **Device profiles** for hardware-specific optimizations
 - **Comprehensive SDK** for developers
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -62,12 +58,10 @@ microcontrollers to desktop systems.
 
 ```bash
 # Clone the repository
-
 git clone https://github.com/ethervox-ai/ethervoxai.git
 cd ethervoxai
 
 # Build for your platform
-
 mkdir build && cd build
 cmake ..
 make -j$(nproc)
@@ -77,17 +71,14 @@ make -j$(nproc)
 
 ```bash
 # ESP32 build
-
 cmake -DCMAKE_TOOLCHAIN_FILE=cmake/esp32.cmake ..
 make
 
 # Raspberry Pi build  
-
 cmake -DCMAKE_TOOLCHAIN_FILE=cmake/rpi.cmake ..
 make
 
 # Windows cross-compile from Linux
-
 cmake -DCMAKE_TOOLCHAIN_FILE=cmake/windows.cmake ..
 make
 ```
@@ -96,7 +87,6 @@ make
 
 ```bash
 # Start the web dashboard
-
 cd dashboard
 npm install
 npm run dev
@@ -108,11 +98,9 @@ Navigate to `http://localhost:3000` to access the EtherVoxAI control panel.
 
 ```bash
 # Test the core system
-
 ./ethervoxai --config=configs/default.conf
 
 # Try SDK examples
-
 cd sdk/examples
 make
 ./intent_plugin_example
@@ -120,7 +108,7 @@ make
 ./device_profile_example
 ```
 
-## ðŸ“‹ System Requirements
+## ≡ƒôï System Requirements
 
 ### Minimum Hardware Requirements
 
@@ -136,32 +124,32 @@ make
 - **ESP32-S3-DevKitC-1** with external I2S microphone
 - **Desktop/Laptop** with quality USB microphone
 
-## ðŸ—ï¸ Architecture Overview
+## ≡ƒÅù∩╕Å Architecture Overview
 
 ```
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚                    EtherVoxAI Core                      â”‚
-â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚Audio Runtimeâ”‚   Dialogue  â”‚   Platform  â”‚    Dashboard  â”‚
-â”‚             â”‚   Engine    â”‚   Layer     â”‚               â”‚
-â”‚â€¢ STT/TTS    â”‚â€¢ Intent     â”‚â€¢ GPIO/I2C   â”‚â€¢ Web UI       â”‚
-â”‚â€¢ Noise Sup. â”‚â€¢ LLM Route  â”‚â€¢ Power Mgmt â”‚â€¢ Monitoring   â”‚
-â”‚â€¢ Multi-lang â”‚â€¢ Context    â”‚â€¢ Hardware   â”‚â€¢ Privacy      â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-            â”‚                                              
-            â–¼                                              
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚                   Plugin System                         â”‚
-â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚   Intent    â”‚   Model     â”‚   External  â”‚    Custom     â”‚
-â”‚  Plugins    â”‚  Routers    â”‚ Integrationsâ”‚   Hardware    â”‚
-â”‚â€¢ Smart Home â”‚â€¢ OpenAI GPT â”‚â€¢ HuggingFaceâ”‚â€¢ Device       â”‚
-â”‚â€¢ IoT Controlâ”‚â€¢ Local LLM  â”‚â€¢ Custom APIsâ”‚ Profiles      â”‚
-â”‚â€¢ Custom NLU â”‚â€¢ Fallbacks  â”‚â€¢ RAG Systemsâ”‚â€¢ GPIO Maps    â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+Γöé                    EtherVoxAI Core                      Γöé
+Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+ΓöéAudio RuntimeΓöé   Dialogue  Γöé   Platform  Γöé    Dashboard  Γöé
+Γöé             Γöé   Engine    Γöé   Layer     Γöé               Γöé
+ΓöéΓÇó STT/TTS    ΓöéΓÇó Intent     ΓöéΓÇó GPIO/I2C   ΓöéΓÇó Web UI       Γöé
+ΓöéΓÇó Noise Sup. ΓöéΓÇó LLM Route  ΓöéΓÇó Power Mgmt ΓöéΓÇó Monitoring   Γöé
+ΓöéΓÇó Multi-lang ΓöéΓÇó Context    ΓöéΓÇó Hardware   ΓöéΓÇó Privacy      Γöé
+ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+            Γöé                                              
+            Γû╝                                              
+ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
+Γöé                   Plugin System                         Γöé
+Γö£ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöñ
+Γöé   Intent    Γöé   Model     Γöé   External  Γöé    Custom     Γöé
+Γöé  Plugins    Γöé  Routers    Γöé IntegrationsΓöé   Hardware    Γöé
+ΓöéΓÇó Smart Home ΓöéΓÇó OpenAI GPT ΓöéΓÇó HuggingFaceΓöéΓÇó Device       Γöé
+ΓöéΓÇó IoT ControlΓöéΓÇó Local LLM  ΓöéΓÇó Custom APIsΓöé Profiles      Γöé
+ΓöéΓÇó Custom NLU ΓöéΓÇó Fallbacks  ΓöéΓÇó RAG SystemsΓöéΓÇó GPIO Maps    Γöé
+ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö┤ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
 ```
 
-## ðŸ’» Usage Examples
+## ≡ƒÆ╗ Usage Examples
 
 ### Basic Voice Interaction
 
@@ -227,49 +215,46 @@ const modelConfig = {
 };
 ```
 
-## ðŸ› ï¸ Development
+## ≡ƒ¢á∩╕Å Development
 
 ### Project Structure
 
 ```
 ethervoxai/
-â”œâ”€â”€ CMakeLists.txt              # Root build configuration
-â”œâ”€â”€ package.json                # Node.js dependencies
-â”œâ”€â”€ src/                        # Core C/C++ source code
-â”‚   â”œâ”€â”€ main.cpp               # Application entry point
-â”‚   â”œâ”€â”€ audio/                 # Audio processing system
-â”‚   â”œâ”€â”€ dialogue/              # Intent and LLM integration  
-â”‚   â”œâ”€â”€ platform/              # Hardware abstraction layer
-â”‚   â””â”€â”€ plugins/               # Plugin management system
-â”œâ”€â”€ include/ethervox/          # Public API headers
-â”œâ”€â”€ dashboard/                 # Vue.js web interface
-â”‚   â”œâ”€â”€ src/components/        # Vue components
-â”‚   â”œâ”€â”€ src/stores/           # Pinia state management
-â”‚   â””â”€â”€ src/views/            # Page components
-â”œâ”€â”€ sdk/                       # Developer SDK
-â”‚   â”œâ”€â”€ ethervox_sdk.h        # SDK API header
-â”‚   â”œâ”€â”€ ethervox_sdk.c        # SDK implementation
-â”‚   â””â”€â”€ examples/             # Usage examples
-â”œâ”€â”€ cmake/                     # Build system configuration
-â”œâ”€â”€ configs/                   # Device and runtime configs
-â””â”€â”€ docs/                      # Documentation
+Γö£ΓöÇΓöÇ CMakeLists.txt              # Root build configuration
+Γö£ΓöÇΓöÇ package.json                # Node.js dependencies
+Γö£ΓöÇΓöÇ src/                        # Core C/C++ source code
+Γöé   Γö£ΓöÇΓöÇ main.cpp               # Application entry point
+Γöé   Γö£ΓöÇΓöÇ audio/                 # Audio processing system
+Γöé   Γö£ΓöÇΓöÇ dialogue/              # Intent and LLM integration  
+Γöé   Γö£ΓöÇΓöÇ platform/              # Hardware abstraction layer
+Γöé   ΓööΓöÇΓöÇ plugins/               # Plugin management system
+Γö£ΓöÇΓöÇ include/ethervox/          # Public API headers
+Γö£ΓöÇΓöÇ dashboard/                 # Vue.js web interface
+Γöé   Γö£ΓöÇΓöÇ src/components/        # Vue components
+Γöé   Γö£ΓöÇΓöÇ src/stores/           # Pinia state management
+Γöé   ΓööΓöÇΓöÇ src/views/            # Page components
+Γö£ΓöÇΓöÇ sdk/                       # Developer SDK
+Γöé   Γö£ΓöÇΓöÇ ethervox_sdk.h        # SDK API header
+Γöé   Γö£ΓöÇΓöÇ ethervox_sdk.c        # SDK implementation
+Γöé   ΓööΓöÇΓöÇ examples/             # Usage examples
+Γö£ΓöÇΓöÇ cmake/                     # Build system configuration
+Γö£ΓöÇΓöÇ configs/                   # Device and runtime configs
+ΓööΓöÇΓöÇ docs/                      # Documentation
 ```
 
 ### Building Components
 
 ```bash
 # Build core system only
-
 cmake -DBUILD_DASHBOARD=OFF ..
 make ethervoxai-core
 
 # Build with all features
-
 cmake -DBUILD_ALL=ON ..
 make
 
 # Build specific examples
-
 cd sdk/examples
 make intent_plugin_example
 ```
@@ -278,19 +263,16 @@ make intent_plugin_example
 
 ```bash
 # Unit tests
-
 make test
 
 # Integration tests
-
 ./scripts/test_integration.sh
 
 # Cross-platform tests
-
 ./scripts/test_platforms.sh
 ```
 
-## ðŸ”Œ Plugin Development
+## ≡ƒöî Plugin Development
 
 ### Creating Intent Plugins
 
@@ -337,7 +319,7 @@ ethervox_device_profile_t rpi_profile = {
 };
 ```
 
-## ðŸŒ Privacy & Security
+## ≡ƒîÉ Privacy & Security
 
 ### Data Handling Principles
 
@@ -354,7 +336,7 @@ ethervox_device_profile_t rpi_profile = {
 - **Regular security audits** of dependencies
 - **Sandboxed plugin execution** for third-party extensions
 
-## ðŸ“š Documentation
+## ≡ƒôÜ Documentation
 
 - **[API Reference](docs/api-reference.md)** - Complete API documentation
 - **[SDK Guide](sdk/README.md)** - Developer SDK documentation  
@@ -363,7 +345,7 @@ ethervox_device_profile_t rpi_profile = {
 - **[Deployment Guide](docs/deployment.md)** - Production deployment
 - **[MVP Specification](docs/mvp.md)** - Product requirements and goals
 
-## ðŸ¤ Contributing
+## ≡ƒñ¥ Contributing
 
 We welcome contributions from the community! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
 
@@ -381,18 +363,18 @@ We welcome contributions from the community! Please see our [Contributing Guide]
 4. **Push** to the branch (`git push origin feature/amazing-feature`)
 5. **Open** a Pull Request
 
-## ðŸ“„ License
+## ≡ƒôä License
 
 This project is licensed under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License**.
 
-- âœ… **Personal use, modification, and sharing** are encouraged
-- âœ… **Educational and research use** is fully supported
-- âŒ **Commercial use** requires separate licensing agreement
-- ðŸ“ **Attribution** required for all derivative works
+- Γ£à **Personal use, modification, and sharing** are encouraged
+- Γ£à **Educational and research use** is fully supported
+- Γ¥î **Commercial use** requires separate licensing agreement
+- ≡ƒô¥ **Attribution** required for all derivative works
 
 See the [LICENSE](LICENSE) file for full details.
 
-## ðŸ™ Acknowledgments
+## ≡ƒÖÅ Acknowledgments
 
 - **Whisper AI** - For advancing open-source speech recognition
 - **Vue.js Community** - For the excellent web framework
@@ -400,7 +382,7 @@ See the [LICENSE](LICENSE) file for full details.
 - **Raspberry Pi Foundation** - For accessible computing hardware
 - **Open Source Community** - For inspiration and collaboration
 
-## ðŸ“§ Contact & Support
+## ≡ƒôº Contact & Support
 
 - **GitHub Issues**: [Report bugs and request features](https://github.com/ethervox-ai/ethervoxai/issues)
 - **Discussions**: [Community discussions and questions](https://github.com/ethervox-ai/ethervoxai/discussions)  
@@ -411,8 +393,8 @@ See the [LICENSE](LICENSE) file for full details.
 
 <div align="center">
 
-**ðŸŒŸ Star this repository if EtherVoxAI helps you build privacy-first voice applications! ðŸŒŸ**
+**≡ƒîƒ Star this repository if EtherVoxAI helps you build privacy-first voice applications! ≡ƒîƒ**
 
-[â­ Star](https://github.com/ethervox-ai/ethervoxai) â€¢ [ðŸ´ Fork](https://github.com/ethervox-ai/ethervoxai/fork) â€¢ [ðŸ› Report Bug](https://github.com/ethervox-ai/ethervoxai/issues) â€¢ [ðŸ’¡ Request Feature](https://github.com/ethervox-ai/ethervoxai/issues)
+[Γ¡É Star](https://github.com/ethervox-ai/ethervoxai) ΓÇó [≡ƒì┤ Fork](https://github.com/ethervox-ai/ethervoxai/fork) ΓÇó [≡ƒÉ¢ Report Bug](https://github.com/ethervox-ai/ethervoxai/issues) ΓÇó [≡ƒÆí Request Feature](https://github.com/ethervox-ai/ethervoxai/issues)
 
 </div>
