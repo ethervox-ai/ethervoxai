@@ -1,0 +1,40 @@
+# Configuration for markdownlint-cli2
+# https://github.com/DavidAnson/markdownlint-cli2
+
+# Glob patterns for files to lint
+globs:
+  - "**/*.md"
+
+# Glob patterns for files to ignore
+ignores:
+  - "node_modules/**"
+  - ".git/**"
+  - "**/node_modules/**"
+  - "dashboard/node_modules/**"
+
+# markdownlint configuration object
+config:
+  # MD013: Line length
+  MD013:
+    line_length: 120
+    code_blocks: false
+    tables: false
+    headings: false
+  
+  # MD033: Inline HTML
+  MD033:
+    allowed_elements:
+      - "br"
+      - "details" 
+      - "summary"
+      - "img"
+      - "a"
+      - "div"
+      - "span"
+      - "kbd"
+  
+  # MD041: First line in file should be a top level header
+  MD041: false
+  
+  # MD034: Bare URL used
+  MD034: false
