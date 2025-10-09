@@ -175,7 +175,7 @@ static float esp32_get_cpu_temperature(void) {
 }
 
 // Register ESP32-specific HAL functions
-int ethervox_platform_register_hal(ethervox_platform_t* platform) {
+int esp32_hal_register(ethervox_platform_t* platform) {
     if (!platform) return -1;
     
     platform->hal.init = esp32_init;

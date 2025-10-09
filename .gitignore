@@ -14,6 +14,8 @@ pids
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov
+.venv/
+build
 
 # nyc test coverage
 .nyc_output
@@ -47,6 +49,9 @@ logs
 dist/
 build/
 out/
+build-rpi/
+build-esp/
+sysroot/
 
 # TypeScript incremental build info
 *.tsbuildinfo
@@ -173,3 +178,4 @@ package-lock.json
 # Android implementation (moved to private repo)
 implementations/android/
 >>>>>>> adb2855380b923fb4a5786acdc70450e196d3c03
+.venv/lib64

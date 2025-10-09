@@ -16,13 +16,20 @@
 #ifndef ETHERVOX_PLUGINS_H
 #define ETHERVOX_PLUGINS_H
 
+//#ifdef ETHERVOX_PLATFORM_RPI
+
 #include "ethervox/config.h"
 #include "ethervox/dialogue.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifndef ETHERVOX_MAX_PLUGINS
+#define ETHERVOX_MAX_PLUGINS 32
 #endif
 
 // Plugin types
@@ -45,17 +52,13 @@ typedef enum {
     ETHERVOX_PLUGIN_STATUS_DISABLED
 } ethervox_plugin_status_t;
 
-// Plugin metadata
+// Plugin metadata structure
 typedef struct {
     char name[64];
     char version[16];
     char author[64];
     char description[256];
     ethervox_plugin_type_t type;
-    uint32_t api_version;
-    char dependencies[512];
-    bool requires_network;
-    bool requires_gpu;
 } ethervox_plugin_metadata_t;
 
 // Plugin configuration
@@ -74,28 +77,30 @@ typedef struct {
 typedef struct ethervox_plugin ethervox_plugin_t;
 typedef struct ethervox_plugin_manager ethervox_plugin_manager_t;
 
-// Plugin interface functions
+// Plugin interface structure
 typedef struct {
-    int (*init)(ethervox_plugin_t* plugin, const ethervox_plugin_config_t* config);
-    void (*cleanup)(ethervox_plugin_t* plugin);
-    int (*process)(ethervox_plugin_t* plugin, const void* input, void* output);
-    int (*configure)(ethervox_plugin_t* plugin, const char* key, const char* value);
-    const char* (*get_status)(ethervox_plugin_t* plugin);
+    int (*init)(struct ethervox_plugin* plugin);
+    int (*process)(struct ethervox_plugin* plugin, const void* input, void* output);
+    void (*cleanup)(struct ethervox_plugin* plugin);
 } ethervox_plugin_interface_t;
 
 // Plugin structure
-struct ethervox_plugin {
-    ethervox_plugin_metadata_t metadata;
-    ethervox_plugin_config_t config;
+typedef struct ethervox_plugin {
+    char name[64];
+    char version[16];
+    char description[256];
+    ethervox_plugin_type_t type;
     ethervox_plugin_status_t status;
-    ethervox_plugin_interface_t interface;
     void* handle;  // Dynamic library handle
-    void* private_data;
-    uint64_t load_time;
-    uint64_t last_used;
+    int (*execute)(const void* input, void* output);
+    void* user_data;
+    ethervox_plugin_metadata_t metadata;
+    ethervox_plugin_interface_t interface;
+    time_t load_time;
+    time_t last_used;
     uint32_t usage_count;
-    char last_error[256];
-};
+} ethervox_plugin_t;
+
 
 // External LLM plugin specifics
 typedef struct {
@@ -108,31 +113,17 @@ typedef struct {
     uint32_t stop_count;
 } ethervox_llm_request_t;
 
-typedef struct {
-    char* text;
-    char* model_name;
-    uint32_t token_count;
-    uint32_t processing_time_ms;
-    float confidence;
-    bool truncated;
-    char* finish_reason;
-} ethervox_llm_response_t;
-
-// Plugin manager
-struct ethervox_plugin_manager {
-    ethervox_plugin_t* plugins;
-    uint32_t max_plugins;
-    uint32_t loaded_plugins;
+// Plugin manager structure
+typedef struct ethervox_plugin_manager {
+    ethervox_plugin_t plugins[ETHERVOX_MAX_PLUGINS];
+    uint32_t plugin_count;
     char plugin_directory[512];
     char config_file[512];
-    
-    // Plugin callbacks
-    void (*on_plugin_loaded)(const ethervox_plugin_t* plugin, void* user_data);
-    void (*on_plugin_error)(const ethervox_plugin_t* plugin, const char* error, void* user_data);
-    void* callback_user_data;
-    
+    bool initialized;
+    uint32_t max_plugins;
     bool is_initialized;
-};
+    uint32_t loaded_plugins;
+} ethervox_plugin_manager_t;
 
 // Public API functions
 int ethervox_plugin_manager_init(ethervox_plugin_manager_t* manager, const char* plugin_dir);
@@ -154,23 +145,24 @@ int ethervox_plugin_execute(ethervox_plugin_t* plugin, const void* input, void* 
 int ethervox_plugin_configure(ethervox_plugin_t* plugin, const char* config_json);
 
 // External LLM integrations
-int ethervox_llm_plugin_openai(const ethervox_llm_request_t* request, ethervox_llm_response_t* response, 
-                               const char* api_key);
-int ethervox_llm_plugin_huggingface(const ethervox_llm_request_t* request, ethervox_llm_response_t* response, 
-                                   const char* model_name, const char* api_key);
+int ethervox_llm_plugin_openai(const ethervox_llm_request_t* request, ethervox_llm_response_t* response,
+                               void* user_data);
+
+int ethervox_llm_plugin_huggingface(const ethervox_llm_request_t* request, ethervox_llm_response_t* response,
+                                   void* user_data);
+
 int ethervox_llm_plugin_local_rag(const ethervox_llm_request_t* request, ethervox_llm_response_t* response,
-                                 const char* index_path);
+                                 void* user_data);
 
 // Built-in plugins
 int ethervox_plugin_register_builtin_openai(ethervox_plugin_manager_t* manager);
-int ethervox_plugin_register_builtin_huggingface(ethervox_plugin_manager_t* manager);
+int ethervox_plugin_register_builtin_huggingface(ethervox_plugin_manager_t* manager);  // Just declaration, no implementation
 int ethervox_plugin_register_builtin_local_rag(ethervox_plugin_manager_t* manager);
 
 // Utility functions
 const char* ethervox_plugin_type_to_string(ethervox_plugin_type_t type);
 const char* ethervox_plugin_status_to_string(ethervox_plugin_status_t status);
 void ethervox_llm_request_free(ethervox_llm_request_t* request);
-void ethervox_llm_response_free(ethervox_llm_response_t* response);
 
 #ifdef __cplusplus
 }

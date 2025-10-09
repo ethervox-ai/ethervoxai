@@ -198,7 +198,7 @@ static float desktop_get_cpu_temperature(void) {
 }
 
 // Register desktop-specific HAL functions
-int ethervox_platform_register_hal(ethervox_platform_t* platform) {
+int desktop_hal_register(ethervox_platform_t* platform) {
     if (!platform) return -1;
     
     platform->hal.init = desktop_init;

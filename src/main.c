@@ -1,5 +1,5 @@
 /**
- * @file main.cpp
+ * @file main.c
  * @brief Main entry point for EthervoxAI application
  * 
  * Copyright (c) 2024-2025 EthervoxAI Team
@@ -17,25 +17,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "ethervox/config.h"
+#include "ethervox/platform.h"
 
-#ifdef ETHERVOX_PLATFORM_DESKTOP
-    #include <iostream>
-#endif
-
-int main() {
-    #ifdef ETHERVOX_PLATFORM_DESKTOP
-        std::cout << "EthervoxAI v" << ETHERVOX_VERSION_STRING << std::endl;
-        std::cout << "Platform: Desktop" << std::endl;
+int main(void) {
+    printf("EthervoxAI v%s\n", ETHERVOX_VERSION_STRING);
+    
+    #ifdef ETHERVOX_PLATFORM_RPI
+        printf("Platform: Raspberry Pi\n");
+    #elif defined(ETHERVOX_PLATFORM_ESP32)
+        printf("Platform: ESP32\n");
+    #elif defined(ETHERVOX_PLATFORM_DESKTOP)
+        printf("Platform: Desktop\n");
     #else
-        printf("EthervoxAI v%s\n", ETHERVOX_VERSION_STRING);
-        printf("Platform: Embedded\n");
+        printf("Platform: Unknown\n");
     #endif
 
-    // TODO: Initialize core systems
-    // 1. Platform layer
-    // 2. Audio runtime
-    // 3. Dialogue engine
-    // 4. Plugin system
+    // Initialize platform
+    ethervox_platform_t platform = {0};
+    int result = ethervox_platform_register_hal(&platform);
+    if (result == 0) {
+        printf("Platform HAL registered: %s\n", platform.info.platform_name);
+    }
     
     printf("Core modules initialization complete.\n");
     

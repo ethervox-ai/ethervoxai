@@ -20,6 +20,33 @@
 #include <stdio.h>
 #include <time.h>
 
+// Forward declarations ONLY (no function bodies)
+#ifdef ETHERVOX_PLATFORM_RPI
+extern int rpi_hal_register(ethervox_platform_t* platform);
+#endif
+#ifdef ETHERVOX_PLATFORM_ESP32
+extern int esp32_hal_register(ethervox_platform_t* platform);
+#endif
+#if defined(ETHERVOX_PLATFORM_WINDOWS) || defined(ETHERVOX_PLATFORM_LINUX)
+extern int desktop_hal_register(ethervox_platform_t* platform);
+#endif
+
+// Register platform-specific HAL
+int ethervox_platform_register_hal(ethervox_platform_t* platform) {
+    if (!platform) return -1;
+    
+    #ifdef ETHERVOX_PLATFORM_ESP32
+        return esp32_hal_register(platform);
+    #elif defined(ETHERVOX_PLATFORM_RPI)
+        return rpi_hal_register(platform);
+    #elif defined(ETHERVOX_PLATFORM_WINDOWS) || defined(ETHERVOX_PLATFORM_LINUX)
+        return desktop_hal_register(platform);
+    #else
+        fprintf(stderr, "No HAL available for this platform\n");
+        return -1;
+    #endif
+}
+
 // Platform detection
 const char* ethervox_platform_get_name(void) {
     #ifdef ETHERVOX_PLATFORM_ESP32
@@ -138,9 +165,6 @@ static uint64_t get_system_timestamp_us(void) {
     #endif
 }
 
-// Initialize platform-specific implementations
-static int register_platform_hal(ethervox_platform_t* platform);
-
 // Initialize platform
 int ethervox_platform_init(ethervox_platform_t* platform) {
     if (!platform) return -1;
@@ -174,7 +198,7 @@ int ethervox_platform_init(ethervox_platform_t* platform) {
     #endif
     
     // Register platform-specific HAL functions
-    int result = register_platform_hal(platform);
+    int result = ethervox_platform_register_hal(platform);
     if (result != 0) {
         snprintf(platform->last_error, sizeof(platform->last_error),
                 "Failed to register platform HAL");
@@ -268,7 +292,3 @@ int ethervox_platform_load_device_profile(ethervox_platform_t* platform, const c
 // Register platform-specific HAL implementation
 // This function is implemented in separate platform-specific files
 extern int ethervox_platform_register_hal(ethervox_platform_t* platform);
-
-static int register_platform_hal(ethervox_platform_t* platform) {
-    return ethervox_platform_register_hal(platform);
-}

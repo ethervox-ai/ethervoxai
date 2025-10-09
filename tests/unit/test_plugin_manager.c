@@ -51,7 +51,7 @@ void test_plugin_manager_init() {
     printf("Testing plugin manager initialization...\n");
     
     ethervox_plugin_manager_t manager;
-    int result = ethervox_plugin_manager_init(&manager);
+    int result = ethervox_plugin_manager_init(&manager,NULL);
     
     // Should succeed with proper initialization
     assert(result == 0);

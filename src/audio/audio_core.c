@@ -15,9 +15,10 @@
  */
 
 #include "ethervox/audio.h"
+#include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 // Default configuration
 ethervox_audio_config_t ethervox_audio_get_default_config(void) {

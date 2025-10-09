@@ -19,6 +19,8 @@
 #include "ethervox/config.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,6 +63,12 @@ typedef struct {
     bool initial_state;
 } ethervox_gpio_config_t;
 
+// sleepmode enum
+typedef enum {
+    ETHERVOX_SLEEP_LIGHT,
+    ETHERVOX_SLEEP_DEEP
+} ethervox_sleep_mode_t;
+
 // Platform-specific data structures
 typedef struct {
     char platform_name[32];
@@ -77,7 +85,7 @@ typedef struct {
     // Platform initialization
     int (*init)(ethervox_platform_info_t* platform);
     void (*cleanup)(ethervox_platform_info_t* platform);
-    
+
     // GPIO operations
     int (*gpio_configure)(uint32_t pin, ethervox_gpio_mode_t mode);
     int (*gpio_write)(uint32_t pin, bool state);
@@ -97,16 +105,19 @@ typedef struct {
     
     // System operations
     void (*system_reset)(void);
-    void (*system_sleep)(uint32_t duration_ms);
+    void (*system_sleep)(ethervox_sleep_mode_t mode);
     uint64_t (*get_timestamp_us)(void);
     uint32_t (*get_free_memory)(void);
     float (*get_cpu_temperature)(void);
-    
+    uint32_t (*get_free_heap_size)(void);
+
     // Power management
     int (*set_cpu_frequency)(uint32_t frequency_mhz);
     int (*enable_power_saving)(bool enable);
     float (*get_battery_voltage)(void);
-    
+    uint32_t (*delay_us)(uint32_t us);
+    uint32_t (*delay_ms)(uint32_t ms);
+
 } ethervox_platform_hal_t;
 
 // Main platform structure
@@ -140,6 +151,21 @@ float ethervox_platform_get_cpu_usage(ethervox_platform_t* platform);
 
 // Device-specific profiles
 int ethervox_platform_load_device_profile(ethervox_platform_t* platform, const char* profile_name);
+
+// // Platform-specific HAL registration
+int ethervox_platform_register_hal(ethervox_platform_t* platform);
+
+// #ifdef ETHERVOX_PLATFORM_ESP32
+// int esp32_hal_register(ethervox_platform_t* platform);
+// #endif
+
+// #ifdef ETHERVOX_PLATFORM_RPI
+// int rpi_hal_register(ethervox_platform_t* platform);
+// #endif
+
+// #if defined(ETHERVOX_PLATFORM_WINDOWS) || defined(ETHERVOX_PLATFORM_LINUX)
+// int desktop_hal_register(ethervox_platform_t* platform);
+// #endif
 
 #ifdef __cplusplus
 }

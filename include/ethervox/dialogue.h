@@ -19,6 +19,7 @@
 #include "ethervox/config.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>  // For size_t
 
 #ifdef __cplusplus
 extern "C" {
@@ -81,6 +82,7 @@ typedef struct {
     uint32_t seed;
     bool use_gpu;
     uint32_t gpu_layers;
+    char* language_code;
 } ethervox_llm_config_t;
 
 // LLM response
@@ -88,10 +90,14 @@ typedef struct {
     char* text;
     char language_code[8];
     float confidence;
-    bool requires_external_llm;
-    char* external_llm_prompt;
     uint32_t processing_time_ms;
     uint32_t token_count;
+    bool requires_external_llm;
+    char* external_llm_prompt;
+    char* model_name;
+    bool truncated;
+    char* finish_reason;
+    size_t tokens_used;  // Add if missing
 } ethervox_llm_response_t;
 
 // Dialogue context

@@ -402,9 +402,15 @@ void ethervox_llm_response_free(ethervox_llm_response_t* response) {
         free(response->text);
         response->text = NULL;
     }
-    if (response->external_llm_prompt) {
-        free(response->external_llm_prompt);
-        response->external_llm_prompt = NULL;
+    
+    if (response->model_name) {
+        free(response->model_name);
+        response->model_name = NULL;
+    }
+    
+    if (response->finish_reason) {
+        free(response->finish_reason);
+        response->finish_reason = NULL;
     }
 }
 

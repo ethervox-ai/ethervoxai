@@ -16,15 +16,42 @@
 
 #ifdef ETHERVOX_PLATFORM_RPI
 
-#include "ethervox/platform.h"
+#ifdef ETHERVOX_RPI_HARDWARE
+// Use actual wiringPi library on real hardware
 #include <wiringPi.h>
 #include <wiringPiI2C.h>
 #include <wiringPiSPI.h>
+#else
+// Stub definitions for cross-compilation without wiringPi
+#define INPUT  0
+#define OUTPUT 1
+#define HIGH   1
+#define LOW    0
+#define PUD_UP   2
+#define PUD_DOWN 1
+
+// Stub functions for cross-compilation
+static inline int wiringPiSetupGpio(void) { return 0; }
+static inline void pinMode(int pin, int mode) { (void)pin; (void)mode; }
+static inline void digitalWrite(int pin, int value) { (void)pin; (void)value; }
+static inline int digitalRead(int pin) { (void)pin; return 0; }
+static inline void pullUpDnControl(int pin, int pud) { (void)pin; (void)pud; }
+static inline int wiringPiI2CSetup(int addr) { (void)addr; return -1; }
+static inline int wiringPiI2CWrite(int fd, int data) { (void)fd; (void)data; return 0; }
+static inline int wiringPiI2CRead(int fd) { (void)fd; return 0; }
+static inline int wiringPiSPISetup(int channel, int speed) { (void)channel; (void)speed; return 0; }
+static inline int wiringPiSPIDataRW(int channel, unsigned char *data, int len) { (void)channel; (void)data; (void)len; return 0; }
+static inline void delay(unsigned int ms) { (void)ms; }
+static inline void delayMicroseconds(unsigned int us) { (void)us; }
+#endif
+
+#include "ethervox/platform.h"
 #include <unistd.h>
 #include <time.h>
 #include <sys/sysinfo.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 // Raspberry Pi-specific HAL implementation
 static int wiringpi_initialized = 0;
@@ -97,17 +124,15 @@ static bool rpi_gpio_read(uint32_t pin) {
     return digitalRead(pin) == HIGH;
 }
 
-static int rpi_i2c_write(uint8_t device_addr, uint8_t reg_addr, const uint8_t* data, size_t len) {
+static int rpi_i2c_write(uint32_t bus, uint8_t device_addr, const uint8_t* data, uint32_t len) {
+    (void)bus;
     // Create new I2C handle for specific device
     int handle = wiringPiI2CSetup(device_addr);
     if (handle < 0) return -1;
     
-    // Write register address followed by data
-    if (wiringPiI2CWrite(handle, reg_addr) < 0) {
-        return -1;
-    }
-    
-    for (size_t i = 0; i < len; i++) {
+    // First byte is typically the register address in I2C protocols
+    // Write all data bytes
+    for (uint32_t i = 0; i < len; i++) {
         if (wiringPiI2CWrite(handle, data[i]) < 0) {
             return -1;
         }
@@ -116,18 +141,15 @@ static int rpi_i2c_write(uint8_t device_addr, uint8_t reg_addr, const uint8_t* d
     return 0;
 }
 
-static int rpi_i2c_read(uint8_t device_addr, uint8_t reg_addr, uint8_t* data, size_t len) {
+static int rpi_i2c_read(uint32_t bus, uint8_t device_addr, uint8_t* data, uint32_t len) {
+    (void)bus;
+   
     // Create new I2C handle for specific device
     int handle = wiringPiI2CSetup(device_addr);
     if (handle < 0) return -1;
     
-    // Write register address
-    if (wiringPiI2CWrite(handle, reg_addr) < 0) {
-        return -1;
-    }
-    
-    // Read data
-    for (size_t i = 0; i < len; i++) {
+    // Read data directly
+    for (uint32_t i = 0; i < len; i++) {
         int byte = wiringPiI2CRead(handle);
         if (byte < 0) return -1;
         data[i] = (uint8_t)byte;
@@ -136,7 +158,8 @@ static int rpi_i2c_read(uint8_t device_addr, uint8_t reg_addr, uint8_t* data, si
     return 0;
 }
 
-static int rpi_spi_transfer(const uint8_t* tx_data, uint8_t* rx_data, size_t len) {
+static int rpi_spi_transfer(uint32_t bus, const uint8_t* tx_data, uint8_t* rx_data, uint32_t len) {
+    (void)bus;
     if (!tx_data || len == 0) return -1;
     
     // Copy tx_data to rx_data buffer for in-place transfer
@@ -149,12 +172,14 @@ static int rpi_spi_transfer(const uint8_t* tx_data, uint8_t* rx_data, size_t len
     return wiringPiSPIDataRW(0, buffer, len);
 }
 
-static void rpi_delay_ms(uint32_t ms) {
+static uint32_t rpi_delay_ms(uint32_t ms) {
     delay(ms);  // WiringPi delay function
+    return ms;
 }
 
-static void rpi_delay_us(uint32_t us) {
+static uint32_t rpi_delay_us(uint32_t us) {
     delayMicroseconds(us);  // WiringPi microsecond delay
+    return us;
 }
 
 static uint64_t rpi_get_timestamp_us(void) {
@@ -164,21 +189,23 @@ static uint64_t rpi_get_timestamp_us(void) {
 }
 
 static void rpi_reset(void) {
+    int result = -1;
     // Raspberry Pi reset via system call
-    system("sudo shutdown -r now");
+    result = system("sudo shutdown -r now");
 }
 
 static void rpi_enter_sleep_mode(ethervox_sleep_mode_t mode) {
     // Raspberry Pi doesn't have hardware sleep modes like microcontrollers
     // Implement power management through system calls
+    int result = -1;
     switch (mode) {
         case ETHERVOX_SLEEP_LIGHT:
             // Reduce CPU frequency
-            system("echo powersave | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor");
+            result = system("echo powersave | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor");
             break;
         case ETHERVOX_SLEEP_DEEP:
             // Suspend to RAM
-            system("sudo systemctl suspend");
+            result = system("sudo systemctl suspend");
             break;
         default:
             break;
@@ -210,7 +237,7 @@ static float rpi_get_cpu_temperature(void) {
 }
 
 // Register Raspberry Pi-specific HAL functions
-int ethervox_platform_register_hal(ethervox_platform_t* platform) {
+int rpi_hal_register(ethervox_platform_t* platform) {
     if (!platform) return -1;
     
     platform->hal.init = rpi_init;
@@ -229,8 +256,8 @@ int ethervox_platform_register_hal(ethervox_platform_t* platform) {
     platform->hal.delay_us = rpi_delay_us;
     platform->hal.get_timestamp_us = rpi_get_timestamp_us;
     
-    platform->hal.reset = rpi_reset;
-    platform->hal.enter_sleep_mode = rpi_enter_sleep_mode;
+    platform->hal.system_reset = rpi_reset;
+    platform->hal.system_sleep = rpi_enter_sleep_mode;
     platform->hal.get_free_heap_size = rpi_get_free_heap_size;
     platform->hal.get_cpu_temperature = rpi_get_cpu_temperature;
     

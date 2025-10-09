@@ -18,13 +18,14 @@
 
 #ifdef ETHERVOX_PLATFORM_LINUX
 #include <alsa/asoundlib.h>
+#include <stdbool.h>
 
 typedef struct {
     snd_pcm_t* pcm_capture;
     snd_pcm_t* pcm_playback;
     snd_pcm_hw_params_t* hw_params;
+    snd_pcm_uframes_t buffer_frames;
     char* audio_buffer;
-    uint32_t buffer_frames;
     bool is_recording;
     bool is_playing;
 } linux_audio_data_t;

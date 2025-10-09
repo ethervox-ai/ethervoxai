@@ -15,23 +15,25 @@
  */
 #include "ethervox/audio.h"
 #include <stdio.h>
-
-#ifdef ETHERVOX_PLATFORM_RPI
-#include <alsa/asoundlib.h>
+#include <stdlib.h>
+#include <string.h>
+// #include <alsa/asoundlib.h>
 #include <bcm2835.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include <unistd.h>
 
+// Raspberry Pi audio data structure
 typedef struct {
-    snd_pcm_t* pcm_capture;
-    snd_pcm_t* pcm_playback;
-    snd_pcm_hw_params_t* hw_params;
-    char* audio_buffer;
+    int i2s_fd;           // I2S device file descriptor
     uint32_t buffer_frames;
-    bool is_recording;
+    uint8_t* capture_buffer;
+    uint8_t* playback_buffer;
+    bool is_capturing;
     bool is_playing;
-    
-    // GPIO for mic array control
     int mic_array_enable_pin;
-    int mic_array_sel_pins[3];  // For 8-channel mic array selection
+    int mic_array_sel_pins[3];
+    char* audio_buffer;
 } rpi_audio_data_t;
 
 static int rpi_gpio_init(rpi_audio_data_t* audio_data) {
@@ -97,100 +99,74 @@ static int rpi_select_microphone(rpi_audio_data_t* audio_data, int mic_index) {
 }
 
 static int rpi_audio_start_capture(ethervox_audio_runtime_t* runtime) {
+    if (!runtime || !runtime->platform_data) return -1;
+    
     rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
-    int err;
     
-    // Select primary microphone (mic 0)
-    rpi_select_microphone(audio_data, 0);
-    
-    // Open PCM device for recording (use hw:1,0 for USB audio or I2S HAT)
-    err = snd_pcm_open(&audio_data->pcm_capture, "hw:1,0", SND_PCM_STREAM_CAPTURE, 0);
-    if (err < 0) {
-        // Fallback to default device
-        err = snd_pcm_open(&audio_data->pcm_capture, "default", SND_PCM_STREAM_CAPTURE, 0);
-        if (err < 0) {
-            printf("Cannot open audio device for capture: %s\n", snd_strerror(err));
-            return -1;
-        }
-    }
-    
-    // Allocate hardware parameters object
-    snd_pcm_hw_params_alloca(&audio_data->hw_params);
-    
-    // Configure hardware parameters for high-quality recording
-    snd_pcm_hw_params_any(audio_data->pcm_capture, audio_data->hw_params);
-    snd_pcm_hw_params_set_access(audio_data->pcm_capture, audio_data->hw_params, SND_PCM_ACCESS_RW_INTERLEAVED);
-    snd_pcm_hw_params_set_format(audio_data->pcm_capture, audio_data->hw_params, SND_PCM_FORMAT_S16_LE);
-    snd_pcm_hw_params_set_channels(audio_data->pcm_capture, audio_data->hw_params, runtime->config.channels);
-    
-    unsigned int sample_rate = runtime->config.sample_rate;
-    snd_pcm_hw_params_set_rate_near(audio_data->pcm_capture, audio_data->hw_params, &sample_rate, 0);
-    
-    // Optimize for low latency
-    snd_pcm_hw_params_set_periods(audio_data->pcm_capture, audio_data->hw_params, 4, 0);
-    snd_pcm_hw_params_set_period_size_near(audio_data->pcm_capture, audio_data->hw_params, &audio_data->buffer_frames, 0);
-    
-    // Apply hardware parameters
-    err = snd_pcm_hw_params(audio_data->pcm_capture, audio_data->hw_params);
-    if (err < 0) {
-        printf("Cannot set hardware parameters: %s\n", snd_strerror(err));
+    // For cross-compilation stub - actual I2S initialization would go here
+    #ifdef ETHERVOX_RPI_HARDWARE
+    // Open I2S device for audio capture
+    audio_data->i2s_fd = open("/dev/i2s", O_RDWR);
+    if (audio_data->i2s_fd < 0) {
+        printf("Cannot open I2S device for capture\n");
         return -1;
     }
     
-    // Prepare device
-    err = snd_pcm_prepare(audio_data->pcm_capture);
-    if (err < 0) {
-        printf("Cannot prepare audio interface for use: %s\n", snd_strerror(err));
-        return -1;
-    }
+    // Configure I2S parameters using ioctl
+    // This would involve setting sample rate, channels, bit depth, etc.
+    #else
+    // Stub for cross-compilation
+    printf("RPI audio capture started (stub)\n");
+    #endif
     
-    audio_data->is_recording = true;
-    printf("Raspberry Pi audio capture started with mic array support\n");
+    audio_data->is_capturing = true;
     return 0;
 }
 
 static int rpi_audio_stop_capture(ethervox_audio_runtime_t* runtime) {
+    if (!runtime || !runtime->platform_data) return -1;
+    
     rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
     
-    if (audio_data->pcm_capture) {
-        snd_pcm_close(audio_data->pcm_capture);
-        audio_data->pcm_capture = NULL;
+    #ifdef ETHERVOX_RPI_HARDWARE
+    if (audio_data->i2s_fd >= 0) {
+        close(audio_data->i2s_fd);
+        audio_data->i2s_fd = -1;
     }
+    #endif
     
-    // Disable mic array
-    bcm2835_gpio_write(audio_data->mic_array_enable_pin, LOW);
-    
-    audio_data->is_recording = false;
-    printf("Raspberry Pi audio capture stopped\n");
+    audio_data->is_capturing = false;
     return 0;
 }
 
 static int rpi_audio_start_playback(ethervox_audio_runtime_t* runtime) {
-    rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
-    int err;
+    if (!runtime || !runtime->platform_data) return -1;
     
-    // Open PCM device for playback
-    err = snd_pcm_open(&audio_data->pcm_playback, "hw:0,0", SND_PCM_STREAM_PLAYBACK, 0);
-    if (err < 0) {
-        err = snd_pcm_open(&audio_data->pcm_playback, "default", SND_PCM_STREAM_PLAYBACK, 0);
-        if (err < 0) {
-            printf("Cannot open audio device for playback: %s\n", snd_strerror(err));
-            return -1;
-        }
-    }
+    rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
+    
+    #ifdef ETHERVOX_RPI_HARDWARE
+    // I2S playback initialization would go here
+    #else
+    // Stub for cross-compilation
+    printf("RPI audio playback started (stub)\n");
+    #endif
     
     audio_data->is_playing = true;
-    printf("Raspberry Pi audio playback started\n");
     return 0;
 }
 
 static int rpi_audio_stop_playback(ethervox_audio_runtime_t* runtime) {
+    if (!runtime || !runtime->platform_data) return -1;
+    
     rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
     
-    if (audio_data->pcm_playback) {
-        snd_pcm_close(audio_data->pcm_playback);
-        audio_data->pcm_playback = NULL;
+    #ifdef ETHERVOX_RPI_HARDWARE
+    // Close I2S device if open
+    if (audio_data->i2s_fd >= 0) {
+        close(audio_data->i2s_fd);
+        audio_data->i2s_fd = -1;
     }
+    #endif
     
     audio_data->is_playing = false;
     printf("Raspberry Pi audio playback stopped\n");
@@ -224,4 +200,4 @@ int ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime) {
     return 0;
 }
 
-#endif // ETHERVOX_PLATFORM_RPI
+//#endif // ETHERVOX_PLATFORM_RPI

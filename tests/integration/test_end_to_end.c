@@ -41,7 +41,10 @@ void test_system_initialization() {
     
     // Test dialogue subsystem  
     ethervox_dialogue_engine_t dialogue_engine;
-    int dialogue_result = ethervox_dialogue_init(&dialogue_engine, "en");
+    // int dialogue_result = ethervox_dialogue_init(&dialogue_engine, "en");
+    ethervox_llm_config_t llm_config = ethervox_dialogue_get_default_llm_config();
+    strncpy(llm_config.language_code, "en", sizeof(llm_config.language_code) - 1);
+    int dialogue_result = ethervox_dialogue_init(&dialogue_engine, &llm_config);
     if (dialogue_result == 0) {
         printf("  ✓ Dialogue engine initialized successfully\n");
         ethervox_dialogue_cleanup(&dialogue_engine);
@@ -51,7 +54,7 @@ void test_system_initialization() {
     
     // Test plugin manager
     ethervox_plugin_manager_t plugin_manager;
-    int plugin_result = ethervox_plugin_manager_init(&plugin_manager);
+    int plugin_result = ethervox_plugin_manager_init(&plugin_manager,NULL);
     assert(plugin_result == 0);
     printf("  ✓ Plugin manager initialized successfully\n");
     ethervox_plugin_manager_cleanup(&plugin_manager);
@@ -95,7 +98,7 @@ void test_error_handling_chain() {
     
     // Test plugin manager error handling
     ethervox_plugin_manager_t manager;
-    result = ethervox_plugin_manager_init(NULL);
+    result = ethervox_plugin_manager_init(NULL,NULL);
     assert(result == -1);
     printf("  ✓ Plugin manager properly rejects null pointer\n");
     
@@ -108,7 +111,7 @@ void test_memory_management() {
     // Test multiple init/cleanup cycles
     for (int i = 0; i < 3; i++) {
         ethervox_plugin_manager_t manager;
-        int result = ethervox_plugin_manager_init(&manager);
+        int result = ethervox_plugin_manager_init(&manager,NULL);
         assert(result == 0);
         
         // Simulate some operations

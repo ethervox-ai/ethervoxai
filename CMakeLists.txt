@@ -8,7 +8,8 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Platform detection and configuration
-if(NOT DEFINED TARGET_PLATFORM)
+# Only auto-detect if not cross-compiling
+if(NOT DEFINED TARGET_PLATFORM AND NOT CMAKE_TOOLCHAIN_FILE)
     if(WIN32)
         set(TARGET_PLATFORM "WINDOWS")
     elseif(UNIX AND NOT APPLE)
@@ -17,6 +18,11 @@ if(NOT DEFINED TARGET_PLATFORM)
         set(TARGET_PLATFORM "MACOS")
     else()
         message(FATAL_ERROR "Unsupported platform")
+    endif()
+elseif(NOT DEFINED TARGET_PLATFORM)
+    # Cross-compiling - let toolchain set the platform
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+        set(TARGET_PLATFORM "RPI")
     endif()
 endif()
 
@@ -64,19 +70,65 @@ endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# Collect source files
-file(GLOB_RECURSE ETHERVOXAI_SOURCES 
-    "src/*.cpp"
-    "src/*.c"
-    "src/audio/*.cpp"
-    "src/audio/*.c"
-    "src/dialogue/*.cpp"
-    "src/dialogue/*.c" 
-    "src/platform/*.cpp"
-    "src/platform/*.c"
-    "src/plugins/*.cpp"
+# Collect core source files (non-platform specific)
+file(GLOB ETHERVOXAI_CORE_SOURCES 
+    "src/dialogue/*.c"
     "src/plugins/*.c"
 )
+
+# Add main entry point
+list(APPEND ETHERVOXAI_CORE_SOURCES "src/main.c")
+
+# Debug: Print what platform is detected
+message(STATUS "ETHERVOX_PLATFORM_RPI: ${ETHERVOX_PLATFORM_RPI}")
+message(STATUS "TARGET_PLATFORM: ${TARGET_PLATFORM}")
+message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
+
+# Platform-specific source files
+# Check multiple conditions for RPI detection
+if(ETHERVOX_PLATFORM_RPI OR 
+   TARGET_PLATFORM STREQUAL "RPI" OR 
+   CMAKE_SYSTEM_PROCESSOR STREQUAL "arm")
+    message(STATUS "Building for Raspberry Pi - using RPI platform sources")
+    set(PLATFORM_SOURCES
+        src/audio/platform_rpi.c
+        src/platform/rpi_hal.c
+    )
+elseif(TARGET_PLATFORM STREQUAL "ESP32")
+    message(STATUS "Building for ESP32 - using ESP32 platform sources")
+    set(PLATFORM_SOURCES
+        src/audio/platform_esp32.c
+        src/platform/esp32_hal.c
+    )
+elseif(WIN32 OR TARGET_PLATFORM STREQUAL "WINDOWS")
+    message(STATUS "Building for Windows - using Windows platform sources")
+    set(PLATFORM_SOURCES
+        src/audio/platform_windows.c
+        src/platform/desktop_hal.c
+    )
+elseif(APPLE OR TARGET_PLATFORM STREQUAL "MACOS")
+    message(STATUS "Building for macOS - using macOS platform sources")
+    set(PLATFORM_SOURCES
+        src/audio/platform_macos.c
+        src/platform/desktop_hal.c
+    )
+else()
+    message(STATUS "Building for Linux - using Linux platform sources")
+    # Linux/Desktop default
+    set(PLATFORM_SOURCES
+        src/audio/platform_linux.c
+        src/platform/desktop_hal.c
+    )
+endif()
+
+# Combine core and platform sources
+set(ETHERVOXAI_SOURCES ${ETHERVOXAI_CORE_SOURCES} ${PLATFORM_SOURCES})
+
+# Add platform_core.c which is common to all platforms
+list(APPEND ETHERVOXAI_SOURCES src/platform/platform_core.c)
+
+# Debug: Print sources being compiled
+message(STATUS "Platform sources: ${PLATFORM_SOURCES}")
 
 # Collect header files
 file(GLOB_RECURSE ETHERVOXAI_HEADERS
@@ -92,8 +144,12 @@ add_executable(ethervoxai ${ETHERVOXAI_SOURCES} ${ETHERVOXAI_HEADERS})
 # Platform-specific linking
 if(WIN32)
     target_link_libraries(ethervoxai winmm ws2_32 crypt32)
+elseif(TARGET_PLATFORM STREQUAL "RPI")
+    # Raspberry Pi - use bcm2835 library from sysroot
+    target_link_libraries(ethervoxai bcm2835 pthread curl ssl crypto m)
 elseif(UNIX AND NOT APPLE)
-    target_link_libraries(ethervoxai asound pthread curl ssl crypto)
+    # Linux desktop - use ALSA
+    target_link_libraries(ethervoxai asound pthread curl ssl crypto m)
 elseif(APPLE)
     target_link_libraries(ethervoxai "-framework CoreAudio" "-framework AudioUnit" "-framework CoreFoundation" pthread curl)
 endif()

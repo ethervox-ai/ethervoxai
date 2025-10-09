@@ -1,29 +1,37 @@
-# Raspberry Pi Cross-compilation toolchain file
+# CMake toolchain file for Raspberry Pi cross-compilation
+
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR arm)
 
-# Set up cross-compiler (adjust paths as needed)
-if(DEFINED ENV{RPI_TOOLCHAIN_PATH})
-    set(RPI_TOOLCHAIN_PATH $ENV{RPI_TOOLCHAIN_PATH})
-else()
-    # Default path for Raspberry Pi toolchain
-    set(RPI_TOOLCHAIN_PATH /opt/cross-pi-gcc/bin)
-endif()
+# Specify the cross compiler
+set(CMAKE_C_COMPILER arm-linux-gnueabihf-gcc)
+set(CMAKE_CXX_COMPILER arm-linux-gnueabihf-g++)
 
-# Toolchain binaries
-set(CMAKE_C_COMPILER ${RPI_TOOLCHAIN_PATH}/arm-linux-gnueabihf-gcc)
-set(CMAKE_CXX_COMPILER ${RPI_TOOLCHAIN_PATH}/arm-linux-gnueabihf-g++)
+# Where to find the target environment
+# Use CMAKE_CURRENT_LIST_DIR to make it portable
+get_filename_component(PROJECT_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+set(CMAKE_SYSROOT "${PROJECT_ROOT}/sysroot/rpi/usr")
 
-# Raspberry Pi specific flags
-set(CMAKE_C_FLAGS "-mcpu=cortex-a72 -mfpu=neon-fp-armv8 -mfloat-abi=hard" CACHE STRING "C Compiler Base Flags")
-set(CMAKE_CXX_FLAGS "-mcpu=cortex-a72 -mfpu=neon-fp-armv8 -mfloat-abi=hard" CACHE STRING "C++ Compiler Base Flags")
+set(CMAKE_FIND_ROOT_PATH 
+    /usr/arm-linux-gnueabihf
+    ${CMAKE_SYSROOT}
+)
 
-# Set the sysroot for Raspberry Pi
-if(DEFINED ENV{RPI_SYSROOT})
-    set(CMAKE_SYSROOT $ENV{RPI_SYSROOT})
-endif()
-
-# Search paths
+# Search for programs in the build host directories
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+
+# Search for libraries and headers in the target directories
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+
+# Explicitly add include and library paths
+include_directories(SYSTEM ${CMAKE_SYSROOT}/include)
+link_directories(${CMAKE_SYSROOT}/lib)
+
+# Define platform
+add_definitions(-DETHERVOX_PLATFORM_RPI)
+
+# Raspberry Pi specific flags
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard")

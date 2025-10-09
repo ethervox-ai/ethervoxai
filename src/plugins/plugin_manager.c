@@ -73,14 +73,8 @@ int ethervox_plugin_manager_init(ethervox_plugin_manager_t* manager, const char*
     snprintf(manager->config_file, sizeof(manager->config_file), 
              "%s/plugins.conf", manager->plugin_directory);
     
-    // Allocate plugin array
+    // Set max plugins
     manager->max_plugins = ETHERVOX_MAX_PLUGINS;
-    manager->plugins = (ethervox_plugin_t*)calloc(manager->max_plugins, sizeof(ethervox_plugin_t));
-    
-    if (!manager->plugins) {
-        return -1;
-    }
-    
     manager->is_initialized = true;
     
     printf("Plugin manager initialized with directory: %s\n", manager->plugin_directory);
@@ -93,6 +87,7 @@ int ethervox_plugin_manager_init(ethervox_plugin_manager_t* manager, const char*
     return 0;
 }
 
+// Cleanup plugin manager
 // Cleanup plugin manager
 void ethervox_plugin_manager_cleanup(ethervox_plugin_manager_t* manager) {
     if (!manager || !manager->is_initialized) return;
@@ -116,11 +111,10 @@ void ethervox_plugin_manager_cleanup(ethervox_plugin_manager_t* manager) {
         }
     }
     
-    if (manager->plugins) {
-        free(manager->plugins);
-        manager->plugins = NULL;
-    }
-    
+    // Don't free plugins array since it's embedded in the manager struct
+    // Just reset the manager state
+    manager->plugin_count = 0;
+    manager->loaded_plugins = 0;
     manager->is_initialized = false;
     printf("Plugin manager cleaned up\n");
 }
@@ -176,6 +170,32 @@ int ethervox_plugin_load(ethervox_plugin_manager_t* manager, const char* plugin_
 }
 
 // Execute plugin
+
+// Wrapper functions for type-safe plugin execution
+static int openai_execute_wrapper(const void* input, void* output) {
+    return ethervox_llm_plugin_openai(
+        (const ethervox_llm_request_t*)input,
+        (ethervox_llm_response_t*)output,
+        NULL
+    );
+}
+
+static int huggingface_execute_wrapper(const void* input, void* output) {
+    return ethervox_llm_plugin_huggingface(
+        (const ethervox_llm_request_t*)input,
+        (ethervox_llm_response_t*)output,
+        NULL
+    );
+}
+
+static int local_rag_execute_wrapper(const void* input, void* output) {
+    return ethervox_llm_plugin_local_rag(
+        (const ethervox_llm_request_t*)input,
+        (ethervox_llm_response_t*)output,
+        NULL
+    );
+}
+
 int ethervox_plugin_execute(ethervox_plugin_t* plugin, const void* input, void* output) {
     if (!plugin || plugin->status != ETHERVOX_PLUGIN_STATUS_LOADED) {
         return -1;
@@ -191,89 +211,124 @@ int ethervox_plugin_execute(ethervox_plugin_t* plugin, const void* input, void* 
     return -1;
 }
 
-// OpenAI plugin implementation
-int ethervox_llm_plugin_openai(const ethervox_llm_request_t* request, ethervox_llm_response_t* response, 
-                               const char* api_key) {
-    if (!request || !response || !api_key) {
-        return -1;
-    }
+// OpenAI plugin implementation (keep only ONE definition)
+int ethervox_llm_plugin_openai(const ethervox_llm_request_t* request, ethervox_llm_response_t* response,
+                               void* user_data) {
+    if (!request || !response) return -1;
     
-    // Placeholder implementation
-    // In production, this would make HTTP requests to OpenAI API
-    memset(response, 0, sizeof(ethervox_llm_response_t));
-    
-    response->text = strdup("This is a placeholder response from OpenAI plugin. "
-                           "To use this plugin, provide a valid API key and implement HTTP client.");
-    response->model_name = strdup("gpt-3.5-turbo");
-    response->token_count = 20;
-    response->processing_time_ms = 500;
+    // Simulate OpenAI API call
+    response->text = (char*)malloc(1024);
+    snprintf(response->text, 1024, "OpenAI response to: %s", request->prompt);
+    strncpy(response->language_code, request->language_code, 7);
     response->confidence = 0.95f;
+    response->processing_time_ms = 100;
+    response->token_count = 50;
+    response->tokens_used = 50;
+    response->model_name = strdup("gpt-3.5-turbo");
+    response->requires_external_llm = false;
+    response->external_llm_prompt = NULL;
     response->truncated = false;
     response->finish_reason = strdup("stop");
     
-    printf("OpenAI plugin called (placeholder)\n");
     return 0;
 }
 
 // HuggingFace plugin implementation
-int ethervox_llm_plugin_huggingface(const ethervox_llm_request_t* request, ethervox_llm_response_t* response, 
-                                   const char* model_name, const char* api_key) {
-    if (!request || !response || !model_name) {
-        return -1;
-    }
+int ethervox_llm_plugin_huggingface(const ethervox_llm_request_t* request, ethervox_llm_response_t* response,
+                                   void* user_data) {
+    if (!request || !response) return -1;
     
-    // Placeholder implementation
-    memset(response, 0, sizeof(ethervox_llm_response_t));
+    // user_data can contain model name if needed
+    const char* model_name = (user_data && strlen((char*)user_data) > 0) ? (char*)user_data : "gpt2";
     
-    response->text = strdup("This is a placeholder response from HuggingFace plugin. "
-                           "Implement HTTP client to connect to HuggingFace Inference API.");
+    // Simulate HuggingFace inference
+    response->text = (char*)malloc(1024);
+    snprintf(response->text, 1024, "HuggingFace (%s) response to: %s", model_name, request->prompt);
+    strncpy(response->language_code, request->language_code, 7);
+    response->confidence = 0.90f;
+    response->processing_time_ms = 150;
+    response->token_count = 45;
+    response->tokens_used = 45;
     response->model_name = strdup(model_name);
-    response->token_count = 18;
-    response->processing_time_ms = 750;
-    response->confidence = 0.88f;
+    response->requires_external_llm = false;
+    response->external_llm_prompt = NULL;
     response->truncated = false;
     response->finish_reason = strdup("stop");
     
-    printf("HuggingFace plugin called with model: %s (placeholder)\n", model_name);
     return 0;
 }
 
 // Local RAG plugin implementation
 int ethervox_llm_plugin_local_rag(const ethervox_llm_request_t* request, ethervox_llm_response_t* response,
-                                 const char* index_path) {
-    if (!request || !response || !index_path) {
-        return -1;
-    }
+                                 void* user_data) {
+    if (!request || !response) return -1;
     
-    // Placeholder implementation
-    memset(response, 0, sizeof(ethervox_llm_response_t));
-    
-    response->text = strdup("This is a placeholder response from Local RAG plugin. "
-                           "Implement vector database integration for local knowledge retrieval.");
+    // Simulate local RAG processing
+    response->text = (char*)malloc(1024);
+    snprintf(response->text, 1024, "Local RAG response to: %s", request->prompt);
+    strncpy(response->language_code, request->language_code, 7);
+    response->confidence = 0.85f;
+    response->processing_time_ms = 80;
+    response->token_count = 60;
+    response->tokens_used = 60;
     response->model_name = strdup("local-rag");
-    response->token_count = 22;
-    response->processing_time_ms = 200;  // Faster as it's local
-    response->confidence = 0.92f;
+    response->requires_external_llm = false;
+    response->external_llm_prompt = NULL;
     response->truncated = false;
     response->finish_reason = strdup("rag_complete");
     
-    printf("Local RAG plugin called with index: %s (placeholder)\n", index_path);
     return 0;
 }
 
 // Register built-in OpenAI plugin
 int ethervox_plugin_register_builtin_openai(ethervox_plugin_manager_t* manager) {
-    return ethervox_plugin_load(manager, "builtin_openai");
+    if (!manager || manager->plugin_count >= ETHERVOX_MAX_PLUGINS) return -1;
+    
+    ethervox_plugin_t* plugin = &manager->plugins[manager->plugin_count];
+    
+    strncpy(plugin->name, "openai", sizeof(plugin->name) - 1);
+    strncpy(plugin->version, "1.0.0", sizeof(plugin->version) - 1);
+    plugin->type = ETHERVOX_PLUGIN_LLM;
+    plugin->status = ETHERVOX_PLUGIN_STATUS_LOADED;
+    plugin->execute = openai_execute_wrapper;  // Use wrapper instead of direct assignment
+    plugin->user_data = NULL;
+    
+    manager->plugin_count++;
+    return 0;
 }
 
 // Register built-in HuggingFace plugin
 int ethervox_plugin_register_builtin_huggingface(ethervox_plugin_manager_t* manager) {
-    return ethervox_plugin_load(manager, "builtin_huggingface");
+    if (!manager || manager->plugin_count >= ETHERVOX_MAX_PLUGINS) return -1;
+    
+    ethervox_plugin_t* plugin = &manager->plugins[manager->plugin_count];
+    
+    strncpy(plugin->name, "huggingface", sizeof(plugin->name) - 1);
+    strncpy(plugin->version, "1.0.0", sizeof(plugin->version) - 1);
+    plugin->type = ETHERVOX_PLUGIN_LLM;
+    plugin->status = ETHERVOX_PLUGIN_STATUS_LOADED;
+    plugin->execute = huggingface_execute_wrapper;  // Use wrapper
+    plugin->user_data = NULL;
+    
+    manager->plugin_count++;
+    return 0;
 }
 
 // Register built-in Local RAG plugin
 int ethervox_plugin_register_builtin_local_rag(ethervox_plugin_manager_t* manager) {
-    return ethervox_plugin_load(manager, "builtin_local_rag");
+    if (!manager || manager->plugin_count >= ETHERVOX_MAX_PLUGINS) return -1;
+    
+    ethervox_plugin_t* plugin = &manager->plugins[manager->plugin_count];
+    
+    strncpy(plugin->name, "local_rag", sizeof(plugin->name) - 1);
+    strncpy(plugin->version, "1.0.0", sizeof(plugin->version) - 1);
+    plugin->type = ETHERVOX_PLUGIN_LLM;
+    plugin->status = ETHERVOX_PLUGIN_STATUS_LOADED;
+    plugin->execute = local_rag_execute_wrapper;  // Use wrapper
+    plugin->user_data = NULL;
+    
+    manager->plugin_count++;
+    return 0;
 }
 
 // Free LLM request
@@ -299,20 +354,3 @@ void ethervox_llm_request_free(ethervox_llm_request_t* request) {
     }
 }
 
-// Free LLM response
-void ethervox_llm_response_free(ethervox_llm_response_t* response) {
-    if (!response) return;
-    
-    if (response->text) {
-        free(response->text);
-        response->text = NULL;
-    }
-    if (response->model_name) {
-        free(response->model_name);
-        response->model_name = NULL;
-    }
-    if (response->finish_reason) {
-        free(response->finish_reason);
-        response->finish_reason = NULL;
-    }
-}
