@@ -1,20 +1,62 @@
-# Minimal Linux build config for mixed Python/Node projects
-.PHONY: help setup-venv install-deps build test clean configure configure-rpi build-rpi
+# Makefile for EthervoxAI
+# Supports native build, Raspberry Pi cross-compilation, Windows cross-compilation, and ESP32
+# Usage: make help for available targets
+	
+.PHONY: help setup-venv install-deps build test clean
+.PHONY: configure configure-rpi configure-windows configure-all
+.PHONY: build-rpi build-windows build-esp32 build-all
+.PHONY: clean-rpi clean-windows clean-esp32 clean-all
+.PHONY: setup-esp32 flash-esp32 monitor-esp32
 
 help:
+	@echo "=========================================="
+	@echo "  EthervoxAI Build System"
+	@echo "=========================================="
+	@echo ""
 	@echo "Usage: make <target>"
-	@echo "Targets:"
-	@echo "  configure       - Configure for native build"
-	@echo "  configure-rpi   - Configure for Raspberry Pi cross-compilation"
+	@echo ""
+	@echo "General Targets:"
+	@echo "  help            - Show this help message"
+	@echo "  install-deps    - Install all dependencies"
+	@echo "  setup-venv      - Set up Python virtual environment"
+	@echo "  clean           - Clean native build artifacts"
+	@echo "  clean-all       - Clean ALL platform build artifacts"
+	@echo ""
+	@echo "Multi-Platform Targets:"
+	@echo "  configure-all   - Configure for all platforms"
+	@echo "  build-all       - Build for all platforms"
+	@echo ""
+	@echo "Linux/Desktop Build:"
+	@echo "  configure       - Configure for native Linux build"
 	@echo "  build           - Build for native platform"
+	@echo "  test            - Run unit tests"
+	@echo ""
+	@echo "Raspberry Pi Cross-Compilation:"
+	@echo "  configure-rpi   - Configure for Raspberry Pi"
 	@echo "  build-rpi       - Cross-compile for Raspberry Pi"
-	@echo "  test            - Run tests"
-	@echo "  clean           - Clean build artifacts"
 	@echo "  clean-rpi       - Clean Raspberry Pi build artifacts"
+	@echo ""
+	@echo "Windows Cross-Compilation:"
+	@echo "  configure-windows - Configure for Windows"
 	@echo "  build-windows   - Cross-compile for Windows"
 	@echo "  clean-windows   - Clean Windows build artifacts"
-	@echo "  install-deps    - Install dependencies"
-	@echo "  setup-venv     - Set up Python virtual environment"
+	@echo ""
+	@echo "ESP32 Development:"
+	@echo "  setup-esp32     - Set up ESP32 toolchain (one-time)"
+	@echo "  build-esp32     - Build for ESP32"
+	@echo "  flash-esp32     - Flash ESP32 device (ESP_PORT=/dev/ttyUSB0)"
+	@echo "  monitor-esp32   - Open serial monitor"
+	@echo "  clean-esp32     - Clean ESP32 build artifacts"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make build-all              # Build for all platforms"
+	@echo "  make build-rpi              # Build for Raspberry Pi only"
+	@echo "  make clean-all              # Clean all builds"
+	@echo "  make flash-esp32 ESP_PORT=/dev/ttyUSB1"
+	@echo "=========================================="
+
+# Default ESP32 port (override with: make flash-esp32 ESP_PORT=/dev/ttyUSB1)
+ESP_PORT ?= /dev/ttyUSB0
 
 setup-venv:
 	@test -d .venv || python3 -m venv .venv
@@ -90,3 +132,47 @@ test: install-deps
 clean:
 	@echo "Cleaning build artifacts..."
 	@rm -rf .venv build build-rpi dist *.egg-info node_modules
+
+setup-esp32:
+	@./scripts/setup-esp32-toolchain.sh
+	@mkdir -p esp32-project/main
+	@[ -L esp32-project/src ] || ln -s ../src esp32-project/src
+	@[ -L esp32-project/include ] || ln -s ../include esp32-project/include
+
+build-esp32:
+	@echo "Building for ESP32..."
+	@cd esp32-project && . $(HOME)/esp/esp-idf/export.sh && idf.py build
+
+flash-esp32:
+	@echo "Flashing ESP32..."
+	@cd esp32-project && . $(HOME)/esp/esp-idf/export.sh && idf.py -p $(ESP_PORT) flash
+
+monitor-esp32:
+	@echo "Opening serial monitor..."
+	@cd esp32-project && . $(HOME)/esp/esp-idf/export.sh && idf.py -p $(ESP_PORT) monitor
+
+clean-esp32:
+	@echo "Cleaning ESP32 build..."
+	@if [ -d "esp32-project/build" ]; then \
+		cd esp32-project && . $(HOME)/esp/esp-idf/export.sh && idf.py fullclean 2>/dev/null || rm -rf build; \
+	else \
+		echo "No ESP32 build directory to clean"; \
+	fi
+	@rm -rf esp32-project/sdkconfig esp32-project/sdkconfig.old
+	
+# Multi-platform targets
+configure-all: configure configure-rpi configure-windows
+	@echo "All platforms configured!"
+
+build-all: build build-rpi build-windows build-esp32
+	@echo "=========================================="
+	@echo "  All Platform Builds Complete!"
+	@echo "=========================================="
+	@echo "Linux binary:   build/ethervoxai"
+	@echo "RPI binary:     build-rpi/ethervoxai"
+	@echo "Windows binary: build-windows/ethervoxai.exe"
+	@echo "ESP32 binary:   build/ethervoxai.bin"
+	@echo "=========================================="
+
+clean-all: clean clean-rpi clean-windows clean-esp32
+	@echo "All build artifacts cleaned!"

@@ -15,185 +15,176 @@
  */
 #include "ethervox/audio.h"
 #include <stdio.h>
+#include <string.h>
 
 #ifdef ETHERVOX_PLATFORM_ESP32
-#include "driver/i2s.h"
-#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "driver/i2s_std.h"
+#include "esp_log.h"
+#include "esp_timer.h"
 
 static const char* TAG = "ESP32_AUDIO";
 
+// I2S Configuration for ESP32
+#define I2S_SAMPLE_RATE     16000
+#define I2S_BITS_PER_SAMPLE 16
+#define I2S_CHANNEL_NUM     1
+
+// GPIO pins for I2S (adjust based on your hardware)
+#define I2S_BCK_IO          26
+#define I2S_WS_IO           25
+#define I2S_DATA_IN_IO      33
+
+// Platform-specific audio data
 typedef struct {
-    i2s_port_t i2s_port;
-    i2s_config_t i2s_config;
-    i2s_pin_config_t pin_config;
-    uint8_t* i2s_buffer;
+    i2s_chan_handle_t rx_handle;
+    uint8_t buffer[1024];
     size_t buffer_size;
-    bool is_recording;
-    bool is_playing;
-    TaskHandle_t audio_task_handle;
 } esp32_audio_data_t;
 
-static void esp32_audio_task(void* parameter) {
-    ethervox_audio_runtime_t* runtime = (ethervox_audio_runtime_t*)parameter;
-    esp32_audio_data_t* audio_data = (esp32_audio_data_t*)runtime->platform_data;
+// Initialize audio runtime
+int ethervox_audio_init(ethervox_audio_runtime_t* runtime, const ethervox_audio_config_t* config) {
+    if (!runtime) return -1;
     
-    size_t bytes_read;
-    ethervox_audio_buffer_t buffer;
+    memset(runtime, 0, sizeof(ethervox_audio_runtime_t));
+    runtime->is_initialized = true;
     
-    while (audio_data->is_recording) {
-        // Read audio data from I2S
-        esp_err_t result = i2s_read(audio_data->i2s_port, audio_data->i2s_buffer, 
-                                   audio_data->buffer_size, &bytes_read, portMAX_DELAY);
-        
-        if (result == ESP_OK && bytes_read > 0) {
-            // Convert to float and call callback
-            buffer.data = (float*)malloc(bytes_read / 2 * sizeof(float));
-            buffer.size = bytes_read / 2;
-            buffer.channels = runtime->config.channels;
-            buffer.timestamp_us = esp_timer_get_time();
-            
-            // Convert 16-bit PCM to float
-            int16_t* pcm_data = (int16_t*)audio_data->i2s_buffer;
-            for (size_t i = 0; i < buffer.size; i++) {
-                buffer.data[i] = pcm_data[i] / 32768.0f;
-            }
-            
-            if (runtime->on_audio_data) {
-                runtime->on_audio_data(&buffer, runtime->user_data);
-            }
-            
-            ethervox_audio_buffer_free(&buffer);
-        }
-        
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
+    // Use config if needed (for now just acknowledge it exists)
+    (void)config;  // Suppress unused parameter warning
     
-    vTaskDelete(NULL);
+    ESP_LOGI(TAG, "Audio runtime initialized for ESP32");
+    return 0;
 }
-
-static int esp32_audio_init(ethervox_audio_runtime_t* runtime, const ethervox_audio_config_t* config) {
+// Start audio capture
+int ethervox_audio_start_capture(ethervox_audio_runtime_t* runtime) {
+    if (!runtime || !runtime->is_initialized) return -1;
+    
+    ESP_LOGI(TAG, "Initializing I2S for audio capture...");
+    
+    // Allocate platform-specific data
     esp32_audio_data_t* audio_data = (esp32_audio_data_t*)malloc(sizeof(esp32_audio_data_t));
     if (!audio_data) {
+        ESP_LOGE(TAG, "Failed to allocate audio data");
         return -1;
     }
     
-    memset(audio_data, 0, sizeof(esp32_audio_data_t));
-    runtime->platform_data = audio_data;
+    audio_data->buffer_size = sizeof(audio_data->buffer);
     
-    audio_data->i2s_port = I2S_NUM_0;
-    audio_data->buffer_size = config->buffer_size * 2; // 16-bit samples
-    audio_data->i2s_buffer = (uint8_t*)malloc(audio_data->buffer_size);
+    // Configure I2S channel
+    i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
     
-    if (!audio_data->i2s_buffer) {
+    esp_err_t ret = i2s_new_channel(&chan_cfg, NULL, &audio_data->rx_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create I2S channel: %s", esp_err_to_name(ret));
         free(audio_data);
         return -1;
     }
     
-    // I2S configuration
-    audio_data->i2s_config = (i2s_config_t) {
-        .mode = I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_TX,
-        .sample_rate = config->sample_rate,
-        .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-        .channel_format = (config->channels == 1) ? I2S_CHANNEL_FMT_ONLY_LEFT : I2S_CHANNEL_FMT_RIGHT_LEFT,
-        .communication_format = I2S_COMM_FORMAT_STAND_I2S,
-        .intr_alloc_flags = ESP_INTR_FLAG_LEVEL2,
-        .dma_buf_count = 2,
-        .dma_buf_len = config->buffer_size / 2,
-        .use_apll = false,
-        .tx_desc_auto_clear = true,
-        .fixed_mclk = 0
+    // Configure I2S standard mode
+    i2s_std_config_t std_cfg = {
+        .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(I2S_SAMPLE_RATE),
+        .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
+        .gpio_cfg = {
+            .mclk = I2S_GPIO_UNUSED,
+            .bclk = I2S_BCK_IO,
+            .ws = I2S_WS_IO,
+            .dout = I2S_GPIO_UNUSED,
+            .din = I2S_DATA_IN_IO,
+            .invert_flags = {
+                .mclk_inv = false,
+                .bclk_inv = false,
+                .ws_inv = false,
+            },
+        },
     };
     
-    // I2S pin configuration (adjust for your hardware)
-    audio_data->pin_config = (i2s_pin_config_t) {
-        .bck_io_num = 26,     // Bit clock
-        .ws_io_num = 25,      // Word select
-        .data_out_num = 22,   // Data out (for playback)
-        .data_in_num = 23     // Data in (for recording)
-    };
-    
-    ESP_LOGI(TAG, "ESP32 audio driver initialized");
-    return 0;
-}
-
-static int esp32_audio_start_capture(ethervox_audio_runtime_t* runtime) {
-    esp32_audio_data_t* audio_data = (esp32_audio_data_t*)runtime->platform_data;
-    
-    // Install and start I2S driver
-    esp_err_t result = i2s_driver_install(audio_data->i2s_port, &audio_data->i2s_config, 0, NULL);
-    if (result != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to install I2S driver: %s", esp_err_to_name(result));
+    ret = i2s_channel_init_std_mode(audio_data->rx_handle, &std_cfg);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize I2S standard mode: %s", esp_err_to_name(ret));
+        i2s_del_channel(audio_data->rx_handle);
+        free(audio_data);
         return -1;
     }
     
-    result = i2s_set_pin(audio_data->i2s_port, &audio_data->pin_config);
-    if (result != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set I2S pins: %s", esp_err_to_name(result));
-        i2s_driver_uninstall(audio_data->i2s_port);
+    ret = i2s_channel_enable(audio_data->rx_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to enable I2S channel: %s", esp_err_to_name(ret));
+        i2s_del_channel(audio_data->rx_handle);
+        free(audio_data);
         return -1;
     }
     
-    // Start audio processing task
-    audio_data->is_recording = true;
-    xTaskCreate(esp32_audio_task, "audio_task", 4096, runtime, 5, &audio_data->audio_task_handle);
+    runtime->platform_data = audio_data;
+    runtime->is_capturing = true;
     
-    ESP_LOGI(TAG, "ESP32 audio capture started");
+    ESP_LOGI(TAG, "I2S audio capture started successfully");
     return 0;
 }
 
-static int esp32_audio_stop_capture(ethervox_audio_runtime_t* runtime) {
+// Stop audio capture
+int ethervox_audio_stop_capture(ethervox_audio_runtime_t* runtime) {
+    if (!runtime || !runtime->is_capturing) return -1;
+    
     esp32_audio_data_t* audio_data = (esp32_audio_data_t*)runtime->platform_data;
-    
-    audio_data->is_recording = false;
-    
-    if (audio_data->audio_task_handle) {
-        vTaskDelete(audio_data->audio_task_handle);
-        audio_data->audio_task_handle = NULL;
-    }
-    
-    i2s_driver_uninstall(audio_data->i2s_port);
-    
-    ESP_LOGI(TAG, "ESP32 audio capture stopped");
-    return 0;
-}
-
-static int esp32_audio_start_playback(ethervox_audio_runtime_t* runtime) {
-    esp32_audio_data_t* audio_data = (esp32_audio_data_t*)runtime->platform_data;
-    audio_data->is_playing = true;
-    ESP_LOGI(TAG, "ESP32 audio playback started");
-    return 0;
-}
-
-static int esp32_audio_stop_playback(ethervox_audio_runtime_t* runtime) {
-    esp32_audio_data_t* audio_data = (esp32_audio_data_t*)runtime->platform_data;
-    audio_data->is_playing = false;
-    ESP_LOGI(TAG, "ESP32 audio playback stopped");
-    return 0;
-}
-
-static void esp32_audio_cleanup(ethervox_audio_runtime_t* runtime) {
-    esp32_audio_data_t* audio_data = (esp32_audio_data_t*)runtime->platform_data;
-    
     if (audio_data) {
-        if (audio_data->i2s_buffer) {
-            free(audio_data->i2s_buffer);
-        }
+        i2s_channel_disable(audio_data->rx_handle);
+        i2s_del_channel(audio_data->rx_handle);
         free(audio_data);
         runtime->platform_data = NULL;
     }
-    ESP_LOGI(TAG, "ESP32 audio driver cleaned up");
+    
+    runtime->is_capturing = false;
+    ESP_LOGI(TAG, "I2S audio capture stopped");
+    return 0;
 }
 
-int ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime) {
-    runtime->driver.init = esp32_audio_init;
-    runtime->driver.start_capture = esp32_audio_start_capture;
-    runtime->driver.stop_capture = esp32_audio_stop_capture;
-    runtime->driver.start_playback = esp32_audio_start_playback;
-    runtime->driver.stop_playback = esp32_audio_stop_playback;
-    runtime->driver.cleanup = esp32_audio_cleanup;
+// Read audio data
+int ethervox_audio_read(ethervox_audio_runtime_t* runtime, ethervox_audio_buffer_t* buffer) {
+    if (!runtime || !buffer || !runtime->is_capturing) return -1;
     
+    esp32_audio_data_t* audio_data = (esp32_audio_data_t*)runtime->platform_data;
+    if (!audio_data) return -1;
+    
+    size_t bytes_read = 0;
+    esp_err_t ret = i2s_channel_read(audio_data->rx_handle, audio_data->buffer, 
+                                     audio_data->buffer_size, &bytes_read, 
+                                     portMAX_DELAY);
+    
+    if (ret != ESP_OK || bytes_read == 0) {
+        return -1;
+    }
+    
+    // Cast to float* as expected by the header
+    buffer->data = (float*)audio_data->buffer;
+    buffer->size = bytes_read;
+    buffer->timestamp_us = esp_timer_get_time();
+    buffer->channels = I2S_CHANNEL_NUM;
+    
+    return 0;
+}
+
+// Cleanup audio runtime
+void ethervox_audio_cleanup(ethervox_audio_runtime_t* runtime) {
+    if (!runtime) return;
+    
+    if (runtime->is_capturing) {
+        ethervox_audio_stop_capture(runtime);
+    }
+    
+    runtime->is_initialized = false;
+    ESP_LOGI(TAG, "Audio runtime cleaned up");
+}
+
+// Platform driver registration (called by audio_core during initialization)
+int ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime) {
+    if (!runtime) return -1;
+    
+    // For ESP32, we don't need to register function pointers
+    // because we directly implement the ethervox_audio_* functions
+    // The linker will resolve them automatically
+    
+    ESP_LOGI(TAG, "ESP32 audio platform driver registered");
     return 0;
 }
 

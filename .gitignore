@@ -51,6 +51,7 @@ build/
 out/
 build-*/
 sysroot/
+esp32-project/build/
 
 # TypeScript incremental build info
 *.tsbuildinfo
@@ -165,16 +166,11 @@ docs/INTERNAL_README_WINDOWS_DEMO.md
 docs/INTERNAL_WINDOWS_DESKTOP_DEMO.md
 docs/INTERNAL_REFACTORING-SUMMARY.md
 docs/INTERNAL_MULTI-LANGUAGE-STRATEGY.md
-=======
-INTERNAL_*.md
-.pio/
-org-*.md
-package-lock.json
+docs/INTERNAL_MODEL-INTEGRATION-STRATEGY.md
 
-# Private implementations moved to separate repositories
-# ===================================================
-
-# Android implementation (moved to private repo)
-implementations/android/
->>>>>>> adb2855380b923fb4a5786acdc70450e196d3c03
-.venv/lib64
+# ESP32 build artifacts
+esp32-project/build/
+esp32-project/sdkconfig
+esp32-project/sdkconfig.old
+esp32-project/.cache/
+esp32-project/dependencies.lock

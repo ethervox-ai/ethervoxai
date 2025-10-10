@@ -22,6 +22,7 @@
 #include <driver/spi_master.h>
 #include <esp_system.h>
 #include <esp_timer.h>
+#include <esp_sleep.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -89,26 +90,32 @@ static bool esp32_gpio_read(uint32_t pin) {
     return gpio_get_level(pin) != 0;
 }
 
-static int esp32_i2c_write(uint8_t device_addr, uint8_t reg_addr, const uint8_t* data, size_t len) {
+static int esp32_i2c_write(uint32_t bus_id, uint8_t device_addr, const uint8_t* data, uint32_t len) {
+    if (!data || len == 0) return -1;
+    
+    // Use bus_id to select I2C port (default to I2C_NUM_0)
+    i2c_port_t i2c_num = (bus_id == 0) ? I2C_NUM_0 : I2C_NUM_1;
+    
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, (device_addr << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_write_byte(cmd, reg_addr, true);
     i2c_master_write(cmd, data, len, true);
     i2c_master_stop(cmd);
     
-    esp_err_t ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 1000 / portTICK_PERIOD_MS);
+    esp_err_t ret = i2c_master_cmd_begin(i2c_num, cmd, 1000 / portTICK_PERIOD_MS);
     i2c_cmd_link_delete(cmd);
     
     return (ret == ESP_OK) ? 0 : -1;
 }
 
-static int esp32_i2c_read(uint8_t device_addr, uint8_t reg_addr, uint8_t* data, size_t len) {
+static int esp32_i2c_read(uint32_t bus_id, uint8_t device_addr, uint8_t* data, uint32_t len) {
+    if (!data || len == 0) return -1;
+    
+    // Use bus_id to select I2C port (default to I2C_NUM_0)
+    i2c_port_t i2c_num = (bus_id == 0) ? I2C_NUM_0 : I2C_NUM_1;
+    
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (device_addr << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_write_byte(cmd, reg_addr, true);
-    i2c_master_start(cmd);  // Repeated start
     i2c_master_write_byte(cmd, (device_addr << 1) | I2C_MASTER_READ, true);
     
     if (len > 1) {
@@ -118,29 +125,33 @@ static int esp32_i2c_read(uint8_t device_addr, uint8_t reg_addr, uint8_t* data, 
     
     i2c_master_stop(cmd);
     
-    esp_err_t ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 1000 / portTICK_PERIOD_MS);
+    esp_err_t ret = i2c_master_cmd_begin(i2c_num, cmd, 1000 / portTICK_PERIOD_MS);
     i2c_cmd_link_delete(cmd);
     
     return (ret == ESP_OK) ? 0 : -1;
 }
 
-static int esp32_spi_transfer(const uint8_t* tx_data, uint8_t* rx_data, size_t len) {
+static int esp32_spi_transfer(uint32_t bus_id, const uint8_t* tx_data, uint8_t* rx_data, uint32_t len) {
     // Basic SPI transfer - would need proper configuration in real implementation
+    // bus_id could be used to select SPI host (SPI2_HOST, SPI3_HOST)
     spi_transaction_t transaction = {
         .length = len * 8,
         .tx_buffer = tx_data,
         .rx_buffer = rx_data,
     };
     
+    // Note: In real implementation, you'd need to store spi_device_handle_t per bus_id
     return spi_device_transmit(NULL, &transaction);  // NULL device handle - placeholder
 }
 
-static void esp32_delay_ms(uint32_t ms) {
+static uint32_t esp32_delay_ms(uint32_t ms) {
     vTaskDelay(ms / portTICK_PERIOD_MS);
+    return ms;
 }
 
-static void esp32_delay_us(uint32_t us) {
+static uint32_t esp32_delay_us(uint32_t us) {
     esp_rom_delay_us(us);
+    return us;
 }
 
 static uint64_t esp32_get_timestamp_us(void) {
@@ -194,8 +205,8 @@ int esp32_hal_register(ethervox_platform_t* platform) {
     platform->hal.delay_us = esp32_delay_us;
     platform->hal.get_timestamp_us = esp32_get_timestamp_us;
     
-    platform->hal.reset = esp32_reset;
-    platform->hal.enter_sleep_mode = esp32_enter_sleep_mode;
+    platform->hal.system_reset = esp32_reset;
+    platform->hal.system_sleep = esp32_enter_sleep_mode;
     platform->hal.get_free_heap_size = esp32_get_free_heap_size;
     platform->hal.get_cpu_temperature = esp32_get_cpu_temperature;
     

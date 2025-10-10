@@ -18,6 +18,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <inttypes.h>
 
 // Supported languages for MVP
 static const char* SUPPORTED_LANGUAGES[] = {
@@ -142,7 +143,7 @@ bool ethervox_dialogue_is_language_supported(const char* language_code) {
 static char* generate_conversation_id(void) {
     static uint32_t counter = 0;
     char* id = (char*)malloc(32);
-    snprintf(id, 32, "conv_%u_%lu", ++counter, (unsigned long)time(NULL));
+    snprintf(id, 32, "conv_%" PRIu32 "_%lu", ++counter, (unsigned long)time(NULL));
     return id;
 }
 

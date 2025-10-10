@@ -50,40 +50,126 @@ EtherVoxAI is an open-source voice AI platform designed for privacy-conscious us
 
 ### Prerequisites
 
-- **For Desktop Development**: GCC/Clang, CMake 3.20+, Node.js 18+
-- **For ESP32**: ESP-IDF 5.0+, Xtensa toolchain
-- **For Raspberry Pi**: ARM GCC toolchain, WiringPi library
+**Desktop Development (Linux/Windows/macOS):**
+- GCC/Clang or MinGW (for Windows cross-compilation)
+- CMake 3.16+
+- Node.js 18+ (for dashboard)
 
-### 1. Clone and Build
+**Raspberry Pi Cross-Compilation:**
+- ARM GCC cross-compiler (`gcc-arm-linux-gnueabihf`)
+- bcm2835 library (auto-installed via setup script)
+- OpenSSL and libcurl ARM libraries
+
+**ESP32 Development:**
+- ESP-IDF 5.0+
+- Xtensa toolchain
+- (Optional) USB redirection to WSL on Windows 11
+
+
+### 1. Clone and Setup
 
 ```bash
 # Clone the repository
 git clone https://github.com/ethervox-ai/ethervoxai.git
 cd ethervoxai
 
-# Build for your platform
+# Install dependencies (optional - auto-installs on first build)
+make install-deps
+```
+
+### 2. Platform-Specific Builds
+
+**Linux (Native Build):**
+```bash
+# Configure and build
+make configure
+make build
+
+# Or use direct CMake
 mkdir build && cd build
 cmake ..
 make -j$(nproc)
+
+# Run tests
+make test
 ```
 
-### 2. Cross-Platform Builds
+**Raspberry Pi (Cross-Compilation from Linux):**
+```bash
+# First-time setup: Install ARM toolchain and libraries
+./scripts/setup-rpi-toolchain.sh
+
+# Configure and build
+make configure-rpi
+make build-rpi
+
+# The binary will be in build-rpi/ethervoxai
+# Copy to your Raspberry Pi and run
+```
+
+**Windows (Cross-Compilation from Linux):**
+```bash
+# Install Windows Cross Compilation Tool chain
+cd /<username>/ethervoxai
+./scripts/setup-windows-toolchain.sh
+
+# Configure and build
+make configure-windows
+make build-windows
+
+# The .exe will be in build-windows/ethervoxai.exe
+```
+
+**ESP32 (Using ESP-IDF):**
+```bash
+# Activate ESP-IDF environment
+. ~/esp/esp-idf/export.sh
+
+# Navigate to your project
+cd ~/ethervoxai
+
+# Set the target chip
+idf.py set-target esp32s3
+
+# Configure the project (optional - opens menuconfig)
+idf.py menuconfig
+
+# Build the project
+idf.py build
+
+# Flash to device (replace with your port)
+# In WSL, this might be /dev/ttyUSB0 or similar after USB passthrough
+idf.py -p /dev/ttyUSB0 flash
+
+# Flash and monitor
+idf.py -p /dev/ttyUSB0 flash monitor
+```
+!NOTE:
+to flash in WSL directly you need to redirect the Windows USB port to WSL. To do so check the section 
+
+### 3. Build Targets
+
+The project uses a unified Makefile with platform-specific targets:
 
 ```bash
-# ESP32 build
-cmake -DCMAKE_TOOLCHAIN_FILE=cmake/esp32.cmake ..
-make
+# Linux native build
+make                    # Default: configure and build
+make clean              # Clean build artifacts
+make test               # Run unit tests
 
-# Raspberry Pi build  
-cmake -DCMAKE_TOOLCHAIN_FILE=cmake/rpi.cmake ..
-make
+# Raspberry Pi cross-compilation
+make build-rpi          # Configure and build for RPI
+make clean-rpi          # Clean RPI build
 
-# Windows cross-compile from Linux
-cmake -DCMAKE_TOOLCHAIN_FILE=cmake/windows.cmake ..
-make
+# Windows cross-compilation  
+make build-windows      # Configure and build for Windows
+make clean-windows      # Clean Windows build
+
+# Clean all platforms
+make clean-all          # Clean all build directories
 ```
 
-### 3. Launch Dashboard
+### 4. Launch Dashboard
 
 ```bash
 # Start the web dashboard
@@ -94,18 +180,63 @@ npm run dev
 
 Navigate to `http://localhost:3000` to access the EtherVoxAI control panel.
 
-### 4. Run Examples
+### 5. Run the Application
 
 ```bash
-# Test the core system
-./ethervoxai --config=configs/default.conf
+# Linux
+./build/ethervoxai
 
-# Try SDK examples
-cd sdk/examples
-make
-./intent_plugin_example
-./model_router_example
-./device_profile_example
+# With configuration file
+./build/ethervoxai --config=configs/default.conf
+
+# Raspberry Pi (on the device)
+./ethervoxai
+
+# Windows
+ethervoxai.exe
+```
+
+### 6. Flashing ESP32 build to device
+
+To flash ESP32 directly from WSL 2.0 you need to redirect the Windows USB port to WSL to do so install usbipd-win from: (https://github.com/dorssel/usbipd-win/releases)[https://github.com/dorssel/usbipd-win/releases]
+
+```powershell
+# On Windows PowerShell (as Administrator):
+
+# List USB devices
+usbipd list
+
+# Bind your ESP32 device (replace BUSID with your device's bus ID)
+usbipd bind --busid <BUSID>
+
+# Attach to WSL
+usbipd attach --wsl --busid <BUSID>
+```
+
+In WSL, after attaching USB device with usbipd:
+```bash
+# Check if device is visible
+ls /dev/ttyUSB*
+
+# If not, you may need to install USB drivers
+sudo apt-get install linux-tools-virtual hwdata
+sudo update-alternatives --install /usr/local/bin/usbip usbip \
+    /usr/lib/linux-tools/*-generic/usbip 20
+```
+or you can flash from Windows once the build is completed using the ESP-IDF Windows installation.
+First build in WSL
+```bash
+# In WSL - build only
+idf.py build
+
+# Copy build output to Windows accessible location
+cp -r build /mnt/c/Users/YourUsername/ethervoxai-build/
+```
+then switch to Windows 
+```powershell
+# In Windows PowerShell - flash
+cd C:\Users\YourUsername\ethervoxai-build
+esptool.py --chip esp32s3 --port <your COM port> write_flash @flash_args
 ```
 
 ## System Requirements
@@ -126,28 +257,44 @@ make
 
 ## Architecture Overview
 
+### Platform Abstraction Layer
+
+EtherVoxAI uses a Hardware Abstraction Layer (HAL) to support multiple platforms:
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    EtherVoxAI Core Platform                     │
 ├─────────────────┬─────────────────┬─────────────────────────────┤
-│ Audio Runtime   │   Dialogue      │  Platform   │    Dashboard  │
-│                 │   Engine        │   Layer     │               │
-│• STT/TTS        │• Intent Parse   │• GPIO/I2C   │• Web UI       │
-│• Noise Sup.     │• LLM Route      │• Power Mgmt │• Monitoring   │
-│• Multi-lang     │• Context        │• Hardware   │• Privacy      │
-└─────────────────┴─────────────────┴─────────────┴───────────────┘
-            │                                              
-            ▼                                              
-┌─────────────────────────────────────────────────────────────────┐
-│                   Plugin System                                 │
-├─────────────────┬─────────────────┬─────────────────┬───────────┤
-│   Intent        │   Model         │   External      │    Custom │
-│  Plugins        │  Routers        │ Integrations    │ Hardware  │
-│• Smart Home     │• OpenAI GPT     │• HuggingFace    │• Device   │
-│• IoT Control    │• Local LLM      │• Custom APIs    │ Profiles  │
-│• Custom NLU     │• Fallbacks      │• RAG Systems    │• GPIO Maps│
-└─────────────────┴─────────────────┴─────────────────┴───────────┘
+│ Audio Runtime   │   Dialogue      │  Platform HAL  │  Dashboard │
+│                 │   Engine        │                │            │
+│• STT/TTS        │• Intent Parse   │• GPIO/I2C/SPI  │• Web UI    │
+│• Noise Sup.     │• LLM Route      │• Power Mgmt    │• Monitoring│
+│• Multi-lang     │• Context Mgmt   │• Timers        │• Privacy   │
+└─────────────────┴─────────────────┴────────────────┴────────────┘
+                  │                                    │
+                  ▼                                    ▼
+┌─────────────────────────────────────┐  ┌──────────────────────┐
+│     Platform-Specific HAL           │  │   Plugin System      │
+├──────────┬──────────┬───────────────┤  ├──────────────────────┤
+│   RPI    │ Desktop  │    ESP32      │  │• Intent Plugins      │
+│          │          │               │  │• Model Routers       │
+│• bcm2835 │• Stubs   │• ESP-IDF      │  │• External APIs       │
+│• I2S     │• ALSA    │• FreeRTOS     │  │• Custom Hardware     │
+│• GPIO    │• WinMM   │• I2S/GPIO     │  │• Device Profiles     │
+└──────────┴──────────┴───────────────┘  └──────────────────────┘
 ```
+
+**Platform Detection:**
+- Automatic platform detection at compile-time
+- Platform-specific macros: `ETHERVOX_PLATFORM_RPI`, `ETHERVOX_PLATFORM_LINUX`, `ETHERVOX_PLATFORM_WINDOWS`, `ETHERVOX_PLATFORM_ESP32`
+- Unified HAL interface for GPIO, I2C, SPI, timers, and power management
+- Platform-specific optimizations for each target
+
+**Cross-Compilation Support:**
+- CMake toolchain files for each platform
+- Sysroot-based cross-compilation for Raspberry Pi
+- MinGW cross-compilation for Windows
+- ESP-IDF integration for ESP32
 
 ## Usage Examples
 
@@ -248,6 +395,109 @@ The web dashboard provides complete transparency:
 
 ## Development
 
+### Build System Architecture
+
+EtherVoxAI uses a layered build system:
+
+1. **Makefile** - High-level build orchestration with platform-specific targets
+2. **CMake** - Cross-platform build configuration and dependency management
+3. **Toolchain Files** - Platform-specific compiler and linker settings
+
+**Directory Structure:**
+```
+ethervoxai/
+├── build/              # Linux native build
+├── build-rpi/          # Raspberry Pi cross-compile build
+├── build-windows/      # Windows cross-compile build
+├── cmake/              # CMake configuration
+│   ├── rpi-toolchain.cmake
+│   ├── windows-toolchain.cmake
+│   └── esp32-toolchain.cmake
+├── scripts/            # Build and setup scripts
+│   └── setup-rpi-toolchain.sh
+├── sysroot/            # Cross-compilation sysroot
+│   └── rpi/            # Raspberry Pi libraries and headers
+├── src/
+│   ├── audio/          # Audio processing
+│   │   ├── platform_linux.c
+│   │   ├── platform_rpi.c
+│   │   ├── platform_windows.c
+│   │   └── platform_esp32.c
+│   ├── platform/       # Platform HAL implementations
+│   │   ├── desktop_hal.c
+│   │   ├── rpi_hal.c
+│   │   └── esp32_hal.c
+│   └── ...
+└── tests/              # Unit and integration tests
+```
+
+### Cross-Compilation Setup
+
+**Raspberry Pi:**
+```bash
+# One-time setup
+./scripts/setup-rpi-toolchain.sh
+
+# This script:
+# - Downloads ARM GCC cross-compiler
+# - Downloads and builds bcm2835 library
+# - Downloads ARM versions of OpenSSL and libcurl
+# - Sets up sysroot for cross-compilation
+```
+
+**Windows (from Linux):**
+```bash
+# Install MinGW
+sudo apt-get install mingw-w64
+
+# Build
+make build-windows
+```
+
+### Adding New Platforms
+
+To add support for a new platform:
+
+1. **Create platform-specific source files:**
+   - `src/audio/platform_newplatform.c`
+   - `src/platform/newplatform_hal.c`
+
+2. **Add platform detection in CMakeLists.txt:**
+```cmake
+elseif(TARGET_PLATFORM STREQUAL "NEWPLATFORM")
+    add_definitions(-DETHERVOX_PLATFORM_NEWPLATFORM=1)
+    set(PLATFORM_SOURCES
+        src/audio/platform_newplatform.c
+        src/platform/newplatform_hal.c
+    )
+```
+
+3. **Create toolchain file** (if cross-compiling):
+   - `cmake/newplatform-toolchain.cmake`
+
+4. **Add Makefile targets:**
+```makefile
+configure-newplatform:
+    cmake -B build-newplatform -DTARGET_PLATFORM=NEWPLATFORM
+
+build-newplatform: configure-newplatform
+    cmake --build build-newplatform
+```
+
+### Testing
+
+```bash
+# Run all tests
+make test
+
+# Run tests for specific platform
+cd build-rpi && ctest --verbose
+
+# Run specific test
+./build/tests/test_audio_core
+./build/tests/test_plugin_manager
+```
+
 ### Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
@@ -255,51 +505,177 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 - Code of conduct and community guidelines
 - Development environment setup
 - Pull request process
+- Platform-specific testing guidelines
 - Issue reporting and feature requests
-
-### Build System
-
-EtherVoxAI uses CMake for cross-platform builds:
-
-```bash
-# Configure build
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-
-# Build with specific features
-cmake -B build -DESP32_BUILD=ON -DRPI_BUILD=ON
-
-# Run tests
-ctest --test-dir build
-```
 
 ### SDK Documentation
 
 Comprehensive API documentation is available:
 
 - **C/C++ API**: [SDK Documentation](sdk/README.md)
+- **Platform HAL Guide**: [HAL Documentation](docs/platform-hal.md)
+- **JavaScript API**: [Dashboard SDK](dashboard/src/sdk/README.md)
+- **Python Bindings**: [Python SDK](python/README.md)
+
+## Development
+
+### Build System Architecture
+
+EtherVoxAI uses a layered build system:
+
+1. **Makefile** - High-level build orchestration with platform-specific targets
+2. **CMake** - Cross-platform build configuration and dependency management
+3. **Toolchain Files** - Platform-specific compiler and linker settings
+
+**Directory Structure:**
+```
+ethervoxai/
+├── build/              # Linux native build
+├── build-rpi/          # Raspberry Pi cross-compile build
+├── build-windows/      # Windows cross-compile build
+├── cmake/              # CMake configuration
+│   ├── rpi-toolchain.cmake
+│   ├── windows-toolchain.cmake
+│   └── esp32-toolchain.cmake
+├── scripts/            # Build and setup scripts
+│   └── setup-rpi-toolchain.sh
+├── sysroot/            # Cross-compilation sysroot
+│   └── rpi/            # Raspberry Pi libraries and headers
+├── src/
+│   ├── audio/          # Audio processing
+│   │   ├── platform_linux.c
+│   │   ├── platform_rpi.c
+│   │   ├── platform_windows.c
+│   │   └── platform_esp32.c
+│   ├── platform/       # Platform HAL implementations
+│   │   ├── desktop_hal.c
+│   │   ├── rpi_hal.c
+│   │   └── esp32_hal.c
+│   └── ...
+└── tests/              # Unit and integration tests
+```
+
+### Cross-Compilation Setup
+
+**Raspberry Pi:**
+```bash
+# One-time setup
+./scripts/setup-rpi-toolchain.sh
+
+# This script:
+# - Downloads ARM GCC cross-compiler
+# - Downloads and builds bcm2835 library
+# - Downloads ARM versions of OpenSSL and libcurl
+# - Sets up sysroot for cross-compilation
+```
+
+**Windows (from Linux):**
+```bash
+# Install MinGW
+sudo apt-get install mingw-w64
+
+# Build
+make build-windows
+```
+
+### Adding New Platforms
+
+To add support for a new platform:
+
+1. **Create platform-specific source files:**
+   - `src/audio/platform_newplatform.c`
+   - `src/platform/newplatform_hal.c`
+
+2. **Add platform detection in CMakeLists.txt:**
+```cmake
+elseif(TARGET_PLATFORM STREQUAL "NEWPLATFORM")
+    add_definitions(-DETHERVOX_PLATFORM_NEWPLATFORM=1)
+    set(PLATFORM_SOURCES
+        src/audio/platform_newplatform.c
+        src/platform/newplatform_hal.c
+    )
+```
+
+3. **Create toolchain file** (if cross-compiling):
+   - `cmake/newplatform-toolchain.cmake`
+
+4. **Add Makefile targets:**
+```makefile
+configure-newplatform:
+    cmake -B build-newplatform -DTARGET_PLATFORM=NEWPLATFORM
+
+build-newplatform: configure-newplatform
+    cmake --build build-newplatform
+```
+
+### Testing
+
+```bash
+# Run all tests
+make test
+
+# Run tests for specific platform
+cd build-rpi && ctest --verbose
+
+# Run specific test
+./build/tests/test_audio_core
+./build/tests/test_plugin_manager
+```
+
+### Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
+
+- Code of conduct and community guidelines
+- Development environment setup
+- Pull request process
+- Platform-specific testing guidelines
+- Issue reporting and feature requests
+
+### SDK Documentation
+
+Comprehensive API documentation is available:
+
+- **C/C++ API**: [SDK Documentation](sdk/README.md)
+- **Platform HAL Guide**: [HAL Documentation](docs/platform-hal.md)
+- **JavaScript API**: [Dashboard SDK](dashboard/src/sdk/README.md)
+- **Python Bindings**: [Python SDK](python/README.md)
+
+### SDK Documentation
+
+Comprehensive API documentation is available:
+
+- **C/C++ API**: [SDK Documentation](sdk/README.md)
+- **Platform HAL Guide**: [HAL Documentation](docs/platform-hal.md)
 - **JavaScript API**: [Dashboard SDK](dashboard/src/sdk/README.md)
 - **Python Bindings**: [Python SDK](python/README.md)
 
 ## Roadmap
 
-### Phase 1 (Current)
+### Phase 1 (Current - v0.1.0)
 - [x] Core audio processing engine
 - [x] Basic intent recognition
-- [x] ESP32 and Raspberry Pi support
+- [x] Multi-platform build system (Linux, RPI, Windows)
+- [x] Hardware Abstraction Layer (HAL)
+- [x] Cross-compilation support
 - [x] Web dashboard MVP
+- [x] Unit test framework
 - [ ] Plugin system implementation
+- [ ] ESP32 platform support
 
-### Phase 2
+### Phase 2 (v0.2.0)
 - [ ] Advanced multi-language support
 - [ ] Cloud LLM integrations (OpenAI, HuggingFace)
 - [ ] Mobile companion app
 - [ ] Advanced privacy controls
+- [ ] Continuous integration/deployment
 
-### Phase 3
+### Phase 3 (v0.3.0)
 - [ ] Federated learning capabilities
 - [ ] Custom wake word training
 - [ ] Advanced context awareness
 - [ ] Enterprise deployment tools
+- [ ] Performance optimizations for embedded platforms
 
 ## License
 

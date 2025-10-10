@@ -19,12 +19,13 @@
 #include <stdio.h>
 #include <time.h>
 
-#ifdef ETHERVOX_PLATFORM_WINDOWS
-    #include <windows.h>
-    #define PLUGIN_EXTENSION ".dll"
-#else
-    #include <dlfcn.h>
-    #define PLUGIN_EXTENSION ".so"
+// Dynamic library loading not supported on ESP32
+#if !defined(ETHERVOX_PLATFORM_ESP32) && !defined(PLATFORM_EMBEDDED)
+    #ifdef _WIN32
+        #include <windows.h>
+    #else
+        #include <dlfcn.h>
+    #endif
 #endif
 
 // Plugin type to string mapping
@@ -59,19 +60,19 @@ int ethervox_plugin_manager_init(ethervox_plugin_manager_t* manager, const char*
     memset(manager, 0, sizeof(ethervox_plugin_manager_t));
     
     // Set plugin directory
-    if (plugin_dir) {
-        strncpy(manager->plugin_directory, plugin_dir, sizeof(manager->plugin_directory) - 1);
-    } else {
-        #ifdef ETHERVOX_PLATFORM_WINDOWS
-            strcpy(manager->plugin_directory, ".\\plugins");
-        #else
-            strcpy(manager->plugin_directory, "./plugins");
-        #endif
-    }
+    strncpy(manager->plugin_directory, plugin_dir, sizeof(manager->plugin_directory) - 1);
+    manager->plugin_directory[sizeof(manager->plugin_directory) - 1] = '\0';
     
-    // Set config file path
-    snprintf(manager->config_file, sizeof(manager->config_file), 
-             "%s/plugins.conf", manager->plugin_directory);
+    // Build config file path with safety check
+    int written = snprintf(manager->config_file, sizeof(manager->config_file),
+                          "%s/plugins.conf", manager->plugin_directory);
+    
+    // Check if path was truncated
+    if (written < 0 || written >= (int)sizeof(manager->config_file)) {
+        fprintf(stderr, "Error: Plugin config path too long or invalid (needs %d bytes, have %zu)\n",
+                written, sizeof(manager->config_file));
+        return -1;
+    }
     
     // Set max plugins
     manager->max_plugins = ETHERVOX_MAX_PLUGINS;
@@ -88,35 +89,26 @@ int ethervox_plugin_manager_init(ethervox_plugin_manager_t* manager, const char*
 }
 
 // Cleanup plugin manager
-// Cleanup plugin manager
 void ethervox_plugin_manager_cleanup(ethervox_plugin_manager_t* manager) {
-    if (!manager || !manager->is_initialized) return;
+    if (!manager) return;
     
     // Unload all plugins
-    for (uint32_t i = 0; i < manager->max_plugins; i++) {
+    for (size_t i = 0; i < manager->plugin_count; i++) {
         ethervox_plugin_t* plugin = &manager->plugins[i];
-        if (plugin->status != ETHERVOX_PLUGIN_STATUS_UNLOADED) {
-            if (plugin->plugin_interface.cleanup) {
-                plugin->plugin_interface.cleanup(plugin);
-            }
-            
-            // Close dynamic library
-            if (plugin->handle) {
-                #ifdef ETHERVOX_PLATFORM_WINDOWS
-                    FreeLibrary((HMODULE)plugin->handle);
-                #else
-                    dlclose(plugin->handle);
-                #endif
-            }
+        if (plugin->handle) {
+#if !defined(ETHERVOX_PLATFORM_ESP32) && !defined(PLATFORM_EMBEDDED)
+    #ifdef _WIN32
+            FreeLibrary((HMODULE)plugin->handle);
+    #else
+            dlclose(plugin->handle);
+    #endif
+#endif
+            plugin->handle = NULL;
         }
     }
     
-    // Don't free plugins array since it's embedded in the manager struct
-    // Just reset the manager state
     manager->plugin_count = 0;
-    manager->loaded_plugins = 0;
     manager->is_initialized = false;
-    printf("Plugin manager cleaned up\n");
 }
 
 // Find plugin by name
