@@ -96,8 +96,8 @@ void ethervox_plugin_manager_cleanup(ethervox_plugin_manager_t* manager) {
     for (uint32_t i = 0; i < manager->max_plugins; i++) {
         ethervox_plugin_t* plugin = &manager->plugins[i];
         if (plugin->status != ETHERVOX_PLUGIN_STATUS_UNLOADED) {
-            if (plugin->interface.cleanup) {
-                plugin->interface.cleanup(plugin);
+            if (plugin->plugin_interface.cleanup) {
+                plugin->plugin_interface.cleanup(plugin);
             }
             
             // Close dynamic library
@@ -203,9 +203,9 @@ int ethervox_plugin_execute(ethervox_plugin_t* plugin, const void* input, void* 
     
     plugin->last_used = time(NULL);
     plugin->usage_count++;
-    
-    if (plugin->interface.process) {
-        return plugin->interface.process(plugin, input, output);
+
+    if (plugin->plugin_interface.process) {
+        return plugin->plugin_interface.process(plugin, input, output);
     }
     
     return -1;

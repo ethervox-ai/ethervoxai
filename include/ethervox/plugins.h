@@ -95,7 +95,7 @@ typedef struct ethervox_plugin {
     int (*execute)(const void* input, void* output);
     void* user_data;
     ethervox_plugin_metadata_t metadata;
-    ethervox_plugin_interface_t interface;
+    ethervox_plugin_interface_t plugin_interface;
     time_t load_time;
     time_t last_used;
     uint32_t usage_count;

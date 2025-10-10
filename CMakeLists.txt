@@ -27,6 +27,7 @@ elseif(NOT DEFINED TARGET_PLATFORM)
 endif()
 
 message(STATUS "Target platform: ${TARGET_PLATFORM}")
+message(STATUS "===================================================")
 
 # Platform-specific configurations
 if(TARGET_PLATFORM STREQUAL "ESP32")
@@ -34,27 +35,59 @@ if(TARGET_PLATFORM STREQUAL "ESP32")
     set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/esp32-toolchain.cmake")
     add_definitions(-DTARGET_ESP32=1)
     add_definitions(-DPLATFORM_EMBEDDED=1)
+    set(ETHERVOX_PLATFORM_ESP32 1)  # Set as CMake variable too
     
 elseif(TARGET_PLATFORM STREQUAL "RPI")
     # Raspberry Pi specific settings
     set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/rpi-toolchain.cmake")
     add_definitions(-DTARGET_RPI=1)
     add_definitions(-DPLATFORM_EMBEDDED=1)
+    set(ETHERVOX_PLATFORM_RPI 1)  # Set as CMake variable too
     
 elseif(TARGET_PLATFORM STREQUAL "WINDOWS")
     # Windows specific settings
     add_definitions(-DTARGET_WINDOWS=1)
+    add_definitions(-DETHERVOX_PLATFORM_WINDOWS=1)    # Add this line
+    add_definitions(-DETHERVOX_PLATFORM_DESKTOP=1)    # Add this line
     add_definitions(-DPLATFORM_DESKTOP=1)
+    set(ETHERVOX_PLATFORM_WINDOWS 1)
+    set(ETHERVOX_PLATFORM_DESKTOP 1)
     
 elseif(TARGET_PLATFORM STREQUAL "LINUX")
     # Linux specific settings
     add_definitions(-DTARGET_LINUX=1)
+    add_definitions(-DETHERVOX_PLATFORM_LINUX=1)      # Add this line
+    add_definitions(-DETHERVOX_PLATFORM_DESKTOP=1)    # Add this line
     add_definitions(-DPLATFORM_DESKTOP=1)
-    
+    set(ETHERVOX_PLATFORM_LINUX 1)
+    set(ETHERVOX_PLATFORM_DESKTOP 1)
+
 elseif(TARGET_PLATFORM STREQUAL "MACOS")
     # macOS specific settings
     add_definitions(-DTARGET_MACOS=1)
+    add_definitions(-DETHERVOX_PLATFORM_MACOS=1)      # Add this line
+    add_definitions(-DETHERVOX_PLATFORM_DESKTOP=1)    # Add this line
     add_definitions(-DPLATFORM_DESKTOP=1)
+    set(ETHERVOX_PLATFORM_MACOS 1)
+    set(ETHERVOX_PLATFORM_DESKTOP 1)
+endif()
+
+# Show which platform macros are defined
+message(STATUS "Show which platform macros are defined")
+if(DEFINED ETHERVOX_PLATFORM_RPI)
+    message(STATUS "ETHERVOX_PLATFORM_RPI is DEFINED")
+endif()
+if(DEFINED ETHERVOX_PLATFORM_ESP32)
+    message(STATUS "ETHERVOX_PLATFORM_ESP32 is DEFINED")
+endif()
+if(DEFINED ETHERVOX_PLATFORM_WINDOWS)
+    message(STATUS "ETHERVOX_PLATFORM_WINDOWS is DEFINED")
+endif()
+if(DEFINED ETHERVOX_PLATFORM_LINUX)
+    message(STATUS "ETHERVOX_PLATFORM_LINUX is DEFINED")
+endif()
+if(DEFINED ETHERVOX_PLATFORM_DESKTOP)
+    message(STATUS "ETHERVOX_PLATFORM_DESKTOP is DEFINED")
 endif()
 
 # Build configuration
@@ -78,11 +111,6 @@ file(GLOB ETHERVOXAI_CORE_SOURCES
 
 # Add main entry point
 list(APPEND ETHERVOXAI_CORE_SOURCES "src/main.c")
-
-# Debug: Print what platform is detected
-message(STATUS "ETHERVOX_PLATFORM_RPI: ${ETHERVOX_PLATFORM_RPI}")
-message(STATUS "TARGET_PLATFORM: ${TARGET_PLATFORM}")
-message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
 
 # Platform-specific source files
 # Check multiple conditions for RPI detection

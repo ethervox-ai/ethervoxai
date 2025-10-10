@@ -49,8 +49,7 @@ logs
 dist/
 build/
 out/
-build-rpi/
-build-esp/
+build-*/
 sysroot/
 
 # TypeScript incremental build info

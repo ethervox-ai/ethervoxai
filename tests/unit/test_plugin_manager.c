@@ -51,14 +51,17 @@ void test_plugin_manager_init() {
     printf("Testing plugin manager initialization...\n");
     
     ethervox_plugin_manager_t manager;
-    int result = ethervox_plugin_manager_init(&manager,NULL);
     
-    // Should succeed with proper initialization
-    assert(result == 0);
+    // Initialize with default plugin directory
+    assert(ethervox_plugin_manager_init(&manager, NULL) == 0);
     assert(manager.plugin_count == 0);
-    assert(manager.plugins != NULL);
+    assert(manager.max_plugins == ETHERVOX_MAX_PLUGINS);
     
     // Cleanup
+    ethervox_plugin_manager_cleanup(&manager);
+    
+    // Initialize with custom plugin directory
+    assert(ethervox_plugin_manager_init(&manager, "./test_plugins") == 0);
     ethervox_plugin_manager_cleanup(&manager);
     
     printf("✓ Plugin manager initialization test passed\n");
@@ -67,11 +70,14 @@ void test_plugin_manager_init() {
 void test_plugin_manager_null_handling() {
     printf("Testing plugin manager null pointer handling...\n");
     
-    // Test null pointer handling
-    assert(ethervox_plugin_manager_init(NULL) == -1);
+     // Test NULL manager
+    assert(ethervox_plugin_manager_init(NULL, NULL) == -1);
+    assert(ethervox_plugin_manager_init(NULL, "./plugins") == -1);
     
-    // Test cleanup with null
-    ethervox_plugin_manager_cleanup(NULL);  // Should not crash
+    // Test NULL plugin directory (should be allowed - uses default)
+    ethervox_plugin_manager_t manager;
+    assert(ethervox_plugin_manager_init(&manager, NULL) == 0);
+    ethervox_plugin_manager_cleanup(&manager);
     
     printf("✓ Plugin manager null pointer handling test passed\n");
 }

@@ -11,6 +11,10 @@ help:
 	@echo "  test            - Run tests"
 	@echo "  clean           - Clean build artifacts"
 	@echo "  clean-rpi       - Clean Raspberry Pi build artifacts"
+	@echo "  build-windows   - Cross-compile for Windows"
+	@echo "  clean-windows   - Clean Windows build artifacts"
+	@echo "  install-deps    - Install dependencies"
+	@echo "  setup-venv     - Set up Python virtual environment"
 
 setup-venv:
 	@test -d .venv || python3 -m venv .venv
@@ -34,14 +38,29 @@ install-deps: setup-venv
 configure:
 	@echo "Configuring CMake build..."
 	@mkdir -p build
-	@cd build && cmake .. -DCMAKE_BUILD_TYPE=Release
+	cmake -B build -S . -DTARGET_PLATFORM=$(or $(TARGET_PLATFORM),LINUX)
 
 configure-rpi:
 	@echo "Configuring CMake for Raspberry Pi cross-compilation..."
 	@mkdir -p build-rpi
-	@cd build-rpi && cmake .. \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_TOOLCHAIN_FILE=../cmake/rpi-toolchain.cmake
+	cmake -B build-rpi -S . \
+        -DTARGET_PLATFORM=RPI \
+        -DCMAKE_TOOLCHAIN_FILE=cmake/rpi-toolchain.cmake
+
+configure-windows:
+	@echo "Configuring CMake for Windows cross-compilation..."
+	@mkdir -p build-windows
+	cmake -B build-windows -S . \
+        -DTARGET_PLATFORM=WINDOWS \
+        -DCMAKE_TOOLCHAIN_FILE=cmake/windows-toolchain.cmake
+
+build-windows: install-deps configure-windows
+	@echo "Building for Windows..."
+	cmake --build build-windows
+
+clean-windows:
+	@echo "Cleaning Windows build..."
+	rm -rf build-windows
 
 build-rpi: install-deps configure-rpi
 	@echo "Cross-compiling for Raspberry Pi..."

@@ -65,32 +65,42 @@ static bool desktop_gpio_read(uint32_t pin) {
 }
 
 // I2C functions not available on standard desktop - return error
-static int desktop_i2c_write(uint8_t device_addr, uint8_t reg_addr, const uint8_t* data, size_t len) {
-    (void)device_addr; (void)reg_addr; (void)data; (void)len;
-    return -1;  // I2C not available on standard desktop
+static int desktop_i2c_write(uint32_t bus, uint8_t device_addr, const uint8_t* data, uint32_t len) {
+    (void)bus;
+    (void)device_addr;
+    (void)data;
+    (void)len;
+    return -1; // Not supported on desktop
 }
 
-static int desktop_i2c_read(uint8_t device_addr, uint8_t reg_addr, uint8_t* data, size_t len) {
-    (void)device_addr; (void)reg_addr; (void)data; (void)len;
-    return -1;  // I2C not available on standard desktop
+static int desktop_i2c_read(uint32_t bus, uint8_t device_addr, uint8_t* data, uint32_t len) {
+    (void)bus;
+    (void)device_addr;
+    (void)data;
+    (void)len;
+    return -1; // Not supported on desktop
 }
 
 // SPI functions not available on standard desktop - return error
-static int desktop_spi_transfer(const uint8_t* tx_data, uint8_t* rx_data, size_t len) {
-    (void)tx_data; (void)rx_data; (void)len;
-    return -1;  // SPI not available on standard desktop
+static int desktop_spi_transfer(uint32_t bus, const uint8_t* tx_data, uint8_t* rx_data, uint32_t len) {
+    (void)bus;
+    (void)tx_data;
+    (void)rx_data;
+    (void)len;
+    return -1; // Not supported on desktop
 }
 
 // Timing functions
-static void desktop_delay_ms(uint32_t ms) {
+static uint32_t desktop_delay_ms(uint32_t ms) {
     #ifdef ETHERVOX_PLATFORM_WINDOWS
         Sleep(ms);
     #else
         usleep(ms * 1000);
     #endif
+    return ms;
 }
 
-static void desktop_delay_us(uint32_t us) {
+static uint32_t desktop_delay_us(uint32_t us) {
     #ifdef ETHERVOX_PLATFORM_WINDOWS
         // Windows doesn't have microsecond sleep, use high-resolution timer
         LARGE_INTEGER frequency, start, end;
@@ -105,6 +115,7 @@ static void desktop_delay_us(uint32_t us) {
     #else
         usleep(us);
     #endif
+    return us;
 }
 
 static uint64_t desktop_get_timestamp_us(void) {
@@ -122,43 +133,46 @@ static uint64_t desktop_get_timestamp_us(void) {
 
 // System control functions
 static void desktop_reset(void) {
-    #ifdef ETHERVOX_PLATFORM_WINDOWS
-        // Restart Windows
-        ExitWindowsEx(EWX_REBOOT | EWX_FORCE, SHTDN_REASON_MAJOR_SOFTWARE);
-    #else
-        // Restart Linux/macOS
-        system("sudo reboot");
-    #endif
+#ifdef __linux__
+    int ret = system("sudo reboot");
+    (void)ret; // Acknowledge we're ignoring the return value
+#else
+    printf("System reset not supported on this platform\n");
+#endif
 }
 
 static void desktop_enter_sleep_mode(ethervox_sleep_mode_t mode) {
-    #ifdef ETHERVOX_PLATFORM_WINDOWS
-        switch (mode) {
-            case ETHERVOX_SLEEP_LIGHT:
-                // Put computer to sleep
-                SetSuspendState(FALSE, FALSE, FALSE);
-                break;
-            case ETHERVOX_SLEEP_DEEP:
-                // Hibernate
-                SetSuspendState(TRUE, FALSE, FALSE);
-                break;
-            default:
-                break;
-        }
-    #else
-        switch (mode) {
-            case ETHERVOX_SLEEP_LIGHT:
-                // Suspend to RAM
-                system("systemctl suspend");
-                break;
-            case ETHERVOX_SLEEP_DEEP:
-                // Hibernate
-                system("systemctl hibernate");
-                break;
-            default:
-                break;
-        }
-    #endif
+    int ret = -1;
+    
+#ifdef __linux__
+    switch (mode) {
+        case ETHERVOX_SLEEP_LIGHT:
+            // Light sleep - just delay
+            usleep(100000); // 100ms
+            break;
+        case ETHERVOX_SLEEP_DEEP:
+            // Deep sleep - attempt system suspend
+            ret = system("systemctl suspend");
+            (void)ret;
+            break;
+        default:
+            break;
+    }
+#elif defined(_WIN32)
+    switch (mode) {
+        case ETHERVOX_SLEEP_LIGHT:
+            Sleep(100); // 100ms
+            break;
+        case ETHERVOX_SLEEP_DEEP:
+            // Windows doesn't have easy suspend from user code
+            Sleep(1000);
+            break;
+        default:
+            break;
+    }
+#else
+    (void)mode;
+#endif
 }
 
 static uint32_t desktop_get_free_heap_size(void) {
@@ -219,8 +233,8 @@ int desktop_hal_register(ethervox_platform_t* platform) {
     platform->hal.delay_us = desktop_delay_us;
     platform->hal.get_timestamp_us = desktop_get_timestamp_us;
     
-    platform->hal.reset = desktop_reset;
-    platform->hal.enter_sleep_mode = desktop_enter_sleep_mode;
+    platform->hal.system_reset = desktop_reset;
+    platform->hal.system_sleep = desktop_enter_sleep_mode;
     platform->hal.get_free_heap_size = desktop_get_free_heap_size;
     platform->hal.get_cpu_temperature = desktop_get_cpu_temperature;
     

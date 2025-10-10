@@ -155,18 +155,6 @@ int ethervox_platform_load_device_profile(ethervox_platform_t* platform, const c
 // // Platform-specific HAL registration
 int ethervox_platform_register_hal(ethervox_platform_t* platform);
 
-// #ifdef ETHERVOX_PLATFORM_ESP32
-// int esp32_hal_register(ethervox_platform_t* platform);
-// #endif
-
-// #ifdef ETHERVOX_PLATFORM_RPI
-// int rpi_hal_register(ethervox_platform_t* platform);
-// #endif
-
-// #if defined(ETHERVOX_PLATFORM_WINDOWS) || defined(ETHERVOX_PLATFORM_LINUX)
-// int desktop_hal_register(ethervox_platform_t* platform);
-// #endif
-
 #ifdef __cplusplus
 }
 #endif

@@ -19,7 +19,7 @@
 
 #ifdef ETHERVOX_PLATFORM_WINDOWS
 #include <windows.h>
-#include <mmeapi.h>
+#include <mmsystem.h>
 #pragma comment(lib, "winmm.lib")
 
 typedef struct {

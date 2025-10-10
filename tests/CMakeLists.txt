@@ -19,14 +19,48 @@ foreach(TEST_SOURCE ${UNIT_TEST_SOURCES})
     # Create executable
     add_executable(${TEST_NAME} ${TEST_SOURCE})
     
-    # Link against the main project sources (excluding main.cpp)
-    file(GLOB_RECURSE ETHERVOXAI_TEST_SOURCES 
-        "${CMAKE_SOURCE_DIR}/src/audio/*.c"
+    # Link against the main project sources (excluding main.c and platform-specific files)
+    file(GLOB ETHERVOXAI_CORE_TEST_SOURCES 
         "${CMAKE_SOURCE_DIR}/src/dialogue/*.c" 
-        "${CMAKE_SOURCE_DIR}/src/platform/*.c"
         "${CMAKE_SOURCE_DIR}/src/plugins/*.c"
     )
-    target_sources(${TEST_NAME} PRIVATE ${ETHERVOXAI_TEST_SOURCES})
+    
+    # Add only the platform-specific sources for the current build platform
+    if(TARGET_PLATFORM STREQUAL "RPI")
+        list(APPEND ETHERVOXAI_CORE_TEST_SOURCES
+            "${CMAKE_SOURCE_DIR}/src/audio/platform_rpi.c"
+            "${CMAKE_SOURCE_DIR}/src/audio/audio_core.c"
+            "${CMAKE_SOURCE_DIR}/src/platform/rpi_hal.c"
+        )
+    elseif(TARGET_PLATFORM STREQUAL "ESP32")
+        list(APPEND ETHERVOXAI_CORE_TEST_SOURCES
+            "${CMAKE_SOURCE_DIR}/src/audio/platform_esp32.c"
+            "${CMAKE_SOURCE_DIR}/src/audio/audio_core.c"
+            "${CMAKE_SOURCE_DIR}/src/platform/esp32_hal.c"
+        )
+    elseif(WIN32 OR TARGET_PLATFORM STREQUAL "WINDOWS")
+        list(APPEND ETHERVOXAI_CORE_TEST_SOURCES
+            "${CMAKE_SOURCE_DIR}/src/audio/platform_windows.c"
+            "${CMAKE_SOURCE_DIR}/src/audio/audio_core.c"
+            "${CMAKE_SOURCE_DIR}/src/platform/desktop_hal.c"
+        )
+    elseif(APPLE OR TARGET_PLATFORM STREQUAL "MACOS")
+        list(APPEND ETHERVOXXAI_CORE_TEST_SOURCES
+            "${CMAKE_SOURCE_DIR}/src/audio/platform_macos.c"
+            "${CMAKE_SOURCE_DIR}/src/audio/audio_core.c"
+            "${CMAKE_SOURCE_DIR}/src/platform/desktop_hal.c"
+        )
+    else()
+        # Linux default
+        list(APPEND ETHERVOXAI_CORE_TEST_SOURCES
+            "${CMAKE_SOURCE_DIR}/src/audio/platform_linux.c"
+            "${CMAKE_SOURCE_DIR}/src/audio/audio_core.c"
+            "${CMAKE_SOURCE_DIR}/src/platform/desktop_hal.c"
+            "${CMAKE_SOURCE_DIR}/src/platform/platform_core.c"
+        )
+    endif()
+    
+    target_sources(${TEST_NAME} PRIVATE ${ETHERVOXAI_CORE_TEST_SOURCES})
     
     # Platform-specific linking (same as main CMakeLists.txt)
     if(WIN32)
@@ -59,7 +93,9 @@ foreach(TEST_SOURCE ${INTEGRATION_TEST_SOURCES})
     set(TEST_NAME "${TEST_NAME}_integration")
     
     add_executable(${TEST_NAME} ${TEST_SOURCE})
-    target_sources(${TEST_NAME} PRIVATE ${ETHERVOXAI_TEST_SOURCES})
+    
+    # Use the same platform-specific sources as unit tests
+    target_sources(${TEST_NAME} PRIVATE ${ETHERVOXAI_CORE_TEST_SOURCES})
     
     if(WIN32)
         target_link_libraries(${TEST_NAME} winmm ws2_32 crypt32)
