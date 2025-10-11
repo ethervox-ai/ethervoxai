@@ -47,8 +47,8 @@ elseif(TARGET_PLATFORM STREQUAL "RPI")
 elseif(TARGET_PLATFORM STREQUAL "WINDOWS")
     # Windows specific settings
     add_definitions(-DTARGET_WINDOWS=1)
-    add_definitions(-DETHERVOX_PLATFORM_WINDOWS=1)    # Add this line
-    add_definitions(-DETHERVOX_PLATFORM_DESKTOP=1)    # Add this line
+    add_definitions(-DETHERVOX_PLATFORM_WINDOWS=1)
+    add_definitions(-DETHERVOX_PLATFORM_DESKTOP=1)
     add_definitions(-DPLATFORM_DESKTOP=1)
     set(ETHERVOX_PLATFORM_WINDOWS 1)
     set(ETHERVOX_PLATFORM_DESKTOP 1)
@@ -56,8 +56,8 @@ elseif(TARGET_PLATFORM STREQUAL "WINDOWS")
 elseif(TARGET_PLATFORM STREQUAL "LINUX")
     # Linux specific settings
     add_definitions(-DTARGET_LINUX=1)
-    add_definitions(-DETHERVOX_PLATFORM_LINUX=1)      # Add this line
-    add_definitions(-DETHERVOX_PLATFORM_DESKTOP=1)    # Add this line
+    add_definitions(-DETHERVOX_PLATFORM_LINUX=1)
+    add_definitions(-DETHERVOX_PLATFORM_DESKTOP=1)
     add_definitions(-DPLATFORM_DESKTOP=1)
     set(ETHERVOX_PLATFORM_LINUX 1)
     set(ETHERVOX_PLATFORM_DESKTOP 1)
@@ -65,8 +65,8 @@ elseif(TARGET_PLATFORM STREQUAL "LINUX")
 elseif(TARGET_PLATFORM STREQUAL "MACOS")
     # macOS specific settings
     add_definitions(-DTARGET_MACOS=1)
-    add_definitions(-DETHERVOX_PLATFORM_MACOS=1)      # Add this line
-    add_definitions(-DETHERVOX_PLATFORM_DESKTOP=1)    # Add this line
+    add_definitions(-DETHERVOX_PLATFORM_MACOS=1)
+    add_definitions(-DETHERVOX_PLATFORM_DESKTOP=1)
     add_definitions(-DPLATFORM_DESKTOP=1)
     set(ETHERVOX_PLATFORM_MACOS 1)
     set(ETHERVOX_PLATFORM_DESKTOP 1)
@@ -107,6 +107,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 file(GLOB ETHERVOXAI_CORE_SOURCES 
     "src/dialogue/*.c"
     "src/plugins/*.c"
+    "src/wake_word/*.c"
+    "src/stt/*.c"
 )
 
 # Add main entry point
@@ -156,6 +158,7 @@ set(ETHERVOXAI_SOURCES ${ETHERVOXAI_CORE_SOURCES} ${PLATFORM_SOURCES})
 list(APPEND ETHERVOXAI_SOURCES src/platform/platform_core.c)
 
 # Debug: Print sources being compiled
+message(STATUS "Core sources: ${ETHERVOXAI_CORE_SOURCES}")
 message(STATUS "Platform sources: ${PLATFORM_SOURCES}")
 
 # Collect header files

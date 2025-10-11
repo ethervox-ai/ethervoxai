@@ -56,11 +56,13 @@ const char* ethervox_plugin_status_to_string(ethervox_plugin_status_t status) {
 // Initialize plugin manager
 int ethervox_plugin_manager_init(ethervox_plugin_manager_t* manager, const char* plugin_dir) {
     if (!manager) return -1;
-    
+
     memset(manager, 0, sizeof(ethervox_plugin_manager_t));
-    
+
+    const char* resolved_plugin_dir = plugin_dir ? plugin_dir : "./plugins";
+
     // Set plugin directory
-    strncpy(manager->plugin_directory, plugin_dir, sizeof(manager->plugin_directory) - 1);
+    strncpy(manager->plugin_directory, resolved_plugin_dir, sizeof(manager->plugin_directory) - 1);
     manager->plugin_directory[sizeof(manager->plugin_directory) - 1] = '\0';
     
     // Build config file path with safety check
@@ -199,7 +201,11 @@ int ethervox_plugin_execute(ethervox_plugin_t* plugin, const void* input, void* 
     if (plugin->plugin_interface.process) {
         return plugin->plugin_interface.process(plugin, input, output);
     }
-    
+
+    if (plugin->execute) {
+        return plugin->execute(input, output);
+    }
+
     return -1;
 }
 

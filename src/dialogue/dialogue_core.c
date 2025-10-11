@@ -17,6 +17,61 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
+static void sanitize_language_code(const char* source, char* target, size_t target_len) {
+    if (!target || target_len == 0) {
+        return;
+    }
+
+    const char* cursor = source;
+    size_t out_pos = 0;
+
+    while (cursor && *cursor && out_pos < target_len - 1) {
+        if (*cursor == '.' || *cursor == '@') {
+            break;
+        }
+        if (*cursor == '_' || *cursor == '-') {
+            target[out_pos++] = '-';
+            cursor++;
+            continue;
+        }
+        if (isalpha((unsigned char)*cursor)) {
+            target[out_pos++] = (char)tolower((unsigned char)*cursor);
+        }
+        cursor++;
+    }
+
+    target[out_pos] = '\0';
+
+    if (out_pos > 3) {
+        target[2] = '\0';
+    }
+}
+
+const char* ethervox_dialogue_detect_system_language(void) {
+    static char cached_language[8] = "";
+    static bool initialized = false;
+
+    if (initialized && cached_language[0] != '\0') {
+        return cached_language;
+    }
+
+    const char* env_lang = getenv("ETHERVOX_LANG");
+    if (!env_lang || !*env_lang) {
+        env_lang = getenv("LANG");
+    }
+
+    if (env_lang && *env_lang) {
+        sanitize_language_code(env_lang, cached_language, sizeof(cached_language));
+    }
+
+    if (cached_language[0] == '\0') {
+        strcpy(cached_language, "en");
+    }
+
+    initialized = true;
+    return cached_language;
+}
 #include <time.h>
 #include <inttypes.h>
 
@@ -114,7 +169,8 @@ ethervox_llm_config_t ethervox_dialogue_get_default_llm_config(void) {
         .top_p = 0.9f,
         .seed = 42,
         .use_gpu = false,  // Default to CPU for compatibility
-        .gpu_layers = 0
+        .gpu_layers = 0,
+        .language_code = NULL
     };
     
     #ifdef ETHERVOX_PLATFORM_DESKTOP
@@ -165,6 +221,20 @@ int ethervox_dialogue_init(ethervox_dialogue_engine_t* engine, const ethervox_ll
     } else {
         engine->llm_config = ethervox_dialogue_get_default_llm_config();
     }
+
+    const char* language_source = NULL;
+    if (config && config->language_code) {
+        language_source = config->language_code;
+    } else if (engine->llm_config.language_code) {
+        language_source = engine->llm_config.language_code;
+    } else {
+        language_source = ethervox_dialogue_detect_system_language();
+    }
+
+    engine->llm_config.language_code = NULL;
+    if (language_source) {
+        engine->llm_config.language_code = strdup(language_source);
+    }
     
     // Allocate context storage
     engine->max_contexts = 16;  // Support up to 16 simultaneous conversations
@@ -214,6 +284,10 @@ void ethervox_dialogue_cleanup(ethervox_dialogue_engine_t* engine) {
     }
     if (engine->llm_config.model_name) {
         free(engine->llm_config.model_name);
+    }
+    if (engine->llm_config.language_code) {
+        free(engine->llm_config.language_code);
+        engine->llm_config.language_code = NULL;
     }
     
     engine->is_initialized = false;
@@ -367,6 +441,56 @@ int ethervox_dialogue_create_context(ethervox_dialogue_engine_t* engine, const c
     }
     
     return -1;  // No available slots
+}
+
+int ethervox_dialogue_set_language(ethervox_dialogue_engine_t* engine, const char* language_code) {
+    if (!engine || !language_code) {
+        return -1;
+    }
+
+    char normalized[8] = {0};
+    sanitize_language_code(language_code, normalized, sizeof(normalized));
+
+    if (normalized[0] == '\0') {
+        return -1;
+    }
+
+    if (!ethervox_dialogue_is_language_supported(normalized)) {
+        fprintf(stderr, "Dialogue language '%s' not supported; keeping current setting\n", normalized);
+        return -1;
+    }
+
+    if (engine->llm_config.language_code &&
+        strcmp(engine->llm_config.language_code, normalized) == 0) {
+        return 0;
+    }
+
+    if (engine->llm_config.language_code) {
+        free(engine->llm_config.language_code);
+        engine->llm_config.language_code = NULL;
+    }
+
+    engine->llm_config.language_code = strdup(normalized);
+    if (!engine->llm_config.language_code) {
+        return -1;
+    }
+
+    for (uint32_t i = 0; i < engine->max_contexts; i++) {
+        ethervox_dialogue_context_t* ctx = &engine->contexts[i];
+        if (ctx->conversation_id) {
+            strncpy(ctx->current_language, normalized, sizeof(ctx->current_language) - 1);
+            ctx->current_language[sizeof(ctx->current_language) - 1] = '\0';
+        }
+    }
+
+    return 0;
+}
+
+const char* ethervox_dialogue_get_language(const ethervox_dialogue_engine_t* engine) {
+    if (!engine || !engine->llm_config.language_code) {
+        return NULL;
+    }
+    return engine->llm_config.language_code;
 }
 
 // Free intent structure

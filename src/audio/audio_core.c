@@ -45,7 +45,7 @@ int ethervox_audio_init(ethervox_audio_runtime_t* runtime, const ethervox_audio_
     // Register platform-specific driver
     int result = ethervox_audio_register_platform_driver(runtime);
     if (result != 0) {
-        printf("Failed to register platform audio driver\n");
+        fprintf(stderr, "Failed to register platform audio driver (err=%d)\n", result);
         return result;
     }
     
@@ -56,6 +56,8 @@ int ethervox_audio_init(ethervox_audio_runtime_t* runtime, const ethervox_audio_
             runtime->is_initialized = true;
             strcpy(runtime->current_language, "en");  // Default language
             runtime->language_confidence = 1.0f;
+        } else {
+            fprintf(stderr, "Platform audio driver initialization failed (err=%d)\n", result);
         }
     }
     
@@ -87,6 +89,61 @@ int ethervox_audio_start(ethervox_audio_runtime_t* runtime) {
     }
     
     return result;
+}
+
+int ethervox_audio_start_capture(ethervox_audio_runtime_t* runtime) {
+    if (!runtime || !runtime->is_initialized) {
+        return -1;
+    }
+
+    if (runtime->is_capturing) {
+        return 0;
+    }
+
+    if (!runtime->driver.start_capture) {
+        fprintf(stderr, "Audio driver does not support start_capture\n");
+        return -1;
+    }
+
+    int result = runtime->driver.start_capture(runtime);
+    if (result == 0) {
+        runtime->is_capturing = true;
+    }
+    return result;
+}
+
+int ethervox_audio_stop_capture(ethervox_audio_runtime_t* runtime) {
+    if (!runtime || !runtime->is_initialized) {
+        return -1;
+    }
+
+    if (!runtime->is_capturing) {
+        return 0;
+    }
+
+    if (!runtime->driver.stop_capture) {
+        fprintf(stderr, "Audio driver does not support stop_capture\n");
+        return -1;
+    }
+
+    int result = runtime->driver.stop_capture(runtime);
+    if (result == 0) {
+        runtime->is_capturing = false;
+    }
+    return result;
+}
+
+int ethervox_audio_read(ethervox_audio_runtime_t* runtime, ethervox_audio_buffer_t* buffer) {
+    if (!runtime || !runtime->is_initialized || !buffer) {
+        return -1;
+    }
+
+    if (!runtime->driver.read_audio) {
+        fprintf(stderr, "Audio driver does not support read_audio\n");
+        return -1;
+    }
+
+    return runtime->driver.read_audio(runtime, buffer);
 }
 
 // Stop audio processing
@@ -143,23 +200,6 @@ int ethervox_language_detect(const ethervox_audio_buffer_t* buffer, ethervox_lan
     return 0;
 }
 
-// STT processing (placeholder implementation)
-int ethervox_stt_process(ethervox_audio_runtime_t* runtime, const ethervox_audio_buffer_t* buffer, ethervox_stt_result_t* result) {
-    if (!runtime || !buffer || !result) {
-        return -1;
-    }
-    
-    // Placeholder: Echo back a test phrase
-    result->text = strdup("Hello, this is a test transcription");
-    strcpy(result->language_code, runtime->current_language);
-    result->confidence = 0.92f;
-    result->is_final = true;
-    result->start_time_us = buffer->timestamp_us;
-    result->end_time_us = buffer->timestamp_us + 1000000;  // 1 second
-    
-    return 0;
-}
-
 // TTS synthesis (placeholder implementation)
 int ethervox_tts_synthesize(ethervox_audio_runtime_t* runtime, const ethervox_tts_request_t* request, ethervox_audio_buffer_t* output) {
     if (!runtime || !request || !output) {
@@ -187,13 +227,5 @@ void ethervox_audio_buffer_free(ethervox_audio_buffer_t* buffer) {
         free(buffer->data);
         buffer->data = NULL;
         buffer->size = 0;
-    }
-}
-
-// Free STT result
-void ethervox_stt_result_free(ethervox_stt_result_t* result) {
-    if (result && result->text) {
-        free(result->text);
-        result->text = NULL;
     }
 }

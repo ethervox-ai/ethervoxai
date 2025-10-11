@@ -138,11 +138,15 @@ export const useSystemStore = defineStore('system', () => {
       await axios.post('/api/audio/settings', settings)
       
       // Update local state
-      Object.assign({
-        microphoneActive: microphoneActive.value,
-        speakerActive: speakerActive.value,
-        currentLanguage: currentLanguage.value
-      }, settings)
+      if (settings.hasOwnProperty('microphoneActive')) {
+        microphoneActive.value = settings.microphoneActive
+      }
+      if (settings.hasOwnProperty('speakerActive')) {
+        speakerActive.value = settings.speakerActive
+      }
+      if (settings.hasOwnProperty('currentLanguage')) {
+        currentLanguage.value = settings.currentLanguage
+      }
       
     } catch (error) {
       addError('Failed to update audio settings')

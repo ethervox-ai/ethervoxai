@@ -54,7 +54,7 @@ void test_plugin_manager_init() {
     
     // Initialize with default plugin directory
     assert(ethervox_plugin_manager_init(&manager, NULL) == 0);
-    assert(manager.plugin_count == 0);
+    assert(manager.plugin_count == ETHERVOX_BUILTIN_PLUGIN_COUNT);
     assert(manager.max_plugins == ETHERVOX_MAX_PLUGINS);
     
     // Cleanup

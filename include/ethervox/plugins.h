@@ -155,6 +155,7 @@ int ethervox_llm_plugin_local_rag(const ethervox_llm_request_t* request, ethervo
                                  void* user_data);
 
 // Built-in plugins
+#define ETHERVOX_BUILTIN_PLUGIN_COUNT 3
 int ethervox_plugin_register_builtin_openai(ethervox_plugin_manager_t* manager);
 int ethervox_plugin_register_builtin_huggingface(ethervox_plugin_manager_t* manager);  // Just declaration, no implementation
 int ethervox_plugin_register_builtin_local_rag(ethervox_plugin_manager_t* manager);

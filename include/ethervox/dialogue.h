@@ -160,12 +160,16 @@ int ethervox_dialogue_get_context(ethervox_dialogue_engine_t* engine, const char
                                  ethervox_dialogue_context_t** context);
 void ethervox_dialogue_destroy_context(ethervox_dialogue_engine_t* engine, const char* context_id);
 
+int ethervox_dialogue_set_language(ethervox_dialogue_engine_t* engine, const char* language_code);
+const char* ethervox_dialogue_get_language(const ethervox_dialogue_engine_t* engine);
+
 // External LLM integration
 void ethervox_dialogue_set_external_llm_callback(ethervox_dialogue_engine_t* engine,
                                                 ethervox_external_llm_callback_t callback, void* user_data);
 
 // Utility functions
 ethervox_llm_config_t ethervox_dialogue_get_default_llm_config(void);
+const char* ethervox_dialogue_detect_system_language(void);
 void ethervox_intent_free(ethervox_intent_t* intent);
 void ethervox_llm_response_free(ethervox_llm_response_t* response);
 const char* ethervox_intent_type_to_string(ethervox_intent_type_t type);

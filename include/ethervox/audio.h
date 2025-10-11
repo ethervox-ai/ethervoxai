@@ -49,15 +49,9 @@ typedef struct {
     bool is_ambient;        // True if detected without wake word
 } ethervox_language_detect_t;
 
-// Speech-to-text result
-typedef struct {
-    char* text;
-    char language_code[8];
-    float confidence;
-    bool is_final;
-    uint64_t start_time_us;
-    uint64_t end_time_us;
-} ethervox_stt_result_t;
+// Forward declaration to avoid circular dependency with stt.h
+struct ethervox_stt_result;
+typedef struct ethervox_stt_result ethervox_stt_result_t;
 
 // Text-to-speech request
 typedef struct {
@@ -108,16 +102,17 @@ int ethervox_audio_init(ethervox_audio_runtime_t* runtime, const ethervox_audio_
 int ethervox_audio_start(ethervox_audio_runtime_t* runtime);
 int ethervox_audio_stop(ethervox_audio_runtime_t* runtime);
 void ethervox_audio_cleanup(ethervox_audio_runtime_t* runtime);
+int ethervox_audio_start_capture(ethervox_audio_runtime_t* runtime);
+int ethervox_audio_stop_capture(ethervox_audio_runtime_t* runtime);
+int ethervox_audio_read(ethervox_audio_runtime_t* runtime, ethervox_audio_buffer_t* buffer);
 
 // Speech processing functions
-int ethervox_stt_process(ethervox_audio_runtime_t* runtime, const ethervox_audio_buffer_t* buffer, ethervox_stt_result_t* result);
 int ethervox_tts_synthesize(ethervox_audio_runtime_t* runtime, const ethervox_tts_request_t* request, ethervox_audio_buffer_t* output);
 int ethervox_language_detect(const ethervox_audio_buffer_t* buffer, ethervox_language_detect_t* result);
 
 // Utility functions
 ethervox_audio_config_t ethervox_audio_get_default_config(void);
 void ethervox_audio_buffer_free(ethervox_audio_buffer_t* buffer);
-void ethervox_stt_result_free(ethervox_stt_result_t* result);
 
 // Platform-specific driver registration
 int ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime);

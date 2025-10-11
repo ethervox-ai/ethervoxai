@@ -135,6 +135,25 @@ ethervox_platform_capabilities_t ethervox_platform_get_capabilities(void) {
         caps.gpio_pin_count = 0;
         caps.ram_size_mb = 16384;  // 16GB typical
         caps.flash_size_mb = 0;    // SSD storage
+    #else
+        // Safe defaults for unknown platforms
+        caps.has_audio_input = false;
+        caps.has_audio_output = false;
+        caps.has_microphone_array = false;
+        caps.has_gpio = false;
+        caps.has_spi = false;
+        caps.has_i2c = false;
+        caps.has_uart = false;
+        caps.has_wifi = false;
+        caps.has_bluetooth = false;
+        caps.has_ethernet = false;
+        caps.has_display = false;
+        caps.has_camera = false;
+        caps.max_audio_channels = 0;
+        caps.max_sample_rate = 48000;
+        caps.gpio_pin_count = 0;
+        caps.ram_size_mb = 0;
+        caps.flash_size_mb = 0;
     #endif
     
     return caps;

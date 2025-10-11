@@ -4,9 +4,10 @@
 	
 .PHONY: help setup-venv install-deps build test clean
 .PHONY: configure configure-rpi configure-windows configure-all
-.PHONY: build-rpi build-windows build-esp32 build-all
-.PHONY: clean-rpi clean-windows clean-esp32 clean-all
+.PHONY: build-rpi build-windows build-esp32 build-voice-assistant build-all
+.PHONY: clean-rpi clean-windows clean-esp32 clean-voice-assistant clean-all
 .PHONY: setup-esp32 flash-esp32 monitor-esp32
+.PHONY: run-voice-assistant
 
 help:
 	@echo "=========================================="
@@ -159,12 +160,24 @@ clean-esp32:
 		echo "No ESP32 build directory to clean"; \
 	fi
 	@rm -rf esp32-project/sdkconfig esp32-project/sdkconfig.old
-	
+
+build-voice-assistant: $(TARGET)
+	@echo "Building voice assistant example..."
+    $(MAKE) -C examples/voice_assistant
+
+run-voice-assistant: build-voice-assistant
+	@echo "Running voice assistant..."
+    $(MAKE) -C examples/voice_assistant run
+
+clean-voice-assistant:
+	@echo "Cleaning voice assistant example..."
+    $(MAKE) -C examples/voice_assistant clean
+
 # Multi-platform targets
 configure-all: configure configure-rpi configure-windows
 	@echo "All platforms configured!"
 
-build-all: build build-rpi build-windows build-esp32
+build-all: build build-rpi build-windows build-esp32 build-voice-assistant
 	@echo "=========================================="
 	@echo "  All Platform Builds Complete!"
 	@echo "=========================================="
@@ -172,7 +185,8 @@ build-all: build build-rpi build-windows build-esp32
 	@echo "RPI binary:     build-rpi/ethervoxai"
 	@echo "Windows binary: build-windows/ethervoxai.exe"
 	@echo "ESP32 binary:   build/ethervoxai.bin"
+	@echo "Voice Assistant Example: examples/voice_assistant/voice_assistant"
 	@echo "=========================================="
 
-clean-all: clean clean-rpi clean-windows clean-esp32
+clean-all: clean clean-rpi clean-windows clean-esp32 clean-voice-assistant
 	@echo "All build artifacts cleaned!"

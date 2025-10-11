@@ -43,7 +43,7 @@ void test_system_initialization() {
     ethervox_dialogue_engine_t dialogue_engine;
     // int dialogue_result = ethervox_dialogue_init(&dialogue_engine, "en");
     ethervox_llm_config_t llm_config = ethervox_dialogue_get_default_llm_config();
-    strncpy(llm_config.language_code, "en", sizeof(llm_config.language_code) - 1);
+    llm_config.language_code = "en";
     int dialogue_result = ethervox_dialogue_init(&dialogue_engine, &llm_config);
     if (dialogue_result == 0) {
         printf("  ✓ Dialogue engine initialized successfully\n");
@@ -115,7 +115,7 @@ void test_memory_management() {
         assert(result == 0);
         
         // Simulate some operations
-        assert(manager.plugin_count == 0);
+    assert(manager.plugin_count == ETHERVOX_BUILTIN_PLUGIN_COUNT);
         
         ethervox_plugin_manager_cleanup(&manager);
         printf("  ✓ Init/cleanup cycle %d completed\n", i + 1);
