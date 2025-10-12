@@ -36,9 +36,14 @@ jobs:
 
     - name: Get version
       id: get_version
+      env:
+        INPUT_VERSION: "${{ github.event.inputs.version }}"
+        EVENT_NAME: "${{ github.event_name }}"
       run: |
-        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-          VERSION="${{ github.event.inputs.version }}"
+        # Use env variables (populated from expressions) inside the shell to avoid
+        # direct expression interpolation in the run block.
+        if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+          VERSION="$INPUT_VERSION"
         else
           VERSION=${GITHUB_REF#refs/tags/}
         fi
@@ -52,15 +57,21 @@ jobs:
 
     - name: Check if pre-release
       id: check_prerelease
+      env:
+        VERSION_OUT: "${{ steps.get_version.outputs.version }}"
+        EVENT_NAME: "${{ github.event_name }}"
+        INPUT_PRERELEASE: "${{ github.event.inputs.prerelease }}"
       run: |
-        VERSION="${{ steps.get_version.outputs.version }}"
+        # Read values from env (populated from action expressions) to avoid
+        # embedding expressions directly in the run script.
+        VERSION="$VERSION_OUT"
         # Re-validate VERSION here in case it's propagated from outputs
         if ! [[ "$VERSION" =~ ^v[0-9A-Za-z._-]+$ ]]; then
           echo "Invalid or unsafe version value at check_prerelease: $VERSION" >&2
           exit 1
         fi
-        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-          IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
+        if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+          IS_PRERELEASE="$INPUT_PRERELEASE"
         elif [[ $VERSION =~ (alpha|beta|rc|pre) ]]; then
           IS_PRERELEASE=true
         else
