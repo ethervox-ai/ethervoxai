@@ -11,6 +11,8 @@ ignores:
   - ".git/**"
   - "**/node_modules/**"
   - "dashboard/node_modules/**"
+  - ".gitignore"
+  - ".github/**"
 
 # markdownlint configuration object
 config:
@@ -38,3 +40,6 @@ config:
   
   # MD034: Bare URL used
   MD034: false
+
+  # MD025: Multiple top-level headings in the same document
+  MD025: false

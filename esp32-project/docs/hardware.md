@@ -1,6 +1,7 @@
 # EthervoxAI - ESP32 Hardware Requirements
 
-# # Build Summary
+## Build Summary
+
 ✅ **Build Status:** SUCCESS  
 📦 **Binary Size:** 227,136 bytes (0x37f80)  
 💾 **Flash Usage:** 22% of 1MB app partition  
@@ -8,9 +9,9 @@
 
 ---
 
-# # Minimum Hardware Configuration
+## Minimum Hardware Configuration
 
-## # 1. ESP32 Module
+## 1. ESP32 Module
 
 | Specification | Requirement | Recommended |
 |--------------|-------------|-------------|
@@ -23,13 +24,14 @@
 | **Bluetooth** | BLE 4.2 | Same |
 
 **Recommended Development Boards:**
+
 - ESP32-DevKitC V4
 - NodeMCU-32S
 - DOIT ESP32 DevKit V1
 
 ---
 
-## # 2. I2S Digital Microphone
+## 2. I2S Digital Microphone
 
 **Primary Choice: INMP441**
 
@@ -43,6 +45,7 @@
 | L/R | GND or VDD | Channel Select | GND=Left, VDD=Right |
 
 **Specifications:**
+
 - **Sensitivity:** -26 dBFS
 - **SNR:** 61 dB
 - **Dynamic Range:** 61 dB
@@ -51,23 +54,25 @@
 - **Power Consumption:** <1 mA
 
 **Alternative Microphones:**
+
 - SPH0645 (I2S, Adafruit)
 - ICS-43434 (I2S, InvenSense)
 - MAX9814 (Analog, requires ADC - not recommended)
 
 ---
 
-## # 3. Power Supply
+## 3. Power Supply
 
-### # Voltage Regulator
+### Voltage Regulator
+
 - **Model:** AMS1117-3.3 or HT7333
 - **Input:** 5V DC
 - **Output:** 3.3V @ 800mA minimum
 - **Dropout:** <1.2V
 
-### # Power Distribution
+### Power Distribution
 
-```
+```text
 5V Input (USB/Battery)
     │
     ├──► AMS1117-3.3 ──► ESP32 VIN (3.3V)
@@ -76,9 +81,10 @@
     │                        └──► Peripheral 3.3V
     │
     └──► Common GND
-```
+```text
 
-### # Decoupling Capacitors
+### Decoupling Capacitors
+
 | Location | Value | Type | Purpose |
 |----------|-------|------|---------|
 | Input (5V) | 10µF | Electrolytic | Smooth input voltage |
@@ -88,6 +94,7 @@
 | Microphone VDD | 100nF | Ceramic | High-freq decoupling |
 
 **Power Consumption:**
+
 - **Active (WiFi ON):** 160-260 mA
 - **Active (WiFi OFF):** 80-120 mA  
 - **Light Sleep:** 0.8-2 mA
@@ -95,12 +102,14 @@
 
 ---
 
-## # 4. Programming Interface
+## 4. Programming Interface
 
-### # USB-to-Serial Bridge (Development)
+### USB-to-Serial Bridge (Development)
+
 - **Chips:** CH340G, CP2102, or FTDI FT232RL
 - **Baud Rate:** 115200 (debug), 921600 (flashing)
 - **Connections:**
+
   ```
   USB Bridge     ESP32
   ─────────      ──────
@@ -111,13 +120,14 @@
   GND     ─────► GND
   ```
 
-### # Boot Mode Control
+### Boot Mode Control
+
 - **Normal Boot:** GPIO0 = HIGH (pulled up)
 - **Flash Boot:** GPIO0 = LOW (button pressed during reset)
 
 **Recommended Circuit:**
 
-```
+```text
         10kΩ
 EN ─────/\/\/\─────┬──── 3.3V
                    │
@@ -137,13 +147,13 @@ GPIO0 ──/\/\/\─────┬──── 3.3V
                   ╲
                    │
                   GND
-```
+```text
 
 ---
 
-# # Complete Pin Assignment
+## Complete Pin Assignment
 
-## # Active Pins (Currently Used)
+## Active Pins (Currently Used)
 
 | GPIO | Function | Direction | Module | Notes |
 |------|----------|-----------|--------|-------|
@@ -155,7 +165,7 @@ GPIO0 ──/\/\/\─────┬──── 3.3V
 | 26 | I2S BCK | Output | Audio | INMP441 bit clock |
 | 33 | I2S SD | Input | Audio | INMP441 data in |
 
-## # Reserved Pins (Future Use)
+## Reserved Pins (Future Use)
 
 | GPIO | Function | Direction | Purpose | Notes |
 |------|----------|-----------|---------|-------|
@@ -166,7 +176,8 @@ GPIO0 ──/\/\/\─────┬──── 3.3V
 | 23 | SPI MOSI | Output | Flash/Sensors | Reserved |
 | 5 | SPI CS | Output | Flash/Sensors | Reserved |
 
-## # Strapping Pins (Avoid if possible)
+## Strapping Pins (Avoid if possible)
+
 | GPIO | Boot Behavior | Constraint |
 |------|---------------|------------|
 | 0 | Must be HIGH on boot | Pull-up required |
@@ -175,14 +186,15 @@ GPIO0 ──/\/\/\─────┬──── 3.3V
 | 12 | Sets flash voltage | Must be LOW for 3.3V flash |
 | 15 | Must be HIGH on boot | Use with caution |
 
-## # Input-Only Pins (Cannot be outputs)
+## Input-Only Pins (Cannot be outputs)
+
 - GPIO 34, 35, 36, 39: ADC only, no pull-up/pull-down
 
 ---
 
-# # Schematic Diagram
+## Schematic Diagram
 
-```
+```text
                          ESP32-WROOM-32
                     ┌─────────────────────┐
                     │                     │
@@ -227,13 +239,13 @@ GPIO0 ──/\/\/\─────┬──── 3.3V
                     │             │
          ESP32  ────┤             │
          GPIO 33    └─────────────┘
-```
+```text
 
 ---
 
-# # Bill of Materials (BOM)
+## Bill of Materials (BOM)
 
-## # Core Components
+## Core Components
 
 | Qty | Component | Part Number | Description | Unit Price | Total |
 |-----|-----------|-------------|-------------|------------|-------|
@@ -242,7 +254,7 @@ GPIO0 ──/\/\/\─────┬──── 3.3V
 | 1 | Voltage Regulator | AMS1117-3.3 | LDO 3.3V 1A | $0.20 | $0.20 |
 | 1 | USB-Serial | CH340G | USB to UART | $0.50 | $0.50 |
 
-## # Passive Components
+## Passive Components
 
 | Qty | Component | Value | Package | Unit Price | Total |
 |-----|-----------|-------|---------|------------|-------|
@@ -253,7 +265,7 @@ GPIO0 ──/\/\/\─────┬──── 3.3V
 | 1 | LED (optional) | Red 3mm | Through-hole | $0.05 | $0.05 |
 | 1 | Resistor (LED) | 220Ω | 0603/0805 | $0.02 | $0.02 |
 
-## # Connectors & Misc
+## Connectors & Misc
 
 | Qty | Component | Description | Unit Price | Total |
 |-----|-----------|-------------|------------|-------|
@@ -265,16 +277,17 @@ GPIO0 ──/\/\/\─────┬──── 3.3V
 
 ---
 
-# # PCB Layout Recommendations
+## PCB Layout Recommendations
 
-## # Layer Stack (2-layer PCB)
+## Layer Stack (2-layer PCB)
 
-```
+```text
 Top Layer:    Signal + Components
 Bottom Layer: Ground plane + Power
-```
+```text
 
-## # Design Rules
+## Design Rules
+
 - **Trace Width:**
   - Power (3.3V): 0.4mm minimum (20mil)
   - Signal: 0.2mm minimum (8mil)
@@ -286,29 +299,25 @@ Bottom Layer: Ground plane + Power
   - Drill: 0.3mm
   - Pad: 0.6mm
 
-## # Critical Layout Guidelines
+## Critical Layout Guidelines
 
 1. **Power Distribution:**
    - Star ground topology from regulator
    - Wide 3.3V traces to ESP32 and microphone
    - Ground plane on bottom layer
-
-2. **ESP32 Placement:**
+1. **ESP32 Placement:**
    - Keep antenna area clear (15mm radius)
    - Place away from noisy signals
    - Good thermal contact to ground plane
-
-3. **Microphone Placement:**
+1. **Microphone Placement:**
    - Away from switching noise sources
    - Sound port accessible (top or edge of PCB)
    - Short traces to ESP32
-
-4. **Decoupling Strategy:**
+1. **Decoupling Strategy:**
    - Capacitors as close as possible to IC pins
    - 100nF ceramics <5mm from power pins
    - 10µF bulk caps within 10mm
-
-5. **I2S Trace Routing:**
+1. **I2S Trace Routing:**
    - Keep BCK, WS, SD traces same length (±2mm)
    - Route parallel, maintain spacing
    - Avoid crossing under noisy signals
@@ -316,21 +325,24 @@ Bottom Layer: Ground plane + Power
 
 ---
 
-# # Flash Partition Table
+## Flash Partition Table
 
 Current configuration supports OTA updates:
 
 ```csv
+
 # Name,     Type, SubType,  Offset,   Size,      Flags
+
 nvs,        data, nvs,      0x9000,   0x6000,
 phy_init,   data, phy,      0xf000,   0x1000,
 factory,    app,  factory,  0x10000,  0x100000,
 ota_0,      app,  ota_0,    0x110000, 0x100000,
 ota_1,      app,  ota_1,    0x210000, 0x100000,
 storage,    data, spiffs,   0x310000, 0xF0000,
-```
+```text
 
 **Partition Usage:**
+
 - **NVS:** 24KB - WiFi credentials, config
 - **PHY Init:** 4KB - RF calibration
 - **Factory:** 1MB - Initial firmware (227KB used, 78% free)
@@ -341,43 +353,48 @@ storage,    data, spiffs,   0x310000, 0xF0000,
 
 ---
 
-# # Assembly Instructions
+## Assembly Instructions
 
-## # Step 1: Power Supply
+## Step 1: Power Supply
+
 1. Solder AMS1117-3.3 regulator to PCB
-2. Add 10µF capacitor on input (5V)
-3. Add 10µF + 100nF on output (3.3V)
-4. Test output voltage (should be 3.28-3.32V)
+1. Add 10µF capacitor on input (5V)
+1. Add 10µF + 100nF on output (3.3V)
+1. Test output voltage (should be 3.28-3.32V)
 
-## # Step 2: ESP32 Module
+## Step 2: ESP32 Module
+
 1. Apply solder paste to pads (if using SMD)
-2. Place ESP32-WROOM-32 carefully aligned
-3. Reflow or hot air solder
-4. Add decoupling caps near VIN pin
-5. Solder boot/reset buttons and pull-ups
+1. Place ESP32-WROOM-32 carefully aligned
+1. Reflow or hot air solder
+1. Add decoupling caps near VIN pin
+1. Solder boot/reset buttons and pull-ups
 
-## # Step 3: Microphone
+## Step 3: Microphone
+
 1. Solder INMP441 module to PCB
-2. Add 10µF + 100nF caps near VDD pin
-3. Connect I2S signals (BCK, WS, SD)
-4. Set L/R pin (GND for left channel)
+1. Add 10µF + 100nF caps near VDD pin
+1. Connect I2S signals (BCK, WS, SD)
+1. Set L/R pin (GND for left channel)
 
-## # Step 4: USB Interface
+## Step 4: USB Interface
+
 1. Solder CH340G or USB connector
-2. Connect TX/RX to ESP32
-3. Add auto-reset circuit (DTR/RTS)
+1. Connect TX/RX to ESP32
+1. Add auto-reset circuit (DTR/RTS)
 
-## # Step 5: Testing
+## Step 5: Testing
+
 1. Power on, check 3.3V rail
-2. Connect USB, verify enumeration
-3. Flash test firmware
-4. Verify serial output at 115200 baud
+1. Connect USB, verify enumeration
+1. Flash test firmware
+1. Verify serial output at 115200 baud
 
 ---
 
-# # Testing & Validation
+## Testing & Validation
 
-## # Power-On Self Test
+## Power-On Self Test
 
 ```cpp
 // Add to main.c for hardware validation
@@ -402,21 +419,27 @@ void hardware_self_test() {
     ESP_LOGI("TEST", "Flash size: %d MB",
              spi_flash_get_chip_size() / (1024*1024));
 }
-```
+```text
 
-## # Audio Capture Test
+## Audio Capture Test
 
 ```bash
+
 # Monitor audio data
+
 make monitor-esp32
 
 # Expected output:
-# I (1234) ESP32_AUDIO: Audio runtime initialized for ESP32
-# I (1240) ESP32_AUDIO: Initializing I2S for audio capture...
-# I (1250) ESP32_AUDIO: I2S audio capture started successfully
-```
 
-## # Signal Quality Check
+# I (1234) ESP32_AUDIO: Audio runtime initialized for ESP32
+
+# I (1240) ESP32_AUDIO: Initializing I2S for audio capture...
+
+# I (1250) ESP32_AUDIO: I2S audio capture started successfully
+```text
+
+## Signal Quality Check
+
 - **BCK Frequency:** 512 kHz (16kHz × 32bits/sample)
 - **WS Frequency:** 16 kHz
 - **SD Data:** Valid I2S data stream
@@ -424,7 +447,7 @@ make monitor-esp32
 
 ---
 
-# # Troubleshooting Guide
+## Troubleshooting Guide
 
 | Symptom | Possible Cause | Solution |
 |---------|----------------|----------|
@@ -439,15 +462,17 @@ make monitor-esp32
 
 ---
 
-# # Compliance & Certifications
+## Compliance & Certifications
 
-## # FCC/CE Requirements (for production)
+## FCC/CE Requirements (for production)
+
 - **WiFi:** Certified ESP32 modules (pre-certified)
 - **EMI:** Follow Espressif design guidelines
 - **ESD:** Add protection diodes on exposed pins
 - **Power:** Use certified power supplies
 
-## # Safety Considerations
+## Safety Considerations
+
 - **Voltage:** All signals ≤3.3V
 - **Current:** Fuse on 5V input (500mA max)
 - **Thermal:** ESP32 max temp 85°C
@@ -455,23 +480,26 @@ make monitor-esp32
 
 ---
 
-# # Next Steps
+## Next Steps
 
 ✅ **You've successfully built the firmware!**
 
 **Hardware Setup:**
+
 1. Order components from BOM
-2. Assemble on breadboard or PCB
-3. Flash firmware: `make flash-esp32`
-4. Test audio capture: `make monitor-esp32`
+1. Assemble on breadboard or PCB
+1. Flash firmware: `make flash-esp32`
+1. Test audio capture: `make monitor-esp32`
 
 **Software Configuration:**
+
 1. Configure WiFi credentials via `idf.py menuconfig`
-2. Set up cloud API endpoints (see API_INTEGRATION.md)
-3. Test wake word detection
-4. Calibrate microphone sensitivity
+1. Set up cloud API endpoints (see API_INTEGRATION.md)
+1. Test wake word detection
+1. Calibrate microphone sensitivity
 
 **Production Deployment:**
+
 - See `docs/PRODUCTION_DEPLOYMENT.md`
 - PCB design files: `hardware/gerber/`
 - 3D enclosure: `hardware/enclosure/`

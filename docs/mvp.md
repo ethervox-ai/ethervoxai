@@ -4,13 +4,13 @@ The EthervoxAI MVP is a privacy-first, multilingual voice intelligence platform 
 
 ---
 
-# # MVP Vision
+## MVP Vision
 
 Enable seamless, ambient, multilingual voice interaction across smart devices—while preserving user privacy, maintaining local-first execution, and empowering end users with full control over their data.
 
 ---
 
-# # Core Principles
+## Core Principles
 
 - **Local-First Execution**: All speech processing, intent detection, and language modeling performed on-device.
 - **Multilingual Seamlessness**: Auto-switch spoken and response language based on user input; no manual toggling required.
@@ -20,7 +20,7 @@ Enable seamless, ambient, multilingual voice interaction across smart devices—
 
 ---
 
-# # MVP Feature Set
+## MVP Feature Set
 
 | Feature                     | Description                                                           |
 |----------------------------|-----------------------------------------------------------------------|
@@ -33,7 +33,7 @@ Enable seamless, ambient, multilingual voice interaction across smart devices—
 
 ---
 
-# # 🛠️ Technical Stack Snapshot
+## 🛠️ Technical Stack Snapshot
 
 - **Local Models**: GGUF + Whisper Tiny or Mistral Lite (optimized for embedded use)
 - **Language Switching**: Profile-based with ambient voice detection and fallback
@@ -42,27 +42,28 @@ Enable seamless, ambient, multilingual voice interaction across smart devices—
 
 ---
 
-# # 🧪 Initial Supported Languages
+## 🧪 Initial Supported Languages
 
 - **English (US/UK)**
 - **Spanish (LatAm)**
 - **Mandarin (Simplified)**  
+
 _(Scalable to >15 languages post-MVP)_
 
 ---
 
-# # 🛤️ MVP Milestones
+## 🛤️ MVP Milestones
 
 1. 🧱 Local runtime + STT/TTS integration
-2. 🧠 Intent parser and basic LLM container
-3. 🔐 Privacy dashboard with audit-ready cloud query logging
-4. 🔌 External LLM integration framework
-5. 🧪 Prototype voice activation on Raspberry Pi
-6. 🎛️ Developer SDK first release (intent plugins + device profiles)
+1. 🧠 Intent parser and basic LLM container
+1. 🔐 Privacy dashboard with audit-ready cloud query logging
+1. 🔌 External LLM integration framework
+1. 🧪 Prototype voice activation on Raspberry Pi
+1. 🎛️ Developer SDK first release (intent plugins + device profiles)
 
 ---
 
-# # 📝 Notes & Assumptions
+## 📝 Notes & Assumptions
 
 - Cloud access only via opt-in and only for web/RAG queries
 - MVP includes sandbox examples for kitchen appliance and robot use cases
@@ -70,10 +71,9 @@ _(Scalable to >15 languages post-MVP)_
 
 ---
 
-# # 🧑‍🤝‍🧑 Want to Join?
+## 🧑‍🤝‍🧑 Want to Join?
 
 Start by reading [`CONTRIBUTING.md`](../CONTRIBUTING.md) and [`ethical-ai.md`](./ethical-ai.md). We welcome collaborators who share our values and want to help shape ambient intelligence with integrity.
 
 Have questions or ideas? Reach us at:  
-📧 team@ethervox.ai
-
+📧 [team@ethervox.ai](mailto:team@ethervox.ai)
