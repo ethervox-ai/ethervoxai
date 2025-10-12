@@ -42,7 +42,13 @@ jobs:
         cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
         
         # Run clang-tidy on source files
-        find src -name "*.cpp" | head -20 | xargs clang-tidy \
+        FILES=$(find src -type f \( -name "*.c" -o -name "*.cpp" \) | head -20)
+        if [ -z "$FILES" ]; then
+          echo "No C/C++ sources found; skipping clang-tidy." >&2
+          exit 0
+        fi
+        echo "Running clang-tidy on:" && echo "$FILES"
+        echo "$FILES" | tr '\n' '\0' | xargs -0 clang-tidy \
           -p build \
           --checks='-*,readability-*,modernize-*,performance-*,bugprone-*' \
           --warnings-as-errors=false
