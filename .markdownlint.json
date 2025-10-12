@@ -8,5 +8,8 @@
     "allowed_elements": ["br", "details", "summary", "img", "a", "div", "span"]
   },
   "MD041": false,
-  "MD025": false
+  "MD025": false,
+    "MD040": {
+    "allowed_languages": ["bash", "json", "french", "spanish", "english", "markdown", "yaml", "python", "cpp", "c", "javascript", "typescript", "java", "ruby", "go", "php", "swift", "kotlin", "rust", "shell", "powershell", "sql"]
+  }
 }
