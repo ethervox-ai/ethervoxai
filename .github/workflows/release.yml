@@ -128,27 +128,16 @@ jobs:
           brew install ninja pkg-config
         fi
 
-    - name: Configure CMake
+    - name: Configure (Makefile)
       run: |
         if [[ "${{ matrix.target }}" == rpi-* ]]; then
-          cmake -B build \
-            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/raspberry-pi.cmake \
-            -DTARGET_PLATFORM=${{ matrix.target }} \
-            -G Ninja
-        elif [[ "${{ matrix.target }}" == "linux-arm64" ]]; then
-          cmake -B build \
-            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/linux-arm64.cmake \
-            -G Ninja
+          make configure-rpi
         else
-          cmake -B build \
-            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -G Ninja
+          make configure TARGET_PLATFORM=${{ matrix.platform }}
         fi
 
-    - name: Build
-      run: cmake --build build --config ${{ env.BUILD_TYPE }} -j$(nproc)
+    - name: Build (Makefile)
+      run: make build
 
     - name: Create distribution package
       run: |

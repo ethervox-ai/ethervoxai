@@ -37,6 +37,7 @@ jobs:
     - name: Run clang-tidy
       run: |
         echo "=== C++ Static Analysis ==="
+        # Configure via Makefile/CMake to generate compile commands
         cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
         
         # Run clang-tidy on source files

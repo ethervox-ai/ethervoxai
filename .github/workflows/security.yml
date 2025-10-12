@@ -53,8 +53,9 @@ jobs:
     - name: Build C/C++ code
       if: matrix.language == 'cpp'
       run: |
-        cmake --preset default
-        cmake --build --preset default
+        # Use Makefile wrapper to configure and build
+        make configure TARGET_PLATFORM=linux
+        make build
 
     - name: Setup Node.js (JavaScript)
       if: matrix.language == 'javascript'
@@ -202,8 +203,8 @@ jobs:
         COPY . /app
         WORKDIR /app
         
-        # Build the application
-        RUN cmake --preset default && cmake --build --preset default
+  # Build the application via Makefile/CMake
+  RUN make configure && cmake --build build
         
         # Create non-root user
         RUN useradd -m ethervox

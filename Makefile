@@ -163,15 +163,15 @@ clean-esp32:
 
 build-voice-assistant: $(TARGET)
 	@echo "Building voice assistant example..."
-    $(MAKE) -C examples/voice_assistant
+	@$(MAKE) -C examples/voice_assistant
 
 run-voice-assistant: build-voice-assistant
 	@echo "Running voice assistant..."
-    $(MAKE) -C examples/voice_assistant run
+	@$(MAKE) -C examples/voice_assistant run
 
 clean-voice-assistant:
 	@echo "Cleaning voice assistant example..."
-    $(MAKE) -C examples/voice_assistant clean
+	@$(MAKE) -C examples/voice_assistant clean
 
 # Multi-platform targets
 configure-all: configure configure-rpi configure-windows
