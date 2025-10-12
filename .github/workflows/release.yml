@@ -42,6 +42,11 @@ jobs:
         else
           VERSION=${GITHUB_REF#refs/tags/}
         fi
+        # Basic whitelist: allow v prefixed semver-like strings with letters/numbers/.-_
+        if ! [[ "$VERSION" =~ ^v[0-9A-Za-z._-]+$ ]]; then
+          echo "Invalid or unsafe version value: $VERSION" >&2
+          exit 1
+        fi
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Version: $VERSION"
 
@@ -49,6 +54,11 @@ jobs:
       id: check_prerelease
       run: |
         VERSION="${{ steps.get_version.outputs.version }}"
+        # Re-validate VERSION here in case it's propagated from outputs
+        if ! [[ "$VERSION" =~ ^v[0-9A-Za-z._-]+$ ]]; then
+          echo "Invalid or unsafe version value at check_prerelease: $VERSION" >&2
+          exit 1
+        fi
         if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
           IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
         elif [[ $VERSION =~ (alpha|beta|rc|pre) ]]; then
