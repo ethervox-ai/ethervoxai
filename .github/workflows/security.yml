@@ -80,6 +80,14 @@ jobs:
       with:
         category: "/language:${{matrix.language}}"
 
+    - name: Upload CodeQL SARIF artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: codeql-sarif-${{ matrix.language }}-${{ github.sha }}
+        path: codeql-results.sarif
+        retention-days: 30
+
   dependency-scan:
     name: Dependency Vulnerability Scan
     runs-on: ubuntu-latest

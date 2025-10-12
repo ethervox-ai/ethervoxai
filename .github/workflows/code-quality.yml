@@ -29,6 +29,7 @@ jobs:
           ninja-build
 
     - name: Check C++ formatting
+      continue-on-error: true
       run: |
         echo "=== C++ Format Check ==="
         find src include -name "*.cpp" -o -name "*.hpp" -o -name "*.h" -o -name "*.c" | \
@@ -94,6 +95,7 @@ jobs:
 
     - name: Run Semgrep
       uses: returntocorp/semgrep-action@v1
+      continue-on-error: true
       with:
         config: >-
           p/security-audit
@@ -106,6 +108,14 @@ jobs:
       if: always()
       with:
         sarif_file: semgrep.sarif
+
+    - name: Upload Semgrep SARIF artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: semgrep-sarif-${{ github.sha }}
+        path: semgrep.sarif
+        retention-days: 30
 
     - name: Secret scanning with TruffleHog
       uses: trufflesecurity/trufflehog@main

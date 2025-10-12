@@ -1,510 +1,511 @@
 /**
  * @file main.c
  * @brief Voice Assistant Demo - Wake Word + STT + Dialogue + LLM
- * 
+ *
  * Demonstrates the complete voice pipeline:
  * 1. Audio Capture (from microphone)
  * 2. Wake Word Detection ("hey ethervox")
  * 3. Speech-to-Text (local Vosk/Whisper)
  * 4. Intent Parsing (existing dialogue_core)
  * 5. LLM Response (local model)
- * 
+ *
  * Copyright (c) 2024-2025 EthervoxAI Team
  * Licensed under CC BY-NC-SA 4.0
  */
 
+#include <ctype.h>
+#include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
-#include <unistd.h>
-#include <ctype.h>
 #include <strings.h>
-#include <stdbool.h>
+#include <unistd.h>
 
 #include "ethervox/audio.h"
-#include "ethervox/wake_word.h"
-#include "ethervox/stt.h"
 #include "ethervox/dialogue.h"
 #include "ethervox/platform.h"
+#include "ethervox/stt.h"
+#include "ethervox/wake_word.h"
 
 // Pipeline state
 typedef enum {
-    STATE_LISTENING_FOR_WAKE,
-    STATE_RECORDING_SPEECH,
-    STATE_PROCESSING_INTENT,
-    STATE_GENERATING_RESPONSE
+  STATE_LISTENING_FOR_WAKE,
+  STATE_RECORDING_SPEECH,
+  STATE_PROCESSING_INTENT,
+  STATE_GENERATING_RESPONSE
 } pipeline_state_t;
 
 typedef struct {
-    bool text_mode;
+  bool text_mode;
 
-    // Platform
-    ethervox_platform_t platform;
+  // Platform
+  ethervox_platform_t platform;
 
-    // Audio
-    ethervox_audio_runtime_t audio;
-    ethervox_audio_config_t audio_config;
-    
-    // Wake word
-    ethervox_wake_runtime_t wake;
-    ethervox_wake_config_t wake_config;
-    
-    // STT
-    ethervox_stt_runtime_t stt;
-    ethervox_stt_config_t stt_config;
-    
-    // Dialogue
-    ethervox_dialogue_engine_t dialogue;
-    ethervox_llm_config_t llm_config;
-    
-    // State
-    pipeline_state_t state;
-    char* context_id;
-    bool running;
-    bool audio_ready;
-    bool wake_ready;
-    bool stt_ready;
-    char language_code[8];
-    char stt_language[16];
+  // Audio
+  ethervox_audio_runtime_t audio;
+  ethervox_audio_config_t audio_config;
+
+  // Wake word
+  ethervox_wake_runtime_t wake;
+  ethervox_wake_config_t wake_config;
+
+  // STT
+  ethervox_stt_runtime_t stt;
+  ethervox_stt_config_t stt_config;
+
+  // Dialogue
+  ethervox_dialogue_engine_t dialogue;
+  ethervox_llm_config_t llm_config;
+
+  // State
+  pipeline_state_t state;
+  char* context_id;
+  bool running;
+  bool audio_ready;
+  bool wake_ready;
+  bool stt_ready;
+  char language_code[8];
+  char stt_language[16];
 } voice_pipeline_t;
 
 static voice_pipeline_t g_pipeline = {0};
 
 // Signal handler for clean shutdown
 void signal_handler(int signum) {
-    (void)signum;
-    printf("\nShutting down voice assistant...\n");
-    g_pipeline.running = false;
+  (void)signum;
+  printf("\nShutting down voice assistant...\n");
+  g_pipeline.running = false;
 }
 
 static void sanitize_language(const char* source, char* target, size_t target_len) {
-    if (!target || target_len == 0) {
-        return;
-    }
+  if (!target || target_len == 0) {
+    return;
+  }
 
-    size_t out_idx = 0;
-    for (const char* cursor = source; cursor && *cursor && out_idx < target_len - 1; ++cursor) {
-        if (*cursor == '.' || *cursor == '@') {
-            break;
-        }
-        if (*cursor == '_' || *cursor == '-') {
-            target[out_idx++] = '-';
-            continue;
-        }
-        if (isalpha((unsigned char)*cursor)) {
-            target[out_idx++] = (char)tolower((unsigned char)*cursor);
-        }
+  size_t out_idx = 0;
+  for (const char* cursor = source; cursor && *cursor && out_idx < target_len - 1; ++cursor) {
+    if (*cursor == '.' || *cursor == '@') {
+      break;
     }
-    target[out_idx] = '\0';
+    if (*cursor == '_' || *cursor == '-') {
+      target[out_idx++] = '-';
+      continue;
+    }
+    if (isalpha((unsigned char)*cursor)) {
+      target[out_idx++] = (char)tolower((unsigned char)*cursor);
+    }
+  }
+  target[out_idx] = '\0';
 
-    if (out_idx < 2) {
-        strncpy(target, "en", target_len - 1);
-        target[target_len - 1] = '\0';
-        return;
-    }
+  if (out_idx < 2) {
+    strncpy(target, "en", target_len - 1);
+    target[target_len - 1] = '\0';
+    return;
+  }
 
-    if (out_idx >= 2) {
-        target[2] = '\0';
-    }
+  if (out_idx >= 2) {
+    target[2] = '\0';
+  }
 }
 
 static void map_stt_language(const char* base_language, char* target, size_t target_len) {
-    if (!base_language || !*base_language) {
-        strncpy(target, "en-US", target_len - 1);
-        target[target_len - 1] = '\0';
-        return;
-    }
-
-    if (strncmp(base_language, "es", 2) == 0) {
-        strncpy(target, "es-ES", target_len - 1);
-    } else if (strncmp(base_language, "zh", 2) == 0) {
-        strncpy(target, "zh-CN", target_len - 1);
-    } else if (strncmp(base_language, "fr", 2) == 0) {
-        strncpy(target, "fr-FR", target_len - 1);
-    } else if (strncmp(base_language, "de", 2) == 0) {
-        strncpy(target, "de-DE", target_len - 1);
-    } else {
-        strncpy(target, "en-US", target_len - 1);
-    }
+  if (!base_language || !*base_language) {
+    strncpy(target, "en-US", target_len - 1);
     target[target_len - 1] = '\0';
+    return;
+  }
+
+  if (strncmp(base_language, "es", 2) == 0) {
+    strncpy(target, "es-ES", target_len - 1);
+  } else if (strncmp(base_language, "zh", 2) == 0) {
+    strncpy(target, "zh-CN", target_len - 1);
+  } else if (strncmp(base_language, "fr", 2) == 0) {
+    strncpy(target, "fr-FR", target_len - 1);
+  } else if (strncmp(base_language, "de", 2) == 0) {
+    strncpy(target, "de-DE", target_len - 1);
+  } else {
+    strncpy(target, "en-US", target_len - 1);
+  }
+  target[target_len - 1] = '\0';
 }
 
 static void pipeline_resolve_language(voice_pipeline_t* pipeline, const char* override_language) {
-    const char* resolved = NULL;
+  const char* resolved = NULL;
 
-    if (override_language && *override_language) {
-        resolved = override_language;
-    } else {
-        const char* env_lang = getenv("ETHERVOX_LANG");
-        if (env_lang && *env_lang) {
-            resolved = env_lang;
-        }
+  if (override_language && *override_language) {
+    resolved = override_language;
+  } else {
+    const char* env_lang = getenv("ETHERVOX_LANG");
+    if (env_lang && *env_lang) {
+      resolved = env_lang;
     }
+  }
 
-    if (!resolved || !*resolved) {
-        resolved = ethervox_dialogue_detect_system_language();
-    }
+  if (!resolved || !*resolved) {
+    resolved = ethervox_dialogue_detect_system_language();
+  }
 
-    sanitize_language(resolved, pipeline->language_code, sizeof(pipeline->language_code));
-    if (pipeline->language_code[0] == '\0') {
-        strncpy(pipeline->language_code, "en", sizeof(pipeline->language_code) - 1);
-        pipeline->language_code[sizeof(pipeline->language_code) - 1] = '\0';
-    }
+  sanitize_language(resolved, pipeline->language_code, sizeof(pipeline->language_code));
+  if (pipeline->language_code[0] == '\0') {
+    strncpy(pipeline->language_code, "en", sizeof(pipeline->language_code) - 1);
+    pipeline->language_code[sizeof(pipeline->language_code) - 1] = '\0';
+  }
 
-    map_stt_language(pipeline->language_code, pipeline->stt_language, sizeof(pipeline->stt_language));
+  map_stt_language(pipeline->language_code, pipeline->stt_language, sizeof(pipeline->stt_language));
 }
 
 // Initialize pipeline
 int pipeline_init(voice_pipeline_t* pipeline, const char* language_override, bool enable_audio) {
-    printf("=== EthervoxAI Voice Assistant ===\n\n");
-    
-    // Initialize platform
-    if (ethervox_platform_init(&pipeline->platform) != 0) {
-        fprintf(stderr, "Failed to initialize platform\n");
-        return -1;
-    }
-    printf("Platform: %s\n\n", ethervox_platform_get_name());
-    
-    pipeline->text_mode = !enable_audio;
+  printf("=== EthervoxAI Voice Assistant ===\n\n");
 
-    pipeline_resolve_language(pipeline, language_override);
-    printf("Language preference: %s (STT: %s)\n\n", pipeline->language_code, pipeline->stt_language);
+  // Initialize platform
+  if (ethervox_platform_init(&pipeline->platform) != 0) {
+    fprintf(stderr, "Failed to initialize platform\n");
+    return -1;
+  }
+  printf("Platform: %s\n\n", ethervox_platform_get_name());
 
-    if (enable_audio) {
-        bool audio_pipeline_ready = true;
+  pipeline->text_mode = !enable_audio;
 
-        pipeline->audio_config = (ethervox_audio_config_t){
-            .sample_rate = 16000,
-            .channels = 1,
-            .bits_per_sample = 16,
-            .buffer_size = 1024
-        };
+  pipeline_resolve_language(pipeline, language_override);
+  printf("Language preference: %s (STT: %s)\n\n", pipeline->language_code, pipeline->stt_language);
 
-        if (ethervox_audio_init(&pipeline->audio, &pipeline->audio_config) != 0) {
-            fprintf(stderr, "Failed to initialize audio\n");
-            audio_pipeline_ready = false;
-        } else {
-            pipeline->audio_ready = true;
-            printf("✓ Audio initialized (16kHz, mono)\n");
+  if (enable_audio) {
+    bool audio_pipeline_ready = true;
 
-            pipeline->wake_config = ethervox_wake_get_default_config();
-            pipeline->wake_config.wake_word = "hey ethervox";
-            pipeline->wake_config.sensitivity = 0.7f;
+    pipeline->audio_config = (ethervox_audio_config_t){
+        .sample_rate = 16000, .channels = 1, .bits_per_sample = 16, .buffer_size = 1024};
 
-            if (ethervox_wake_init(&pipeline->wake, &pipeline->wake_config) != 0) {
-                fprintf(stderr, "Failed to initialize wake word detection\n");
-                audio_pipeline_ready = false;
-            } else {
-                pipeline->wake_ready = true;
-                printf("✓ Wake word: '%s' (sensitivity: %.1f)\n",
-                       pipeline->wake_config.wake_word, pipeline->wake_config.sensitivity);
-
-                pipeline->stt_config = ethervox_stt_get_default_config();
-                pipeline->stt_config.language = pipeline->stt_language;
-
-                if (ethervox_stt_init(&pipeline->stt, &pipeline->stt_config) != 0) {
-                    fprintf(stderr, "Failed to initialize STT\n");
-                    audio_pipeline_ready = false;
-                } else {
-                    pipeline->stt_ready = true;
-                    printf("✓ STT initialized (%s)\n", pipeline->stt_config.language);
-                    printf("Tip: speak '%s' clearly near the microphone. Use --text if audio isn't available.\n\n",
-                           pipeline->wake_config.wake_word);
-                }
-            }
-        }
-
-        if (!audio_pipeline_ready) {
-            if (pipeline->stt_ready) {
-                ethervox_stt_cleanup(&pipeline->stt);
-                pipeline->stt_ready = false;
-            }
-            if (pipeline->wake_ready) {
-                ethervox_wake_cleanup(&pipeline->wake);
-                pipeline->wake_ready = false;
-            }
-            if (pipeline->audio_ready) {
-                ethervox_audio_cleanup(&pipeline->audio);
-                pipeline->audio_ready = false;
-            }
-
-            pipeline->text_mode = true;
-            printf("⚠️  Audio capture unavailable; switching to text interaction mode. Set ETHERVOX_ALSA_DEVICE or launch with --text to skip audio.\n\n");
-        }
+    if (ethervox_audio_init(&pipeline->audio, &pipeline->audio_config) != 0) {
+      fprintf(stderr, "Failed to initialize audio\n");
+      audio_pipeline_ready = false;
     } else {
-        printf("(Audio disabled — running in text interaction mode)\n");
+      pipeline->audio_ready = true;
+      printf("✓ Audio initialized (16kHz, mono)\n");
+
+      pipeline->wake_config = ethervox_wake_get_default_config();
+      pipeline->wake_config.wake_word = "hey ethervox";
+      pipeline->wake_config.sensitivity = 0.7f;
+
+      if (ethervox_wake_init(&pipeline->wake, &pipeline->wake_config) != 0) {
+        fprintf(stderr, "Failed to initialize wake word detection\n");
+        audio_pipeline_ready = false;
+      } else {
+        pipeline->wake_ready = true;
+        printf("✓ Wake word: '%s' (sensitivity: %.1f)\n", pipeline->wake_config.wake_word,
+               pipeline->wake_config.sensitivity);
+
+        pipeline->stt_config = ethervox_stt_get_default_config();
+        pipeline->stt_config.language = pipeline->stt_language;
+
+        if (ethervox_stt_init(&pipeline->stt, &pipeline->stt_config) != 0) {
+          fprintf(stderr, "Failed to initialize STT\n");
+          audio_pipeline_ready = false;
+        } else {
+          pipeline->stt_ready = true;
+          printf("✓ STT initialized (%s)\n", pipeline->stt_config.language);
+          printf(
+              "Tip: speak '%s' clearly near the microphone. Use --text if audio isn't "
+              "available.\n\n",
+              pipeline->wake_config.wake_word);
+        }
+      }
     }
-    
-    // Initialize dialogue engine
-    pipeline->llm_config = ethervox_dialogue_get_default_llm_config();
-    
-    pipeline->llm_config.language_code = pipeline->language_code;
-    if (ethervox_dialogue_init(&pipeline->dialogue, &pipeline->llm_config) != 0) {
-        fprintf(stderr, "Failed to initialize dialogue engine\n");
-        return -1;
+
+    if (!audio_pipeline_ready) {
+      if (pipeline->stt_ready) {
+        ethervox_stt_cleanup(&pipeline->stt);
+        pipeline->stt_ready = false;
+      }
+      if (pipeline->wake_ready) {
+        ethervox_wake_cleanup(&pipeline->wake);
+        pipeline->wake_ready = false;
+      }
+      if (pipeline->audio_ready) {
+        ethervox_audio_cleanup(&pipeline->audio);
+        pipeline->audio_ready = false;
+      }
+
+      pipeline->text_mode = true;
+      printf(
+          "⚠️  Audio capture unavailable; switching to text interaction mode. Set "
+          "ETHERVOX_ALSA_DEVICE or launch with --text to skip audio.\n\n");
     }
-    ethervox_dialogue_set_language(&pipeline->dialogue, pipeline->language_code);
-    printf("✓ Dialogue engine initialized\n");
-    
-    // Create dialogue context
-    if (ethervox_dialogue_create_context(&pipeline->dialogue, "demo_user", "en", 
-                                        &pipeline->context_id) != 0) {
-        fprintf(stderr, "Failed to create dialogue context\n");
-        return -1;
-    }
-    printf("✓ Dialogue context: %s\n\n", pipeline->context_id);
-    
-    pipeline->state = STATE_LISTENING_FOR_WAKE;
-    pipeline->running = true;
-    
-    return 0;
+  } else {
+    printf("(Audio disabled — running in text interaction mode)\n");
+  }
+
+  // Initialize dialogue engine
+  pipeline->llm_config = ethervox_dialogue_get_default_llm_config();
+
+  pipeline->llm_config.language_code = pipeline->language_code;
+  if (ethervox_dialogue_init(&pipeline->dialogue, &pipeline->llm_config) != 0) {
+    fprintf(stderr, "Failed to initialize dialogue engine\n");
+    return -1;
+  }
+  ethervox_dialogue_set_language(&pipeline->dialogue, pipeline->language_code);
+  printf("✓ Dialogue engine initialized\n");
+
+  // Create dialogue context
+  if (ethervox_dialogue_create_context(&pipeline->dialogue, "demo_user", "en",
+                                       &pipeline->context_id) != 0) {
+    fprintf(stderr, "Failed to create dialogue context\n");
+    return -1;
+  }
+  printf("✓ Dialogue context: %s\n\n", pipeline->context_id);
+
+  pipeline->state = STATE_LISTENING_FOR_WAKE;
+  pipeline->running = true;
+
+  return 0;
 }
 
 // Cleanup pipeline
 void pipeline_cleanup(voice_pipeline_t* pipeline) {
-    ethervox_dialogue_cleanup(&pipeline->dialogue);
+  ethervox_dialogue_cleanup(&pipeline->dialogue);
 
-    if (pipeline->stt_ready) {
-        ethervox_stt_cleanup(&pipeline->stt);
-    }
+  if (pipeline->stt_ready) {
+    ethervox_stt_cleanup(&pipeline->stt);
+  }
 
-    if (pipeline->wake_ready) {
-        ethervox_wake_cleanup(&pipeline->wake);
-    }
+  if (pipeline->wake_ready) {
+    ethervox_wake_cleanup(&pipeline->wake);
+  }
 
-    if (pipeline->audio_ready) {
-        ethervox_audio_cleanup(&pipeline->audio);
-    }
+  if (pipeline->audio_ready) {
+    ethervox_audio_cleanup(&pipeline->audio);
+  }
 
-    ethervox_platform_cleanup(&pipeline->platform);
-    
-    if (pipeline->context_id) {
-        free(pipeline->context_id);
-    }
-    
-    printf("Pipeline cleaned up\n");
+  ethervox_platform_cleanup(&pipeline->platform);
+
+  if (pipeline->context_id) {
+    free(pipeline->context_id);
+  }
+
+  printf("Pipeline cleaned up\n");
 }
 
 static void pipeline_run_text(voice_pipeline_t* pipeline);
 
 // Main processing loop
 static void pipeline_run_voice(voice_pipeline_t* pipeline) {
-    printf("🎤 Say '%s' to begin. Press Ctrl+C to exit.\n\n", pipeline->wake_config.wake_word);
+  printf("🎤 Say '%s' to begin. Press Ctrl+C to exit.\n\n", pipeline->wake_config.wake_word);
 
-    if (ethervox_audio_start_capture(&pipeline->audio) != 0) {
-        fprintf(stderr, "Failed to start audio capture\n");
-        if (pipeline->stt_ready) {
-            ethervox_stt_cleanup(&pipeline->stt);
-            pipeline->stt_ready = false;
-        }
-        if (pipeline->wake_ready) {
-            ethervox_wake_cleanup(&pipeline->wake);
-            pipeline->wake_ready = false;
-        }
-        if (pipeline->audio_ready) {
-            ethervox_audio_cleanup(&pipeline->audio);
-            pipeline->audio_ready = false;
-        }
-
-        printf("⚠️  Switching to text interaction mode. Configure ETHERVOX_ALSA_DEVICE to choose an input device.\n\n");
-        pipeline->text_mode = true;
-        pipeline_run_text(pipeline);
-        return;
+  if (ethervox_audio_start_capture(&pipeline->audio) != 0) {
+    fprintf(stderr, "Failed to start audio capture\n");
+    if (pipeline->stt_ready) {
+      ethervox_stt_cleanup(&pipeline->stt);
+      pipeline->stt_ready = false;
+    }
+    if (pipeline->wake_ready) {
+      ethervox_wake_cleanup(&pipeline->wake);
+      pipeline->wake_ready = false;
+    }
+    if (pipeline->audio_ready) {
+      ethervox_audio_cleanup(&pipeline->audio);
+      pipeline->audio_ready = false;
     }
 
-    bool conversation_active = false;
-    bool stt_session_active = false;
+    printf(
+        "⚠️  Switching to text interaction mode. Configure ETHERVOX_ALSA_DEVICE to choose an "
+        "input device.\n\n");
+    pipeline->text_mode = true;
+    pipeline_run_text(pipeline);
+    return;
+  }
 
-    while (pipeline->running) {
-        ethervox_audio_buffer_t audio_buffer = {0};
-        if (ethervox_audio_read(&pipeline->audio, &audio_buffer) != 0) {
-            usleep(10000);
-            continue;
+  bool conversation_active = false;
+  bool stt_session_active = false;
+
+  while (pipeline->running) {
+    ethervox_audio_buffer_t audio_buffer = {0};
+    if (ethervox_audio_read(&pipeline->audio, &audio_buffer) != 0) {
+      usleep(10000);
+      continue;
+    }
+
+    if (!conversation_active) {
+      ethervox_wake_result_t wake_result = {0};
+      if (ethervox_wake_process(&pipeline->wake, &audio_buffer, &wake_result) == 0 &&
+          wake_result.detected) {
+        printf("\n🔔 Wake word detected! Listening for speech...\n");
+        ethervox_wake_reset(&pipeline->wake);
+        if (!stt_session_active) {
+          ethervox_stt_start(&pipeline->stt);
+          stt_session_active = true;
         }
+        conversation_active = true;
+        printf("🗣️  Speak now (say 'stop' to end).\n");
+      }
+    } else {
+      if (!stt_session_active) {
+        ethervox_stt_start(&pipeline->stt);
+        stt_session_active = true;
+      }
 
-        if (!conversation_active) {
-            ethervox_wake_result_t wake_result = {0};
-            if (ethervox_wake_process(&pipeline->wake, &audio_buffer, &wake_result) == 0 &&
-                wake_result.detected) {
-                printf("\n🔔 Wake word detected! Listening for speech...\n");
-                ethervox_wake_reset(&pipeline->wake);
-                if (!stt_session_active) {
-                    ethervox_stt_start(&pipeline->stt);
-                    stt_session_active = true;
-                }
-                conversation_active = true;
-                printf("🗣️  Speak now (say 'stop' to end).\n");
-            }
+      ethervox_stt_result_t stt_result = {0};
+      int stt_status = ethervox_stt_process(&pipeline->stt, &audio_buffer, &stt_result);
+
+      if (stt_status == 0 && (stt_result.is_final || stt_result.is_partial)) {
+        const char* transcript = stt_result.text ? stt_result.text : "";
+        printf("\n📝 Heard: \"%s\"\n", transcript);
+
+        bool should_stop = (strcasecmp(transcript, "stop") == 0);
+
+        char response_text[512];
+        snprintf(response_text, sizeof(response_text), "I heard you say: %s", transcript);
+
+        ethervox_tts_request_t tts_request = {.text = response_text,
+                                              .language_code = pipeline->language_code,
+                                              .speech_rate = 1.0f,
+                                              .pitch = 0.0f,
+                                              .voice_id = "default"};
+
+        ethervox_audio_buffer_t tts_output = {0};
+        if (ethervox_tts_synthesize(&pipeline->audio, &tts_request, &tts_output) == 0) {
+          printf("🔊 TTS ready (%u samples)\n", tts_output.size);
+          ethervox_audio_buffer_free(&tts_output);
         } else {
-            if (!stt_session_active) {
-                ethervox_stt_start(&pipeline->stt);
-                stt_session_active = true;
-            }
-
-            ethervox_stt_result_t stt_result = {0};
-            int stt_status = ethervox_stt_process(&pipeline->stt, &audio_buffer, &stt_result);
-
-            if (stt_status == 0 && (stt_result.is_final || stt_result.is_partial)) {
-                const char* transcript = stt_result.text ? stt_result.text : "";
-                printf("\n📝 Heard: \"%s\"\n", transcript);
-
-                bool should_stop = (strcasecmp(transcript, "stop") == 0);
-
-                char response_text[512];
-                snprintf(response_text, sizeof(response_text), "I heard you say: %s", transcript);
-
-                ethervox_tts_request_t tts_request = {
-                    .text = response_text,
-                    .language_code = pipeline->language_code,
-                    .speech_rate = 1.0f,
-                    .pitch = 0.0f,
-                    .voice_id = "default"
-                };
-
-                ethervox_audio_buffer_t tts_output = {0};
-                if (ethervox_tts_synthesize(&pipeline->audio, &tts_request, &tts_output) == 0) {
-                    printf("🔊 TTS ready (%u samples)\n", tts_output.size);
-                    ethervox_audio_buffer_free(&tts_output);
-                } else {
-                    printf("⚠️  TTS synthesis failed\n");
-                }
-
-                ethervox_stt_result_free(&stt_result);
-
-                if (should_stop) {
-                    printf("🛑 Stop command received. Exiting loop.\n");
-                    pipeline->running = false;
-                    ethervox_audio_buffer_free(&audio_buffer);
-                    break;
-                }
-
-                if (stt_session_active) {
-                    ethervox_stt_stop(&pipeline->stt);
-                    stt_session_active = false;
-                }
-
-                ethervox_stt_start(&pipeline->stt);
-                stt_session_active = true;
-                printf("🗣️  Ready for your next phrase.\n");
-            }
+          printf("⚠️  TTS synthesis failed\n");
         }
 
-        ethervox_audio_buffer_free(&audio_buffer);
+        ethervox_stt_result_free(&stt_result);
+
+        if (should_stop) {
+          printf("🛑 Stop command received. Exiting loop.\n");
+          pipeline->running = false;
+          ethervox_audio_buffer_free(&audio_buffer);
+          break;
+        }
+
+        if (stt_session_active) {
+          ethervox_stt_stop(&pipeline->stt);
+          stt_session_active = false;
+        }
+
+        ethervox_stt_start(&pipeline->stt);
+        stt_session_active = true;
+        printf("🗣️  Ready for your next phrase.\n");
+      }
     }
 
-    if (stt_session_active) {
-        ethervox_stt_stop(&pipeline->stt);
-    }
+    ethervox_audio_buffer_free(&audio_buffer);
+  }
 
-    ethervox_audio_stop_capture(&pipeline->audio);
+  if (stt_session_active) {
+    ethervox_stt_stop(&pipeline->stt);
+  }
+
+  ethervox_audio_stop_capture(&pipeline->audio);
 }
 
 static void trim_newline(char* str) {
-    if (!str) {
-        return;
-    }
+  if (!str) {
+    return;
+  }
 
-    size_t len = strlen(str);
-    while (len > 0 && (str[len - 1] == '\n' || str[len - 1] == '\r')) {
-        str[--len] = '\0';
-    }
+  size_t len = strlen(str);
+  while (len > 0 && (str[len - 1] == '\n' || str[len - 1] == '\r')) {
+    str[--len] = '\0';
+  }
 }
 
 static bool is_exit_phrase(const char* text) {
-    if (!text) {
-        return true;
-    }
+  if (!text) {
+    return true;
+  }
 
-    return strcasecmp(text, "exit") == 0 ||
-           strcasecmp(text, "quit") == 0 ||
-           strcasecmp(text, "stop") == 0;
+  return strcasecmp(text, "exit") == 0 || strcasecmp(text, "quit") == 0 ||
+         strcasecmp(text, "stop") == 0;
 }
 
 static void pipeline_run_text(voice_pipeline_t* pipeline) {
-    printf("💬 Text interaction mode enabled. Type 'exit' to quit.\n");
+  printf("💬 Text interaction mode enabled. Type 'exit' to quit.\n");
 
-    char input[512];
+  char input[512];
 
-    while (pipeline->running) {
-        printf("You> ");
-        fflush(stdout);
+  while (pipeline->running) {
+    printf("You> ");
+    fflush(stdout);
 
-        if (!fgets(input, sizeof(input), stdin)) {
-            printf("\nInput stream closed — exiting.\n");
-            break;
-        }
-
-        trim_newline(input);
-
-        if (input[0] == '\0') {
-            continue;
-        }
-
-        if (is_exit_phrase(input)) {
-            printf("🛑 Stop command received.\n");
-            break;
-        }
-
-        ethervox_intent_t intent = {0};
-        if (ethervox_dialogue_parse_intent(&pipeline->dialogue, input, pipeline->language_code, &intent) != 0) {
-            printf("⚠️  Couldn't parse intent. Try again.\n");
-            continue;
-        }
-
-        ethervox_llm_response_t response = {0};
-        if (ethervox_dialogue_process_llm(&pipeline->dialogue, &intent, pipeline->context_id, &response) != 0) {
-            printf("⚠️  Dialogue engine couldn't produce a response.\n");
-            ethervox_intent_free(&intent);
-            continue;
-        }
-
-        const char* assistant_text = response.text ? response.text : "(no response)";
-        printf("Assistant> %s\n", assistant_text);
-
-        ethervox_llm_response_free(&response);
-        ethervox_intent_free(&intent);
+    if (!fgets(input, sizeof(input), stdin)) {
+      printf("\nInput stream closed — exiting.\n");
+      break;
     }
+
+    trim_newline(input);
+
+    if (input[0] == '\0') {
+      continue;
+    }
+
+    if (is_exit_phrase(input)) {
+      printf("🛑 Stop command received.\n");
+      break;
+    }
+
+    ethervox_intent_t intent = {0};
+    if (ethervox_dialogue_parse_intent(&pipeline->dialogue, input, pipeline->language_code,
+                                       &intent) != 0) {
+      printf("⚠️  Couldn't parse intent. Try again.\n");
+      continue;
+    }
+
+    ethervox_llm_response_t response = {0};
+    if (ethervox_dialogue_process_llm(&pipeline->dialogue, &intent, pipeline->context_id,
+                                      &response) != 0) {
+      printf("⚠️  Dialogue engine couldn't produce a response.\n");
+      ethervox_intent_free(&intent);
+      continue;
+    }
+
+    const char* assistant_text = response.text ? response.text : "(no response)";
+    printf("Assistant> %s\n", assistant_text);
+
+    ethervox_llm_response_free(&response);
+    ethervox_intent_free(&intent);
+  }
 }
 
 void pipeline_run(voice_pipeline_t* pipeline) {
-    if (pipeline->text_mode) {
-        pipeline_run_text(pipeline);
-        return;
-    }
+  if (pipeline->text_mode) {
+    pipeline_run_text(pipeline);
+    return;
+  }
 
-    pipeline_run_voice(pipeline);
+  pipeline_run_voice(pipeline);
 }
 
 int main(int argc, char** argv) {
-    const char* cli_language = NULL;
-    bool text_mode = false;
-    for (int i = 1; i < argc; ++i) {
-        if (strncmp(argv[i], "--lang=", 7) == 0) {
-            cli_language = argv[i] + 7;
-        } else if ((strcmp(argv[i], "--lang") == 0 || strcmp(argv[i], "-l") == 0) && i + 1 < argc) {
-            cli_language = argv[++i];
-        } else if (strcmp(argv[i], "--text") == 0 || strcmp(argv[i], "--cli") == 0) {
-            text_mode = true;
-        }
+  const char* cli_language = NULL;
+  bool text_mode = false;
+  for (int i = 1; i < argc; ++i) {
+    if (strncmp(argv[i], "--lang=", 7) == 0) {
+      cli_language = argv[i] + 7;
+    } else if ((strcmp(argv[i], "--lang") == 0 || strcmp(argv[i], "-l") == 0) && i + 1 < argc) {
+      cli_language = argv[++i];
+    } else if (strcmp(argv[i], "--text") == 0 || strcmp(argv[i], "--cli") == 0) {
+      text_mode = true;
     }
-    
-    // Set up signal handlers
-    signal(SIGINT, signal_handler);
-    signal(SIGTERM, signal_handler);
-    
-    // Initialize pipeline
-    if (pipeline_init(&g_pipeline, cli_language, !text_mode) != 0) {
-        fprintf(stderr, "Failed to initialize pipeline\n");
-        return 1;
-    }
-    
-    // Run main loop
-    pipeline_run(&g_pipeline);
-    
-    // Cleanup
-    pipeline_cleanup(&g_pipeline);
-    
-    printf("\nGoodbye!\n");
-    return 0;
+  }
+
+  // Set up signal handlers
+  signal(SIGINT, signal_handler);
+  signal(SIGTERM, signal_handler);
+
+  // Initialize pipeline
+  if (pipeline_init(&g_pipeline, cli_language, !text_mode) != 0) {
+    fprintf(stderr, "Failed to initialize pipeline\n");
+    return 1;
+  }
+
+  // Run main loop
+  pipeline_run(&g_pipeline);
+
+  // Cleanup
+  pipeline_cleanup(&g_pipeline);
+
+  printf("\nGoodbye!\n");
+  return 0;
 }
