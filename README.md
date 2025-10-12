@@ -68,7 +68,7 @@ EtherVoxAI is an open-source voice AI platform designed for privacy-conscious us
 - Xtensa toolchain
 - (Optional) USB redirection to WSL on Windows 11
 
-## 1. Installation
+## Installation
 
 ### Clone and Setup
 
@@ -84,7 +84,7 @@ cd ethervoxai
 make install-deps
 ```text
 
-## 2. Platform-Specific Builds
+## Platform-Specific Builds
 
 **Linux (Native Build):**
 
@@ -179,7 +179,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 !NOTE:
 to flash in WSL directly you need to redirect the Windows USB port to WSL. To do so check the section
 
-## 3. Build Targets
+## Build Targets
 
 The project uses a unified Makefile with platform-specific targets:
 
@@ -206,7 +206,7 @@ make clean-windows      # Clean Windows build
 make clean-all          # Clean all build directories
 ```text
 
-## 4. Launch Dashboard
+## Launch Dashboard
 
 ```bash
 
@@ -801,6 +801,11 @@ See the [LICENSE](LICENSE) file for full terms.
 - **Discussions**: [GitHub Discussions](https://github.com/ethervox-ai/ethervoxai/discussions)
 - **Email**: support@ethervox-ai.org
 
----
+
+## License
+
+See [LICENSE.md](LICENSE)
+
+
 
 **EtherVoxAI** - Building the future of privacy-first voice AI 🎙️✨

@@ -27,6 +27,6 @@ The EtherVoxAI dashboard is a Vue 3 + Vite application that surfaces runtime met
 - Add or update Cypress component tests in `tests/` whenever you introduce new interactive behavior; mock API responses to keep tests deterministic.
 - Update `docs/mvp.md` and `dashboard/tailwind.config.js` if you add new design primitives that other contributors should reuse.
 
-## Licensing
+## License
 
 All dashboard files are covered by the repository license (`LICENSE` at the root). Include the SPDX header (`SPDX-License-Identifier: CC-BY-NC-SA-4.0`) in any new source files to maintain compliance.
