@@ -226,18 +226,17 @@ jobs:
         # Copy source code
         COPY . /app
         WORKDIR /app
-        
-  # Build the application via Makefile/CMake
-  RUN make configure && cmake --build build
-        
-        # Create non-root user
-        RUN useradd -m ethervox
-        USER ethervox
-        
-        ENTRYPOINT ["./build/ethervoxai"]
-        EOF
-        
-        docker build -f Dockerfile.security -t ethervoxai:security .
+        # Build the application via Makefile/CMake
+        RUN make configure && cmake --build build
+              
+              # Create non-root user
+              RUN useradd -m ethervox
+              USER ethervox
+              
+              ENTRYPOINT ["./build/ethervoxai"]
+              EOF
+              
+              docker build -f Dockerfile.security -t ethervoxai:security .
 
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master

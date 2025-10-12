@@ -126,32 +126,31 @@ jobs:
         path: artifacts/
         retention-days: 30
 
-    smoke:
-      name: Quick smoke (fast fail)
-      runs-on: ubuntu-latest
-      if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+  smoke:
+    name: Quick smoke (fast fail)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
 
-      steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Run quick Makefile build
-        continue-on-error: true
-        run: |
-          set -e
-          make configure TARGET_PLATFORM=linux 2>&1 | tee quick-configure.log || true
-          make build 2>&1 | tee quick-build.log || true
+    - name: Run quick Makefile build
+      continue-on-error: true
+      run: |
+        set -e
+        make configure TARGET_PLATFORM=linux 2>&1 | tee quick-configure.log || true
+        make build 2>&1 | tee quick-build.log || true
 
-      - name: Upload quick build logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: smoke-logs-${{ github.sha }}
-          path: |
-            quick-configure.log
-            quick-build.log
-          retention-days: 7
-
+    - name: Upload quick build logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: smoke-logs-${{ github.sha }}
+        path: |
+          quick-configure.log
+          quick-build.log
+        retention-days: 7
 
   build-raspberry-pi:
     name: Build Raspberry Pi
