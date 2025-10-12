@@ -177,3 +177,4 @@ esp32-project/dependencies.lock
 # CI/CD artifacts
 run-artifacts/
 *.md.bak
+bin/act
