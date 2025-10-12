@@ -5,7 +5,7 @@ licensed under the **Creative Commons BY-NC-SA 4.0 International License**.
 
 ---
 
-## ðŸ” Intellectual Property
+# # ðŸ” Intellectual Property
 
 - The name â€œEthervoxAI,â€ associated branding,
 and code artifacts are the property of Mike Kostersitz unless otherwise noted.
@@ -13,14 +13,14 @@ and code artifacts are the property of Mike Kostersitz unless otherwise noted.
 
 ---
 
-## ðŸ“› Trademark Use
+# # ðŸ“› Trademark Use
 
 You may not use EthervoxAI branding, logos, or trademarks in a way that implies endorsement, affiliation,
 or commercial licensing without written permission.
 
 ---
 
-## ðŸš« Commercial Use
+# # ðŸš« Commercial Use
 
 No individual or organization may:
 
@@ -32,7 +32,7 @@ For commercial licensing or exceptions, contact:
 
 ---
 
-## ðŸ§‘â€âš–ï¸ Liability Disclaimer
+# # ðŸ§‘â€âš–ï¸ Liability Disclaimer
 
 This project is provided â€œAS ISâ€ without warranty.
 All risks associated with usage or deployment are borne by the user.

@@ -5,7 +5,7 @@ multilingual audio intelligence. Whether youâ€™re contributing code, docume
 
 ---
 
-## ðŸŒŸ Our Standards
+# # ðŸŒŸ Our Standards
 
 We are dedicated to a harassment-free experience for everyone, regardless of:
 
@@ -32,7 +32,7 @@ Behaviors expected from all contributors include:
 
 ---
 
-## ðŸš« Unacceptable Behavior
+# # ðŸš« Unacceptable Behavior
 
 - Harassment or discrimination in any form
 - Threats or violent language
@@ -44,14 +44,14 @@ Violations may result in temporary or permanent bans from participation.
 
 ---
 
-## ðŸ›¡ï¸ Enforcement
+# # ðŸ›¡ï¸ Enforcement
 
 Code of conduct violations will be investigated fairly and confidentially by project maintainers.
 Actions may range from warning to ban depending on severity.
 
 ---
 
-## ðŸ“¬ Reporting Issues
+# # ðŸ“¬ Reporting Issues
 
 If you observe behavior that violates this Code of Conduct, please email us at:  
 **conduct@ethervox.ai**
@@ -66,7 +66,7 @@ We will respond as quickly as possible and treat all reports seriously.
 
 ---
 
-## ðŸ¤² Attribution
+# # ðŸ¤² Attribution
 
 This Code of Conduct is adapted from the [Contributor Covenant](https://www.contributor-covenant.org/), version 2.1.
 

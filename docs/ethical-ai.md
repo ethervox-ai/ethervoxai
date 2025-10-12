@@ -5,7 +5,7 @@ and respect for human agency. We uphold these principles to guide how voice tech
 
 ---
 
-## âœ¨ Core Values
+# # âœ¨ Core Values
 
 - **Privacy by Design**  
   Local-first inference. No data is collected or transmitted without user consent.
@@ -24,7 +24,7 @@ and respect for human agency. We uphold these principles to guide how voice tech
 
 ---
 
-## âš–ï¸ Responsible Deployment
+# # âš–ï¸ Responsible Deployment
 
 - **Avoid Surveillance Use Cases**  
   EthervoxAI is not intended for continuous or covert monitoring applications.
@@ -37,7 +37,7 @@ and respect for human agency. We uphold these principles to guide how voice tech
 
 ---
 
-## ðŸ’¬ Commitments to the Community
+# # ðŸ’¬ Commitments to the Community
 
 We will:
 

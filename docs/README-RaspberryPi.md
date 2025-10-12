@@ -1,13 +1,14 @@
 # Cross-Compilation Guide for Raspberry Pi
 
-## Prerequisites
+# # Prerequisites
 
 Install ARM cross-compilation toolchain:
+
 ```bash
 sudo apt install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
 ```
 
-## Build for Raspberry Pi
+# # Build for Raspberry Pi
 
 ```bash
 # Configure and build
@@ -17,7 +18,7 @@ make build-rpi
 file build-rpi/ethervoxai
 ```
 
-## Deploy to Raspberry Pi
+# # Deploy to Raspberry Pi
 
 ```bash
 # Set Raspberry Pi connection details (optional)
@@ -29,7 +30,7 @@ export RPI_DIR=/home/pi/ethervoxai
 ./scripts/deploy-rpi.sh
 ```
 
-## Manual Deployment
+# # Manual Deployment
 
 ```bash
 # Copy to Raspberry Pi
@@ -40,15 +41,16 @@ ssh pi@raspberrypi.local
 ./ethervoxai
 ```
 
-## Troubleshooting
+# # Troubleshooting
 
-### Missing Libraries on Pi
+## # Missing Libraries on Pi
 If you get library errors on the Pi, install dependencies:
+
 ```bash
 sudo apt install libasound2 libcurl4
 ```
 
-### Different Pi Model
+## # Different Pi Model
 For Raspberry Pi 4 or newer, you can optimize further:
 - Edit `cmake/toolchain-rpi.cmake`
 - Change `-march=armv7-a` to `-march=armv8-a` for 64-bit Pi OS

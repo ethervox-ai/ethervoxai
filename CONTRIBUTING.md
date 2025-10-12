@@ -4,23 +4,23 @@ Thank you for your interest in contributing to EtherVoxAI—a privacy-first, mul
 
 *By contributing, you agree that your work is released under [CC BY-NC-SA 4.0](LICENSE). Commercial redistribution requires separate approval.*
 
-## Ways to Contribute
+# # Ways to Contribute
 
-### Bug Reports
+## # Bug Reports
 
 - Use the [bug report template](.github/ISSUE_TEMPLATE/bug_report.md)
 - Include platform information, steps to reproduce, and expected behavior
 - Test across multiple platforms when possible
 - Include logs and system information
 
-### Feature Requests
+## # Feature Requests
 
 - Use the [feature request template](.github/ISSUE_TEMPLATE/feature_request.md)
 - Explain the use case and expected benefit
 - Consider privacy and cross-platform implications
 - Provide mockups or examples when helpful
 
-### Code Contributions
+## # Code Contributions
 
 - **Core System**: Audio processing, dialogue engine, platform abstraction
 - **SDK Development**: Plugin system, model routing, device profiles
@@ -28,17 +28,18 @@ Thank you for your interest in contributing to EtherVoxAI—a privacy-first, mul
 - **Documentation**: API docs, tutorials, examples
 - **Testing**: Unit tests, integration tests, cross-platform validation
 
-### Localization
+## # Localization
 
 - **Language Support**: Add new language models and configurations
 - **UI Translation**: Dashboard and documentation translation
 - **Cultural Adaptation**: Locale-specific optimizations
 
-## Development Environment Setup
+# # Development Environment Setup
 
-### Prerequisites
+## # Prerequisites
 
-#### For All Development
+### # For All Development
+
 ```bash
 # Required tools
 sudo apt update
@@ -50,7 +51,8 @@ cd ethervoxai
 git submodule update --init --recursive
 ```
 
-#### For ESP32 Development
+### # For ESP32 Development
+
 ```bash
 # Install ESP-IDF
 mkdir -p ~/esp
@@ -64,7 +66,8 @@ cd esp-idf
 echo 'alias get_idf=". $HOME/esp/esp-idf/export.sh"' >> ~/.bashrc
 ```
 
-#### For Raspberry Pi Cross-Compilation
+### # For Raspberry Pi Cross-Compilation
+
 ```bash
 # Install ARM toolchain
 sudo apt install gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
@@ -73,7 +76,8 @@ sudo apt install gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
 sudo apt install wiringpi
 ```
 
-#### For Windows Development
+### # For Windows Development
+
 ```powershell
 # Using chocolatey
 choco install cmake mingw nodejs git
@@ -82,23 +86,25 @@ choco install cmake mingw nodejs git
 # Download Visual Studio Community with C++ workload
 ```
 
-### Build Configuration
+## # Build Configuration
 
-#### Desktop Build (Development)
+### # Desktop Build (Development)
+
 ```bash
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON ..
 make -j$(nproc)
 ```
 
-#### Cross-Platform Builds
+### # Cross-Platform Builds
+
 ```bash
 # ESP32
 cmake -DCMAKE_TOOLCHAIN_FILE=cmake/esp32.cmake ..
 make
 
 # Raspberry Pi
-cmake -DCMAKE_TOOLCHAIN_FILE=cmake/rpi.cmake ..  
+cmake -DCMAKE_TOOLCHAIN_FILE=cmake/rpi.cmake ..
 make
 
 # Windows (from Linux)
@@ -106,7 +112,8 @@ cmake -DCMAKE_TOOLCHAIN_FILE=cmake/windows.cmake ..
 make
 ```
 
-#### Dashboard Development
+### # Dashboard Development
+
 ```bash
 cd dashboard
 npm install
@@ -115,11 +122,12 @@ npm run build  # Production build
 npm run test   # Run tests
 ```
 
-## 📝 Code Style Guidelines
+# # 📝 Code Style Guidelines
 
-### C/C++ Code Style
+## # C/C++ Code Style
 
-#### Naming Conventions
+### # Naming Conventions
+
 ```c
 // Functions: snake_case with ethervox prefix
 int ethervox_audio_init(ethervox_audio_runtime_t* runtime);
@@ -127,7 +135,7 @@ int ethervox_audio_init(ethervox_audio_runtime_t* runtime);
 // Types: snake_case with _t suffix
 typedef struct ethervox_device_profile_t ethervox_device_profile_t;
 
-// Constants: UPPER_SNAKE_CASE with ETHERVOX prefix  
+// Constants: UPPER_SNAKE_CASE with ETHERVOX prefix
 #define ETHERVOX_MAX_CHANNELS 8
 
 // Variables: snake_case
@@ -135,7 +143,8 @@ uint32_t sample_rate = 48000;
 bool is_initialized = false;
 ```
 
-#### Code Organization
+### # Code Organization
+
 ```c
 // Header structure
 #ifndef ETHERVOX_MODULE_H
@@ -153,7 +162,7 @@ extern "C" {
 
 #endif // ETHERVOX_MODULE_H
 
-// Implementation structure  
+// Implementation structure
 #include "ethervox/module.h"
 #include <standard_headers>
 #include "local_headers"
@@ -167,28 +176,30 @@ int ethervox_module_init(void) {
 }
 ```
 
-#### Documentation
+### # Documentation
+
 ```c
 /**
  * @brief Initialize the audio runtime system
  * @param runtime Pointer to audio runtime structure
  * @param language Primary language for STT/TTS
  * @return 0 on success, negative error code on failure
- * 
- * This function initializes platform-specific audio drivers and 
- * sets up STT/TTS engines for the specified language. Must be 
+ *
+ * This function initializes platform-specific audio drivers and
+ * sets up STT/TTS engines for the specified language. Must be
  * called before any other audio operations.
- * 
+ *
  * @note This function is not thread-safe during initialization
  * @see ethervox_audio_cleanup()
  */
-int ethervox_audio_init(ethervox_audio_runtime_t* runtime, 
+int ethervox_audio_init(ethervox_audio_runtime_t* runtime,
                        ethervox_language_t language);
 ```
 
-### JavaScript/Vue.js Style
+## # JavaScript/Vue.js Style
 
-#### Naming Conventions
+### # Naming Conventions
+
 ```javascript
 // Components: PascalCase
 export default {
@@ -207,12 +218,13 @@ const MAX_RECORDING_TIME = 30000;
 // system-metrics.js
 ```
 
-#### Vue.js Patterns
+### # Vue.js Patterns
+
 ```vue
 <template>
   <div class="audio-controls">
     <!-- Use semantic HTML -->
-    <button 
+    <button
       :disabled="!isInitialized"
       @click="toggleRecording"
       class="btn-primary"
@@ -231,7 +243,7 @@ const audioStore = useAudioStore()
 const isRecording = ref(false)
 
 // Computed properties for reactive data
-const buttonText = computed(() => 
+const buttonText = computed(() =>
   isRecording.value ? 'Stop Recording' : 'Start Recording'
 )
 </script>
@@ -248,11 +260,12 @@ const buttonText = computed(() =>
 </style>
 ```
 
-## 🧪 Testing Guidelines
+# # 🧪 Testing Guidelines
 
-### Unit Testing
+## # Unit Testing
 
-#### C/C++ Tests (using simple framework)
+### # C/C++ Tests (using simple framework)
+
 ```c
 #include "test_framework.h"
 #include "ethervox/audio.h"
@@ -260,10 +273,10 @@ const buttonText = computed(() =>
 void test_audio_init_success(void) {
     ethervox_audio_runtime_t runtime = {0};
     int result = ethervox_audio_init(&runtime, ETHERVOX_LANG_ENGLISH);
-    
+
     assert_equals(result, 0, "Audio init should succeed");
     assert_true(runtime.is_initialized, "Runtime should be marked initialized");
-    
+
     ethervox_audio_cleanup(&runtime);
 }
 
@@ -279,7 +292,8 @@ int main(void) {
 }
 ```
 
-#### JavaScript Tests (Vitest)
+### # JavaScript Tests (Vitest)
+
 ```javascript
 import { describe, it, expect, vi } from 'vitest'
 import { useAudioStore } from '@/stores/audio'
@@ -299,9 +313,10 @@ describe('Audio Store', () => {
 })
 ```
 
-### Integration Testing
+## # Integration Testing
 
-#### Cross-Platform Testing
+### # Cross-Platform Testing
+
 ```bash
 #!/bin/bash
 # scripts/test_platforms.sh
@@ -316,7 +331,7 @@ cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/esp32.cmake ..
 make || exit 1
 cd ..
 
-# Test Raspberry Pi build  
+# Test Raspberry Pi build
 echo "Building for Raspberry Pi..."
 mkdir -p build-rpi
 cd build-rpi
@@ -327,7 +342,8 @@ cd ..
 echo "All platform builds successful!"
 ```
 
-#### System Integration Tests
+### # System Integration Tests
+
 ```c
 // Test complete voice processing pipeline
 void test_voice_pipeline_integration(void) {
@@ -335,21 +351,21 @@ void test_voice_pipeline_integration(void) {
     ethervox_audio_runtime_t audio = {0};
     ethervox_dialogue_engine_t dialogue = {0};
     ethervox_sdk_t sdk = {0};
-    
+
     assert_success(ethervox_audio_init(&audio, ETHERVOX_LANG_ENGLISH));
-    assert_success(ethervox_dialogue_init(&dialogue));  
+    assert_success(ethervox_dialogue_init(&dialogue));
     assert_success(ethervox_sdk_init(&sdk));
-    
+
     // Test audio processing
     const char* test_audio = load_test_audio("hello_world.wav");
     char transcript[256];
     assert_success(ethervox_audio_process(&audio, test_audio, 1024, transcript));
-    
+
     // Test intent recognition
     ethervox_intent_result_t result;
     assert_success(ethervox_dialogue_parse_intent(&dialogue, transcript, &result));
     assert_equals(result.type, ETHERVOX_INTENT_GREETING);
-    
+
     // Cleanup
     ethervox_audio_cleanup(&audio);
     ethervox_dialogue_cleanup(&dialogue);
@@ -357,14 +373,15 @@ void test_voice_pipeline_integration(void) {
 }
 ```
 
-## 🚀 Pull Request Process
+# # 🚀 Pull Request Process
 
-### Before Submitting
+## # Before Submitting
 
 1. **Create Feature Branch**
+
 ```bash
 git checkout main
-git pull origin main  
+git pull origin main
 git checkout -b feature/your-feature-name
 ```
 
@@ -375,6 +392,7 @@ git checkout -b feature/your-feature-name
 - Ensure cross-platform compatibility
 
 3. **Test Thoroughly**
+
 ```bash
 # Run all tests
 make test
@@ -391,9 +409,10 @@ cd dashboard && npm test
 - Add examples for new features
 - Update changelog with notable changes
 
-### Submitting the PR
+## # Submitting the PR
 
 1. **Push Feature Branch**
+
 ```bash
 git add .
 git commit -m "feat: add voice command batching support"
@@ -413,9 +432,10 @@ git push origin feature/your-feature-name
 - Test changes after modifications
 - Request re-review when ready
 
-### PR Requirements
+## # PR Requirements
 
-#### Commit Message Format
+### # Commit Message Format
+
 ```
 type(scope): brief description
 
@@ -428,7 +448,7 @@ Fixes #123
 **Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 **Scopes**: `audio`, `dialogue`, `platform`, `dashboard`, `sdk`, `build`
 
-#### Quality Checklist
+### # Quality Checklist
 - [ ] Code follows style guidelines  
 - [ ] Tests added for new functionality
 - [ ] All tests pass locally
@@ -437,48 +457,48 @@ Fixes #123
 - [ ] No breaking changes (or properly documented)
 - [ ] Privacy implications considered
 
-## 🏗️ Project Architecture
+# # 🏗️ Project Architecture
 
-### Core Components
+## # Core Components
 
-#### Audio Runtime (`src/audio/`)
+### # Audio Runtime (`src/audio/`)
 - Platform-specific audio drivers (ALSA, WaveAPI, I2S)
 - STT/TTS integration with offline models
 - Noise suppression and echo cancellation
 - Multi-language audio processing
 
-#### Dialogue Engine (`src/dialogue/`)  
+### # Dialogue Engine (`src/dialogue/`)
 - Intent recognition and entity extraction
 - LLM integration and routing
 - Conversation context management
 - Multi-language natural language understanding
 
-#### Platform Layer (`src/platform/`)
+### # Platform Layer (`src/platform/`)
 - Hardware abstraction layer (GPIO, I2C, SPI)
 - Power management and system control
 - Platform-specific optimizations
 - Device capability detection
 
-#### Plugin System (`src/plugins/`)
+### # Plugin System (`src/plugins/`)
 - Dynamic plugin loading and management
 - Built-in integrations (OpenAI, HuggingFace, RAG)
 - External API routing and fallback
 - Plugin lifecycle and statistics
 
-#### SDK (`sdk/`)
+### # SDK (`sdk/`)
 - Developer API for extensions
 - Intent plugin framework
 - Model router architecture  
 - Device profile system
 - Comprehensive examples
 
-#### Dashboard (`dashboard/`)
+### # Dashboard (`dashboard/`)
 - Vue.js 3 web interface
 - Real-time system monitoring
 - Privacy-first configuration
 - Responsive design
 
-### Development Workflow
+## # Development Workflow
 
 ```mermaid
 graph TD
@@ -496,11 +516,12 @@ graph TD
     K --> L[Release Planning]
 ```
 
-## 🌍 Multi-Language Contributions
+# # 🌍 Multi-Language Contributions
 
-### Adding Language Support
+## # Adding Language Support
 
-#### 1. Language Configuration
+### # 1. Language Configuration
+
 ```c
 // Add to include/ethervox/config.h
 typedef enum {
@@ -512,17 +533,19 @@ typedef enum {
 } ethervox_language_t;
 ```
 
-#### 2. Audio Models
+### # 2. Audio Models
+
 ```bash
 # Add language-specific models
 models/
 ├── whisper-base-en.bin      # English
-├── whisper-base-es.bin      # Spanish  
+├── whisper-base-es.bin      # Spanish
 ├── whisper-base-zh.bin      # Chinese
 └── whisper-base-fr.bin      # French (new)
 ```
 
-#### 3. Intent Patterns
+### # 3. Intent Patterns
+
 ```c
 // src/dialogue/intent_fr.c
 static const char* french_greetings[] = {
@@ -530,11 +553,12 @@ static const char* french_greetings[] = {
 };
 
 static const char* french_commands[] = {
-    "allume", "éteins", "augmente", "diminue", NULL  
+    "allume", "éteins", "augmente", "diminue", NULL
 };
 ```
 
-#### 4. Dashboard Localization
+### # 4. Dashboard Localization
+
 ```javascript
 // dashboard/src/locales/fr.json
 {
@@ -545,7 +569,7 @@ static const char* french_commands[] = {
 }
 ```
 
-### Translation Guidelines
+## # Translation Guidelines
 
 1. **Technical Accuracy**: Ensure technical terms are correctly translated
 2. **Cultural Context**: Consider cultural differences in interaction patterns  
@@ -553,28 +577,30 @@ static const char* french_commands[] = {
 4. **Testing**: Test voice recognition with native speakers
 5. **Documentation**: Update all language-specific documentation
 
-## 🔒 Security Considerations
+# # 🔒 Security Considerations
 
-### Code Security
+## # Code Security
 
-#### Input Validation
+### # Input Validation
+
 ```c
 // Always validate inputs
 int ethervox_process_text(const char* text) {
     if (!text || strlen(text) == 0) {
         return -EINVAL;
     }
-    
+
     if (strlen(text) > MAX_TEXT_LENGTH) {
         return -E2BIG;
     }
-    
+
     // Process validated input
     return process_validated_text(text);
 }
 ```
 
-#### Memory Safety
+### # Memory Safety
+
 ```c
 // Use safe string functions
 char buffer[256];
@@ -591,28 +617,30 @@ free(data);
 data = NULL;
 ```
 
-#### API Key Handling
+### # API Key Handling
+
 ```c
 // Never log sensitive data
 void log_api_request(const char* endpoint, const char* key) {
     // WRONG: log_info("API request to %s with key %s", endpoint, key);
-    
-    // CORRECT: 
+
+    // CORRECT:
     char masked_key[32];
     snprintf(masked_key, sizeof(masked_key), "%.4s****", key);
     log_info("API request to %s with key %s", endpoint, masked_key);
 }
 ```
 
-### Privacy Protection
+## # Privacy Protection
 
-#### Data Minimization
+### # Data Minimization
 - Only collect data necessary for functionality
 - Implement automatic data expiration
 - Provide user control over data retention
 - Document all data flows clearly
 
-#### Consent Management
+### # Consent Management
+
 ```javascript
 // dashboard/src/stores/privacy.js
 export const usePrivacyStore = defineStore('privacy', {
@@ -623,7 +651,7 @@ export const usePrivacyStore = defineStore('privacy', {
       analytics: false
     }
   }),
-  
+
   actions: {
     async requestConsent(type, purpose) {
       // Show clear consent dialog
@@ -635,9 +663,9 @@ export const usePrivacyStore = defineStore('privacy', {
 });
 ```
 
-## 🎨 UI/UX Contributions
+# # 🎨 UI/UX Contributions
 
-### Design Principles
+## # Design Principles
 
 1. **Privacy-First**: Make privacy settings prominent and understandable
 2. **Accessibility**: Support screen readers, keyboard navigation, color blindness
@@ -645,7 +673,7 @@ export const usePrivacyStore = defineStore('privacy', {
 4. **Performance**: Fast loading, smooth interactions, efficient updates
 5. **Clarity**: Clear visual hierarchy, intuitive navigation, helpful feedback
 
-### Component Guidelines
+## # Component Guidelines
 
 ```vue
 <!-- Good: Clear, accessible, consistent -->
@@ -660,9 +688,9 @@ export const usePrivacyStore = defineStore('privacy', {
       <Icon :name="isRecording ? 'stop' : 'microphone'" />
       <span>{{ isRecording ? 'Stop' : 'Start' }} Recording</span>
     </button>
-    
-    <div 
-      v-if="isRecording" 
+
+    <div
+      v-if="isRecording"
       class="recording-indicator"
       aria-live="polite"
     >
@@ -672,7 +700,7 @@ export const usePrivacyStore = defineStore('privacy', {
 </template>
 ```
 
-### Accessibility Requirements
+## # Accessibility Requirements
 
 - **WCAG 2.1 AA Compliance**: All UI components must meet accessibility standards
 - **Keyboard Navigation**: Full functionality via keyboard
@@ -680,11 +708,12 @@ export const usePrivacyStore = defineStore('privacy', {
 - **Color Contrast**: Minimum 4.5:1 contrast ratio for text
 - **Focus Management**: Clear focus indicators and logical tab order
 
-## 📊 Performance Guidelines
+# # 📊 Performance Guidelines
 
-### C/C++ Performance
+## # C/C++ Performance
 
-#### Memory Efficiency
+### # Memory Efficiency
+
 ```c
 // Use stack allocation when possible
 char small_buffer[256];  // Stack
@@ -698,7 +727,8 @@ typedef struct {
 // Avoid frequent malloc/free in hot paths
 ```
 
-#### CPU Optimization
+### # CPU Optimization
+
 ```c
 // Cache-friendly data structures
 typedef struct {
@@ -706,7 +736,7 @@ typedef struct {
     bool is_active;
     uint32_t sample_rate;
     uint32_t channels;
-    
+
     // Less frequently accessed fields at end
     char description[256];
 } audio_config_t;
@@ -716,9 +746,10 @@ uint8_t flags;     // Not int for single byte values
 uint32_t count;    // Not uint64_t unless needed
 ```
 
-### JavaScript Performance
+## # JavaScript Performance
 
-#### Reactive Data
+### # Reactive Data
+
 ```javascript
 // Efficient reactive patterns
 const audioMetrics = ref({
@@ -727,7 +758,7 @@ const audioMetrics = ref({
   timestamp: 0
 });
 
-// Update efficiently 
+// Update efficiently
 const updateMetrics = (newData) => {
   Object.assign(audioMetrics.value, newData);
 };
@@ -736,7 +767,8 @@ const updateMetrics = (newData) => {
 const debouncedUpdate = debounce(updateMetrics, 100);
 ```
 
-#### Component Optimization
+### # Component Optimization
+
 ```vue
 <script setup>
 // Use computed for expensive calculations
@@ -746,7 +778,7 @@ const processedAudio = computed(() => {
 
 // Memoize expensive operations
 const memoizedTransform = computed(() => {
-  return useMemoize(() => 
+  return useMemoize(() =>
     transformAudioData(audioMetrics.value),
     [audioMetrics.value.timestamp]
   );
@@ -754,9 +786,10 @@ const memoizedTransform = computed(() => {
 </script>
 ```
 
-## 🐛 Debugging Guidelines
+# # 🐛 Debugging Guidelines
 
-### Debug Build Configuration
+## # Debug Build Configuration
+
 ```bash
 # Enable debug symbols and sanitizers
 cmake -DCMAKE_BUILD_TYPE=Debug \
@@ -766,7 +799,8 @@ cmake -DCMAKE_BUILD_TYPE=Debug \
       ..
 ```
 
-### Logging Best Practices
+## # Logging Best Practices
+
 ```c
 // Use structured logging
 #define LOG_AUDIO(level, format, ...) \
@@ -780,40 +814,43 @@ LOG_AUDIO(WARN, "Buffer underrun detected");
 LOG_AUDIO(ERROR, "Failed to open audio device: %s", error_msg);
 ```
 
-### Memory Debugging
+## # Memory Debugging
+
 ```bash
 # Valgrind for memory leaks
 valgrind --leak-check=full --track-origins=yes ./ethervoxai
 
-# AddressSanitizer for runtime errors  
+# AddressSanitizer for runtime errors
 export ASAN_OPTIONS=abort_on_error=1:fast_unwind_on_malloc=0
 ./ethervoxai
 ```
 
-## 📈 Performance Testing
+# # 📈 Performance Testing
 
-### Benchmarking
+## # Benchmarking
+
 ```c
 #include <time.h>
 
 uint64_t benchmark_function(void) {
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
-    
+
     // Function to benchmark
     int result = ethervox_process_audio(data, size);
-    
+
     clock_gettime(CLOCK_MONOTONIC, &end);
-    
-    uint64_t duration_ns = (end.tv_sec - start.tv_sec) * 1000000000UL + 
+
+    uint64_t duration_ns = (end.tv_sec - start.tv_sec) * 1000000000UL +
                           (end.tv_nsec - start.tv_nsec);
-    
+
     printf("Function took %lu ns (result: %d)\n", duration_ns, result);
     return duration_ns;
 }
 ```
 
-### Load Testing
+## # Load Testing
+
 ```javascript
 // Dashboard load testing
 async function loadTest() {
@@ -824,23 +861,23 @@ async function loadTest() {
     const end = performance.now();
     return {id: i, duration: end - start};
   });
-  
+
   const results = await Promise.all(requests);
   const avgDuration = results.reduce((sum, r) => sum + r.duration, 0) / concurrent;
-  
+
   console.log(`Average response time: ${avgDuration}ms`);
 }
 ```
 
-## 📋 Release Process
+# # 📋 Release Process
 
-### Version Numbering
+## # Version Numbering
 - **Major.Minor.Patch** (e.g., 1.2.3)
 - **Major**: Breaking changes
 - **Minor**: New features, backward compatible
 - **Patch**: Bug fixes, backward compatible
 
-### Release Checklist
+## # Release Checklist
 - [ ] All tests pass on all platforms
 - [ ] Documentation updated
 - [ ] Changelog updated  
@@ -850,7 +887,7 @@ async function loadTest() {
 - [ ] Translation updates
 - [ ] Release notes prepared
 
-## 🎉 Recognition
+# # 🎉 Recognition
 
 Contributors who make significant impacts will be recognized in:
 
@@ -859,26 +896,26 @@ Contributors who make significant impacts will be recognized in:
 - **Annual Report**: Yearly recognition of top contributors
 - **Swag & Merchandise**: EtherVoxAI contributor items
 
-## 📞 Getting Help
+# # 📞 Getting Help
 
-### Community Support
+## # Community Support
 - **GitHub Discussions**: [Ask questions and share ideas](https://github.com/ethervox-ai/ethervoxai/discussions)
 - **Discord Server**: Real-time chat with maintainers and contributors
 - **Stack Overflow**: Tag questions with `ethervoxai`
 
-### Documentation
+## # Documentation
 - **Wiki**: Community-maintained documentation and tutorials
 - **API Reference**: Complete API documentation with examples
 - **Video Tutorials**: Step-by-step development guides
 
-### Direct Contact
+## # Direct Contact
 - **Maintainer Email**: maintainers@ethervox.ai
 - **Security Issues**: security@ethervox.ai (private disclosure)
 - **Partnership Inquiries**: partnerships@ethervox.ai
 
 ---
 
-## 🙏 Thank You
+# # 🙏 Thank You
 
 Your contributions make EtherVoxAI better for everyone. Whether you're fixing a typo, adding a feature, or helping other users, every contribution matters.
 

@@ -5,7 +5,7 @@ misappropriation.
 
 ---
 
-## ðŸ” Comparison Table
+# # ðŸ” Comparison Table
 
 | License          | Allows Commercial Use | Requires Sharing Derivatives | Allows Proprietary Forks | Ideal For                    |
 |------------------|-----------------------|-------------------------------|---------------------------|------------------------------|
@@ -17,7 +17,7 @@ misappropriation.
 
 ---
 
-## ðŸ§  Why BY-NC-SA?
+# # ðŸ§  Why BY-NC-SA?
 
 - Protects the project's spirit from commercial dilution
 - Encourages knowledge sharing while discouraging freeloading profiteers

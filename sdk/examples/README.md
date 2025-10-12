@@ -2,9 +2,9 @@
 
 This directory contains comprehensive examples demonstrating how to extend EtherVox using the SDK.
 
-## Examples Overview
+# # Examples Overview
 
-### 1. Intent Plugin Example (`intent_plugin_example.c`)
+## # 1. Intent Plugin Example (`intent_plugin_example.c`)
 
 Demonstrates how to create custom intent recognition plugins for domain-specific commands.
 
@@ -22,12 +22,13 @@ Demonstrates how to create custom intent recognition plugins for domain-specific
 - Performance monitoring
 
 **Run example:**
+
 ```bash
 gcc -o intent_plugin_example intent_plugin_example.c ../ethervox_sdk.c
 ./intent_plugin_example
 ```
 
-### 2. Model Router Example (`model_router_example.c`)
+## # 2. Model Router Example (`model_router_example.c`)
 
 Shows how to create intelligent routing between multiple LLM models based on request complexity.
 
@@ -45,12 +46,13 @@ Shows how to create intelligent routing between multiple LLM models based on req
 - Model performance optimization
 
 **Run example:**
+
 ```bash
 gcc -o model_router_example model_router_example.c ../ethervox_sdk.c
 ./model_router_example
 ```
 
-### 3. Device Profile Example (`device_profile_example.c`)
+## # 3. Device Profile Example (`device_profile_example.c`)
 
 Demonstrates device profile creation and hardware abstraction for different platforms.
 
@@ -69,12 +71,13 @@ Demonstrates device profile creation and hardware abstraction for different plat
 - Cross-platform compatibility
 
 **Run example:**
+
 ```bash
 gcc -o device_profile_example device_profile_example.c ../ethervox_sdk.c
 ./device_profile_example
 ```
 
-## Building All Examples
+# # Building All Examples
 
 Use the provided Makefile to build all examples at once:
 
@@ -85,9 +88,9 @@ make
 
 This will create executables for all three examples.
 
-## Example Output
+# # Example Output
 
-### Intent Plugin Example Output:
+## # Intent Plugin Example Output:
 
 ```
 === EtherVox SDK Intent Plugin Example ===
@@ -109,7 +112,7 @@ Plugin Statistics:
   Average processing time: 0.12 ms
 ```
 
-### Model Router Example Output:
+## # Model Router Example Output:
 
 ```
 === EtherVox SDK Model Router Example ===
@@ -131,7 +134,7 @@ Trying model: llama-2-7b (attempt 1)
   Response: Using local processing, here's my response: Hello, how are you? [Simulated response from llama-2-7b]
 ```
 
-### Device Profile Example Output:
+## # Device Profile Example Output:
 
 ```
 === EtherVox SDK Device Profile Example ===
@@ -150,11 +153,12 @@ Device Profile: RaspberryPi-ReSpeaker
   Processing: Edge Inference: Yes, Max Streams: 4
 ```
 
-## Integration Guide
+# # Integration Guide
 
-### Adding Custom Intent Plugins
+## # Adding Custom Intent Plugins
 
 1. **Define your plugin structure:**
+
 ```c
 typedef struct {
     // Your custom data
@@ -163,9 +167,10 @@ typedef struct {
 ```
 
 2. **Implement the parsing function:**
+
 ```c
-static int my_intent_parser(const ethervox_stt_input_t* input, 
-                           ethervox_intent_result_t* result, 
+static int my_intent_parser(const ethervox_stt_input_t* input,
+                           ethervox_intent_result_t* result,
                            void* user_data) {
     // Your intent recognition logic
     // Return 0 on success, -1 on failure
@@ -173,14 +178,16 @@ static int my_intent_parser(const ethervox_stt_input_t* input,
 ```
 
 3. **Register your plugin:**
+
 ```c
 ethervox_intent_plugin_t* plugin = create_my_plugin();
 ethervox_sdk_register_intent_plugin(&sdk, plugin);
 ```
 
-### Creating Custom Model Routers
+## # Creating Custom Model Routers
 
 1. **Implement routing logic:**
+
 ```c
 static int my_model_route(const ethervox_llm_request_t* request,
                          ethervox_llm_response_t* response,
@@ -191,15 +198,17 @@ static int my_model_route(const ethervox_llm_request_t* request,
 ```
 
 2. **Configure your router:**
+
 ```c
 ethervox_model_router_t* router = create_my_router();
 router->route = my_model_route;
 ethervox_sdk_set_model_router(&sdk, router);
 ```
 
-### Defining Device Profiles
+## # Defining Device Profiles
 
 1. **Create configuration function:**
+
 ```c
 static void configure_my_device(ethervox_device_profile_t* profile) {
   snprintf(profile->name, sizeof(profile->name), "%s", "MyDevice");
@@ -209,15 +218,16 @@ static void configure_my_device(ethervox_device_profile_t* profile) {
 ```
 
 2. **Apply the profile:**
+
 ```c
 ethervox_device_profile_t profile;
 configure_my_device(&profile);
 ethervox_sdk_create_device_profile(&sdk, "MyDevice", &profile);
 ```
 
-## Advanced Usage
+# # Advanced Usage
 
-### Diagnostics and Logging
+## # Diagnostics and Logging
 
 Enable comprehensive logging and system monitoring:
 
@@ -226,7 +236,7 @@ Enable comprehensive logging and system monitoring:
 ethervox_sdk_set_log_callback(&sdk, my_log_handler, NULL);
 
 // Log messages
-ethervox_sdk_log(&sdk, ETHERVOX_LOG_INFO, "MyComponent", 
+ethervox_sdk_log(&sdk, ETHERVOX_LOG_INFO, "MyComponent",
                  "Processing request with confidence %.2f", confidence);
 
 // Get system metrics
@@ -234,14 +244,14 @@ ethervox_system_metrics_t metrics;
 ethervox_sdk_get_system_metrics(&sdk, &metrics);
 ```
 
-### Performance Optimization
+## # Performance Optimization
 
 - Use local models for low-latency responses
 - Implement request caching in your model router
 - Configure device profiles to match your hardware capabilities
 - Monitor plugin performance and optimize parsing algorithms
 
-## Contributing
+# # Contributing
 
 Feel free to submit additional examples or improvements to existing ones. Examples should be:
 
@@ -250,7 +260,7 @@ Feel free to submit additional examples or improvements to existing ones. Exampl
 3. **Practical** - Demonstrate real-world use cases
 4. **Educational** - Help developers understand SDK concepts
 
-## Support
+# # Support
 
 For questions about the SDK examples or integration help:
 

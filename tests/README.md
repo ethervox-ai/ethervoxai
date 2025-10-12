@@ -2,13 +2,13 @@
 
 This directory contains comprehensive tests for the EthervoxAI platform, organized into unit tests and integration tests.
 
-## Structure
+# # Structure
 
 ```
 tests/
 ├── unit/                    # Unit tests for individual components
 │   ├── test_audio_core.c   # Audio subsystem unit tests
-│   ├── test_config.c       # Configuration system tests  
+│   ├── test_config.c       # Configuration system tests
 │   └── test_plugin_manager.c # Plugin management tests
 ├── integration/             # Integration tests across components
 │   └── test_end_to_end.c   # End-to-end system tests
@@ -16,15 +16,15 @@ tests/
 └── README.md               # This file
 ```
 
-## Running Tests
+# # Running Tests
 
-### Prerequisites
+## # Prerequisites
 
 - CMake 3.16 or higher
 - C compiler (GCC, Clang, or MSVC)
 - Platform-specific dependencies (ALSA on Linux, etc.)
 
-### Building and Running
+## # Building and Running
 
 ```bash
 # From project root
@@ -44,7 +44,7 @@ ctest --output-on-failure --verbose
 ./tests/test_end_to_end_integration
 ```
 
-### Test Coverage
+## # Test Coverage
 
 For code coverage analysis (Linux/macOS with gcov):
 
@@ -60,9 +60,9 @@ ctest
 cmake --build . --target coverage
 ```
 
-## Test Categories
+# # Test Categories
 
-### Unit Tests
+## # Unit Tests
 
 Unit tests focus on individual components in isolation:
 
@@ -70,15 +70,15 @@ Unit tests focus on individual components in isolation:
 - **test_config.c**: Tests platform detection, version constants, and feature configuration
 - **test_plugin_manager.c**: Tests plugin type conversions, manager initialization, and error handling
 
-### Integration Tests  
+## # Integration Tests
 
 Integration tests verify component interactions:
 
 - **test_end_to_end.c**: Tests complete system initialization, configuration consistency, and error handling chains
 
-## Test Philosophy
+# # Test Philosophy
 
-### Expected Failures in CI
+## # Expected Failures in CI
 
 Some tests may fail in CI environments due to missing hardware or models:
 
@@ -86,23 +86,23 @@ Some tests may fail in CI environments due to missing hardware or models:
 - Dialogue engine may fail without language models
 - These failures are expected and logged as warnings
 
-### Cross-Platform Testing
+## # Cross-Platform Testing
 
 Tests are designed to work across all supported platforms:
 
 - Windows (MSVC, MinGW)
-- Linux (GCC, Clang) 
+- Linux (GCC, Clang)
 - macOS (Clang)
 - Raspberry Pi (ARM GCC)
 - ESP32 (Xtensa GCC)
 
-### Test Data
+## # Test Data
 
 Tests use minimal synthetic data and avoid external dependencies where possible. When external resources are needed, graceful fallbacks are implemented.
 
-## Adding New Tests
+# # Adding New Tests
 
-### Unit Test Template
+## # Unit Test Template
 
 ```c
 #include <assert.h>
@@ -111,35 +111,35 @@ Tests use minimal synthetic data and avoid external dependencies where possible.
 
 void test_your_function() {
     printf("Testing your_function...\n");
-    
+
     // Test implementation
     assert(your_function() == expected_value);
-    
+
     printf("✓ Your function test passed\n");
 }
 
 int main() {
     printf("Running Your Module Unit Tests\n");
     printf("==============================\n");
-    
+
     test_your_function();
-    
+
     printf("==============================\n");
     printf("All tests completed!\n");
     return 0;
 }
 ```
 
-### Integration Test Template
+## # Integration Test Template
 
 Integration tests should verify interactions between components and handle expected failures gracefully.
 
-## Continuous Integration
+# # Continuous Integration
 
 Tests are automatically run in GitHub Actions across multiple platforms:
 
 - Ubuntu (latest)
-- Windows (latest) 
+- Windows (latest)
 - macOS (latest)
 - Cross-compilation for Raspberry Pi
 - Cross-compilation for ESP32

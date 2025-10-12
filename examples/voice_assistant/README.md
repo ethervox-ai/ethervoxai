@@ -2,7 +2,7 @@
 
 The voice assistant demo exercises the EthervoxAI wake word, speech-to-text, dialogue, and text-to-speech pipeline.
 
-## Running with audio (default)
+# # Running with audio (default)
 
 ```bash
 ./voice_assistant_demo
@@ -23,7 +23,7 @@ export ETHERVOX_ALSA_DEVICE=plughw:1,0
 
 To choose a different playback device, set `ETHERVOX_ALSA_PLAYBACK` in the same fashion. The demo will automatically fall back to text mode when capture cannot start.
 
-## Text-only fallback
+# # Text-only fallback
 
 When you do not have a microphone available, launch the demo with `--text` to interact from the terminal:
 
@@ -33,7 +33,7 @@ When you do not have a microphone available, launch the demo with `--text` to in
 
 Type your message after the `You>` prompt and press Enter. Type `exit`, `quit`, or `stop` to leave the session.
 
-## Language override
+# # Language override
 
 Use `--lang` (or `-l`) to provide a 2-letter language code. The assistant will map this to a supported STT locale where possible.
 

@@ -3,17 +3,17 @@
 The EtherVox SDK provides a comprehensive framework for extending the EtherVox voice AI system with custom plugins,
 model routers, device profiles, and diagnostics tools.
 
-## Overview
+# # Overview
 
 The SDK enables developers to:
 
 - **Create Intent Plugins**: Build custom natural language understanding modules for domain-specific voice commands
 - **Develop Model Routers**: Implement intelligent routing between multiple LLM models based on request characteristics
- 
+
 - **Define Device Profiles**: Configure hardware-specific settings for different platforms and form factors
 - **Integrate Diagnostics**: Add comprehensive logging, monitoring, and performance tracking
 
-## Architecture
+# # Architecture
 
 ```
 â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
@@ -29,9 +29,9 @@ The SDK enables developers to:
 â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
-## Quick Start
+# # Quick Start
 
-### 1. Initialize the SDK
+## # 1. Initialize the SDK
 
 ```c
 #include "ethervox_sdk.h"
@@ -50,7 +50,7 @@ if (!ethervox_sdk_is_compatible(1, 0)) {
 }
 ```
 
-### 2. Create an Intent Plugin
+## # 2. Create an Intent Plugin
 
 ```c
 // Define plugin data structure
@@ -59,11 +59,11 @@ typedef struct {
 } my_plugin_data_t;
 
 // Implement intent parsing
-static int my_parse_intent(const ethervox_stt_input_t* input, 
-                          ethervox_intent_result_t* result, 
+static int my_parse_intent(const ethervox_stt_input_t* input,
+                          ethervox_intent_result_t* result,
                           void* user_data) {
     my_plugin_data_t* data = (my_plugin_data_t*)user_data;
-    
+
     // Your NLU logic here
     if (strstr(input->text, "my_command")) {
     result->type = ETHERVOX_INTENT_COMMAND;
@@ -72,7 +72,7 @@ static int my_parse_intent(const ethervox_stt_input_t* input,
         data->processed_commands++;
         return 0;  // Success
     }
-    
+
     return -1;  // Not recognized
 }
 
@@ -86,7 +86,7 @@ plugin->user_data = calloc(1, sizeof(my_plugin_data_t));
 ethervox_sdk_register_intent_plugin(&sdk, plugin);
 ```
 
-### 3. Set Up Model Routing
+## # 3. Set Up Model Routing
 
 ```c
 // Configure model
@@ -103,7 +103,7 @@ ethervox_model_config_t config = {
 ethervox_sdk_add_model_config(&sdk, &config);
 ```
 
-### 4. Create Device Profile
+## # 4. Create Device Profile
 
 ```c
 ethervox_device_profile_t profile = {0};
@@ -118,82 +118,82 @@ profile.supports_edge_inference = true;
 *sdk.device_profile = profile;
 ```
 
-## API Reference
+# # API Reference
 
-### Core Functions
+## # Core Functions
 
-#### `int ethervox_sdk_init(ethervox_sdk_t* sdk)`
+### # `int ethervox_sdk_init(ethervox_sdk_t* sdk)`
 
 Initialize the SDK instance with default settings.
 - **Parameters**: Pointer to SDK structure
 - **Returns**: 0 on success, -1 on failure
 
-#### `void ethervox_sdk_cleanup(ethervox_sdk_t* sdk)`  
+### # `void ethervox_sdk_cleanup(ethervox_sdk_t* sdk)`
 
 Clean up SDK resources and registered plugins.
 - **Parameters**: Pointer to initialized SDK structure
 
-#### `const char* ethervox_sdk_get_version_string(void)`
+### # `const char* ethervox_sdk_get_version_string(void)`
 
 Get SDK version as string (e.g., "1.0.0").
 - **Returns**: Version string
 
-#### `bool ethervox_sdk_is_compatible(uint32_t major, uint32_t minor)`
+### # `bool ethervox_sdk_is_compatible(uint32_t major, uint32_t minor)`
 
 Check version compatibility with required version.
 - **Parameters**: Required major and minor version numbers
 - **Returns**: true if compatible
 
-### Intent Plugin Management
+## # Intent Plugin Management
 
-#### `int ethervox_sdk_register_intent_plugin(ethervox_sdk_t* sdk, ethervox_intent_plugin_t* plugin)`
+### # `int ethervox_sdk_register_intent_plugin(ethervox_sdk_t* sdk, ethervox_intent_plugin_t* plugin)`
 
 Register a new intent recognition plugin.
 - **Parameters**: SDK instance, plugin structure
 - **Returns**: 0 on success, -1 on failure
 
-#### `ethervox_intent_plugin_t* ethervox_sdk_find_intent_plugin(ethervox_sdk_t* sdk, const char* name)`
+### # `ethervox_intent_plugin_t* ethervox_sdk_find_intent_plugin(ethervox_sdk_t* sdk, const char* name)`
 
 Find registered plugin by name.
 - **Parameters**: SDK instance, plugin name
 - **Returns**: Plugin pointer or NULL if not found
 
-#### `int ethervox_sdk_process_intent(ethervox_sdk_t* sdk, const ethervox_stt_input_t* input,
+### # `int ethervox_sdk_process_intent(ethervox_sdk_t* sdk, const ethervox_stt_input_t* input,
 ethervox_intent_result_t* result)`
 Process input text through all registered plugins.
 - **Parameters**: SDK instance, input text structure, result structure
 - **Returns**: 0 on success, -1 if no plugin recognized intent
 
-### Model Router Management
+## # Model Router Management
 
-#### `int ethervox_sdk_add_model_config(ethervox_sdk_t* sdk, const ethervox_model_config_t* config)`
+### # `int ethervox_sdk_add_model_config(ethervox_sdk_t* sdk, const ethervox_model_config_t* config)`
 
 Add model configuration to router.
 - **Parameters**: SDK instance, model configuration
 - **Returns**: 0 on success, -1 on failure
 
-#### `int ethervox_sdk_route_llm_request(ethervox_sdk_t* sdk, const ethervox_llm_request_t* request,
+### # `int ethervox_sdk_route_llm_request(ethervox_sdk_t* sdk, const ethervox_llm_request_t* request,
 ethervox_llm_response_t* response)`
 Route LLM request to appropriate model.
 - **Parameters**: SDK instance, request structure, response structure  
 - **Returns**: 0 on success, -1 on failure
 
-### Diagnostics
+## # Diagnostics
 
-#### `void ethervox_sdk_log(ethervox_sdk_t* sdk, ethervox_log_level_t level, const char* component, const char* format,
+### # `void ethervox_sdk_log(ethervox_sdk_t* sdk, ethervox_log_level_t level, const char* component, const char* format,
 ...)`
 Log formatted message with specified level.
 - **Parameters**: SDK instance, log level, component name, format string and args
 
-#### `int ethervox_sdk_set_log_callback(ethervox_sdk_t* sdk, ethervox_log_callback_fn callback, void* user_data)`
+### # `int ethervox_sdk_set_log_callback(ethervox_sdk_t* sdk, ethervox_log_callback_fn callback, void* user_data)`
 
 Set custom log callback function.
 - **Parameters**: SDK instance, callback function, user data pointer
 - **Returns**: 0 on success
 
-## Data Structures
+# # Data Structures
 
-### Intent Plugin Structure
+## # Intent Plugin Structure
 
 ```c
 typedef struct ethervox_intent_plugin_t {
@@ -202,11 +202,11 @@ typedef struct ethervox_intent_plugin_t {
     char description[256];                      // Description
     uint32_t supported_languages_count;        // Number of supported languages
     char supported_languages[16][8];           // Language codes (e.g., "en", "es")
-    
+
     ethervox_intent_parse_fn parse;             // Parsing function
     ethervox_intent_cleanup_fn cleanup;         // Cleanup function
     void* user_data;                            // Plugin-specific data
-    
+
     // Runtime statistics
     bool is_active;                             // Plugin active state
     uint64_t total_requests;                    // Total processed requests
@@ -215,7 +215,7 @@ typedef struct ethervox_intent_plugin_t {
 } ethervox_intent_plugin_t;
 ```
 
-### Model Configuration Structure
+## # Model Configuration Structure
 
 ```c
 typedef struct {
@@ -230,14 +230,14 @@ typedef struct {
 } ethervox_model_config_t;
 ```
 
-### Device Profile Structure  
+## # Device Profile Structure
 
 ```c
 typedef struct {
     char name[64];                              // Device name
     char hardware_revision[32];                 // Hardware revision
     char platform[32];                          // Platform name
-    
+
     // Audio configuration
     uint32_t mic_array_channels;                // Number of microphone channels
     uint32_t sample_rate;                       // Audio sample rate (Hz)
@@ -245,7 +245,7 @@ typedef struct {
     float mic_sensitivity;                      // Microphone sensitivity (dBFS)
     bool has_echo_cancellation;                 // Echo cancellation support
     bool has_noise_suppression;                 // Noise suppression support
-    
+
     // GPIO pin assignments
     struct {
         uint32_t led_status;                    // Status LED pin
@@ -255,17 +255,17 @@ typedef struct {
         uint32_t i2c_sda;                       // I2C data pin
         uint32_t i2c_scl;                       // I2C clock pin
         uint32_t spi_mosi;                      // SPI MOSI pin
-        uint32_t spi_miso;                      // SPI MISO pin  
+        uint32_t spi_miso;                      // SPI MISO pin
         uint32_t spi_sclk;                      // SPI clock pin
         uint32_t spi_cs;                        // SPI chip select pin
     } gpio_pins;
-    
+
     // Network capabilities
     bool has_wifi;                              // WiFi support
     bool has_ethernet;                          // Ethernet support
     bool has_bluetooth;                         // Bluetooth support
     char default_ssid[64];                      // Default WiFi SSID
-    
+
     // Processing capabilities
     bool supports_edge_inference;               // Edge AI processing support
     uint32_t max_concurrent_streams;            // Maximum concurrent audio streams
@@ -273,34 +273,34 @@ typedef struct {
 } ethervox_device_profile_t;
 ```
 
-## Examples
+# # Examples
 
 The SDK includes comprehensive examples demonstrating various use cases:
 
-### Intent Plugin Example
+## # Intent Plugin Example
 
 - Smart home voice command recognition
 - Entity extraction (device, action, room, value)
 - Multi-language support
 - Performance statistics
 
-### Model Router Example  
+## # Model Router Example
 
 - Intelligent routing between GPT-3.5, GPT-4, and local models
 - Request complexity analysis
 - Fallback and retry mechanisms
 - Performance optimization
 
-### Device Profile Example
+## # Device Profile Example
 
 - Pre-configured profiles for Raspberry Pi, ESP32, Desktop
 - Hardware-specific GPIO mappings
 - Audio configuration optimization
 - Configuration file generation
 
-## Best Practices
+# # Best Practices
 
-### Plugin Development
+## # Plugin Development
 
 1. **Implement robust error handling** - Always validate inputs and handle edge cases
 2. **Optimize for performance** - Intent parsing should complete in < 100ms
@@ -308,7 +308,7 @@ The SDK includes comprehensive examples demonstrating various use cases:
 4. **Provide detailed statistics** - Track success rates and processing times
 5. **Use consistent naming** - Follow naming conventions for consistency
 
-### Model Routing
+## # Model Routing
 
 1. **Implement intelligent selection** - Route based on complexity, latency, cost
 2. **Add fallback mechanisms** - Handle model failures gracefully  
@@ -316,7 +316,7 @@ The SDK includes comprehensive examples demonstrating various use cases:
 4. **Cache responses** - Implement caching for repeated requests
 5. **Respect rate limits** - Handle API rate limiting appropriately
 
-### Device Profiles  
+## # Device Profiles
 
 1. **Match hardware capabilities** - Configure settings appropriate for platform
 2. **Optimize for power** - Use appropriate sleep timeouts and power management
@@ -324,37 +324,37 @@ The SDK includes comprehensive examples demonstrating various use cases:
 4. **Test thoroughly** - Validate configuration on target hardware
 5. **Version configurations** - Track profile versions for compatibility
 
-## Troubleshooting
+# # Troubleshooting
 
-### Common Issues
+## # Common Issues
 
-#### Plugin Not Recognized
+### # Plugin Not Recognized
 
 - Check plugin is properly registered with `ethervox_sdk_register_intent_plugin()`
 - Verify plugin name is unique
 - Ensure parse function returns 0 on success
 - Check supported language matches input language
 
-#### Model Routing Failures
+### # Model Routing Failures
 
 - Verify API keys are valid and not expired
 - Check network connectivity to model endpoints  
 - Ensure model configuration parameters are correct
 - Monitor timeout settings for slow models
 
-#### Device Profile Issues
+### # Device Profile Issues
 
 - Validate GPIO pin assignments don't conflict
 - Check hardware permissions (GPIO access may require root)
 - Verify audio device configuration matches hardware
 - Test I2C/SPI bus availability
 
-### Debugging
+## # Debugging
 
 Enable detailed logging to diagnose issues:
 
 ```c
-// Set minimum log level  
+// Set minimum log level
 sdk.diagnostics->min_log_level = ETHERVOX_LOG_DEBUG;
 
 // Set up log callback for custom handling
@@ -365,9 +365,9 @@ ethervox_sdk_log(&sdk, ETHERVOX_LOG_DEBUG, "MyComponent",
                  "Processing input: %s", input_text);
 ```
 
-## Integration Examples
+# # Integration Examples
 
-### Web API Integration
+## # Web API Integration
 
 ```c
 // REST endpoint for intent processing
@@ -375,7 +375,7 @@ int process_voice_command(const char* audio_data, char* response) {
     ethervox_stt_input_t input;
     // Convert audio to text (using audio runtime)
     snprintf(input.text, sizeof(input.text), "%s", transcribed_text);
-    
+
     ethervox_intent_result_t result;
     if (ethervox_sdk_process_intent(&sdk, &input, &result) == 0) {
         // Process recognized intent
@@ -386,7 +386,7 @@ int process_voice_command(const char* audio_data, char* response) {
 }
 ```
 
-### IoT Device Integration
+## # IoT Device Integration
 
 ```c
 // GPIO-based status indication
@@ -395,13 +395,13 @@ void update_device_status(ethervox_sdk_t* sdk, bool recording) {
         gpio_write(sdk->device_profile->gpio_pins.led_recording, true);
         gpio_write(sdk->device_profile->gpio_pins.led_status, false);
     } else {
-        gpio_write(sdk->device_profile->gpio_pins.led_recording, false);  
+        gpio_write(sdk->device_profile->gpio_pins.led_recording, false);
         gpio_write(sdk->device_profile->gpio_pins.led_status, true);
     }
 }
 ```
 
-### Multi-tenant Applications
+## # Multi-tenant Applications
 
 ```c
 // Separate SDK instances per tenant
@@ -420,9 +420,9 @@ tenant_context_t* create_tenant_context(const char* tenant_id) {
 }
 ```
 
-## Performance Considerations
+# # Performance Considerations
 
-### Memory Usage
+## # Memory Usage
 
 - SDK base overhead: ~50KB
 - Each intent plugin: ~5-10KB  
@@ -430,14 +430,14 @@ tenant_context_t* create_tenant_context(const char* tenant_id) {
 - Log buffer: ~100KB (1000 entries)
 - Device profile: ~2KB
 
-### Processing Performance
+## # Processing Performance
 
 - Intent parsing: 10-100ms typical
 - Model routing decision: <10ms
 - LLM inference: 500-5000ms depending on model
 - Device profile loading: <1ms
 
-### Optimization Tips
+## # Optimization Tips
 
 1. **Limit active plugins** - Only register needed plugins
 2. **Use local models** - For low-latency requirements
@@ -445,11 +445,11 @@ tenant_context_t* create_tenant_context(const char* tenant_id) {
 4. **Optimize parsing algorithms** - Use efficient pattern matching
 5. **Monitor resource usage** - Track CPU and memory consumption
 
-## License
+# # License
 
 The EtherVox SDK is distributed under the same license as the main EtherVox project. See the LICENSE file for details.
 
-## Contributing
+# # Contributing
 
 We welcome contributions to the SDK! Please:
 
@@ -459,7 +459,7 @@ We welcome contributions to the SDK! Please:
 4. Test across all supported platforms
 5. Submit pull requests with clear descriptions
 
-## Support
+# # Support
 
 For SDK support and questions:
 
