@@ -24,6 +24,7 @@
 #ifdef ETHERVOX_PLATFORM_WINDOWS
 #include <windows.h>
 #endif
+#include <linux/time.h>
 
 // Forward declarations ONLY (no function bodies)
 #ifdef ETHERVOX_PLATFORM_RPI
@@ -41,8 +42,9 @@ extern int desktop_hal_register(ethervox_platform_t* platform);
 
 // Register platform-specific HAL
 int ethervox_platform_register_hal(ethervox_platform_t* platform) {
-  if (!platform)
+  if (!platform) {
     return -1;
+  }
 
 #ifdef ETHERVOX_PLATFORM_ESP32
 #pragma message("Returning ESP32_HAL")
@@ -163,37 +165,39 @@ ethervox_platform_capabilities_t ethervox_platform_get_capabilities(void) {
 
 // Check if platform has specific capability
 bool ethervox_platform_has_capability(const char* capability) {
-  if (!capability)
+  if (!capability) {
     return false;
+  }
 
   ethervox_platform_capabilities_t caps = ethervox_platform_get_capabilities();
 
-  if (strcmp(capability, "audio_input") == 0)
+  if (strcmp(capability, "audio_input") == 0) {
     return caps.has_audio_input;
-  if (strcmp(capability, "audio_output") == 0)
+  } else if (strcmp(capability, "audio_output") == 0) {
     return caps.has_audio_output;
-  if (strcmp(capability, "microphone_array") == 0)
+  } else if (strcmp(capability, "microphone_array") == 0) {
     return caps.has_microphone_array;
-  if (strcmp(capability, "gpio") == 0)
+  } else if (strcmp(capability, "gpio") == 0) {
     return caps.has_gpio;
-  if (strcmp(capability, "spi") == 0)
+  } else if (strcmp(capability, "spi") == 0) {
     return caps.has_spi;
-  if (strcmp(capability, "i2c") == 0)
+  } else if (strcmp(capability, "i2c") == 0) {
     return caps.has_i2c;
-  if (strcmp(capability, "uart") == 0)
+  } else if (strcmp(capability, "uart") == 0) {
     return caps.has_uart;
-  if (strcmp(capability, "wifi") == 0)
+  } else if (strcmp(capability, "wifi") == 0) {
     return caps.has_wifi;
-  if (strcmp(capability, "bluetooth") == 0)
+  } else if (strcmp(capability, "bluetooth") == 0) {
     return caps.has_bluetooth;
-  if (strcmp(capability, "ethernet") == 0)
+  } else if (strcmp(capability, "ethernet") == 0) {
     return caps.has_ethernet;
-  if (strcmp(capability, "display") == 0)
+  } else if (strcmp(capability, "display") == 0) {
     return caps.has_display;
-  if (strcmp(capability, "camera") == 0)
+  } else if (strcmp(capability, "camera") == 0) {
     return caps.has_camera;
-
-  return false;
+  } else {
+    return false;
+  }
 }
 
 // Get system timestamp in microseconds
@@ -270,8 +274,9 @@ int ethervox_platform_init(ethervox_platform_t* platform) {
 
 // Cleanup platform
 void ethervox_platform_cleanup(ethervox_platform_t* platform) {
-  if (!platform || !platform->is_initialized)
+  if (!platform || !platform->is_initialized) {
     return;
+  }
 
   if (platform->hal.cleanup) {
     platform->hal.cleanup(&platform->info);
@@ -283,9 +288,9 @@ void ethervox_platform_cleanup(ethervox_platform_t* platform) {
 
 // Get uptime in milliseconds
 uint64_t ethervox_platform_get_uptime_ms(ethervox_platform_t* platform) {
-  if (!platform)
+  if (!platform) {
     return 0;
-
+  }
   uint64_t current_time = get_system_timestamp_us();
   return (current_time - platform->boot_time) / 1000;
 }
@@ -326,9 +331,9 @@ bool ethervox_gpio_read_pin(ethervox_platform_t* platform, uint32_t pin) {
 
 // Load device profile (placeholder implementation)
 int ethervox_platform_load_device_profile(ethervox_platform_t* platform, const char* profile_name) {
-  if (!platform || !profile_name)
+  if (!platform || !profile_name) {
     return -1;
-
+}
   printf("Loading device profile: %s\n", profile_name);
 
   // In a real implementation, this would load configuration from a file

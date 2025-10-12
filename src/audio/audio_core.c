@@ -21,11 +21,18 @@
 
 #include "ethervox/audio.h"
 
+static const float kEthervoxAudioLanguageConfidenceDefault = 0.85f;
+static const float kEthervoxAudioFinalConfidenceDefault = 0.90f;
+static const uint32_t kEthervoxAudioTtsDurationSeconds = 2U;
+static const float kEthervoxAudioToneAmplitude = 0.5f;
+static const float kEthervoxAudioToneFrequencyHz = 440.0f;
+static const float kEthervoxAudioTwoPi = 6.283185307f;
+
 // Default configuration
 ethervox_audio_config_t ethervox_audio_get_default_config(void) {
   ethervox_audio_config_t config = {.sample_rate = ETHERVOX_AUDIO_SAMPLE_RATE,
-                                    .channels = 1,  // Mono by default
-                                    .bits_per_sample = 16,
+                                    .channels = ETHERVOX_AUDIO_CHANNELS_DEFAULT,
+                                    .bits_per_sample = ETHERVOX_AUDIO_BITS_PER_SAMPLE,
                                     .buffer_size = ETHERVOX_AUDIO_BUFFER_SIZE,
                                     .enable_noise_suppression = true,
                                     .enable_echo_cancellation = true};
@@ -162,8 +169,9 @@ int ethervox_audio_stop(ethervox_audio_runtime_t* runtime) {
   // Stop audio playback
   if (runtime->is_playing && runtime->driver.stop_playback) {
     int playback_result = runtime->driver.stop_playback(runtime);
-    if (result == 0)
+    if (result == 0) {
       result = playback_result;
+    }
     runtime->is_playing = false;
   }
 
@@ -195,7 +203,7 @@ int ethervox_language_detect(const ethervox_audio_buffer_t* buffer,
   // Placeholder: Simple heuristic based on audio characteristics
   // In a real implementation, this would use ML models
   snprintf(result->language_code, sizeof(result->language_code), "%s", "en");
-  result->confidence = 0.85f;
+  result->confidence = kEthervoxAudioLanguageConfidenceDefault;
   result->is_ambient = true;
 
   return 0;
@@ -210,15 +218,19 @@ int ethervox_tts_synthesize(ethervox_audio_runtime_t* runtime,
   }
 
   // Placeholder: Generate simple tone as audio output
-  uint32_t samples = runtime->config.sample_rate * 2;  // 2 seconds of audio
+  uint32_t samples = runtime->config.sample_rate * kEthervoxAudioTtsDurationSeconds;
   output->data = (float*)malloc(samples * sizeof(float));
   output->size = samples;
   output->channels = 1;
   output->timestamp_us = 0;
 
   // Generate a simple sine wave (440 Hz)
+  const float sample_rate_f = (float)runtime->config.sample_rate;
+
   for (uint32_t i = 0; i < samples; i++) {
-    output->data[i] = 0.5f * sinf(2.0f * 3.14159f * 440.0f * i / runtime->config.sample_rate);
+    const float time_s = (float)i / sample_rate_f;
+    output->data[i] = kEthervoxAudioToneAmplitude *
+                      sinf(kEthervoxAudioTwoPi * kEthervoxAudioToneFrequencyHz * time_s);
   }
 
   return 0;

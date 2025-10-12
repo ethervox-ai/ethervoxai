@@ -17,8 +17,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ethervox/config.h"
+
+#ifdef ETHERVOX_PLATFORM_RPI
+
 #include "ethervox/audio.h"
-// #include <alsa/asoundlib.h>
 #include <bcm2835.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -72,8 +75,9 @@ static int rpi_audio_init(ethervox_audio_runtime_t* runtime,
   runtime->platform_data = audio_data;
 
   audio_data->buffer_frames = config->buffer_size;
-  audio_data->audio_buffer =
-      (char*)malloc(audio_data->buffer_frames * config->channels * sizeof(int16_t));
+  const size_t buffer_bytes =
+    (size_t)audio_data->buffer_frames * config->channels * sizeof(int16_t);
+  audio_data->audio_buffer = (char*)malloc(buffer_bytes);
 
   // Initialize GPIO for mic array control
   if (rpi_gpio_init(audio_data) != 0) {
@@ -101,8 +105,9 @@ static int rpi_select_microphone(rpi_audio_data_t* audio_data, int mic_index) {
 }
 
 static int rpi_audio_start_capture(ethervox_audio_runtime_t* runtime) {
-  if (!runtime || !runtime->platform_data)
+  if (!runtime || !runtime->platform_data) {
     return -1;
+  }
 
   rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
 
@@ -127,8 +132,9 @@ static int rpi_audio_start_capture(ethervox_audio_runtime_t* runtime) {
 }
 
 static int rpi_audio_stop_capture(ethervox_audio_runtime_t* runtime) {
-  if (!runtime || !runtime->platform_data)
+  if (!runtime || !runtime->platform_data) {
     return -1;
+  }
 
   rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
 
@@ -144,8 +150,9 @@ static int rpi_audio_stop_capture(ethervox_audio_runtime_t* runtime) {
 }
 
 static int rpi_audio_start_playback(ethervox_audio_runtime_t* runtime) {
-  if (!runtime || !runtime->platform_data)
+  if (!runtime || !runtime->platform_data) {
     return -1;
+  }
 
   rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
 
@@ -161,8 +168,9 @@ static int rpi_audio_start_playback(ethervox_audio_runtime_t* runtime) {
 }
 
 static int rpi_audio_stop_playback(ethervox_audio_runtime_t* runtime) {
-  if (!runtime || !runtime->platform_data)
+  if (!runtime || !runtime->platform_data) {
     return -1;
+  }
 
   rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
 
@@ -183,7 +191,6 @@ static void rpi_audio_cleanup(ethervox_audio_runtime_t* runtime) {
   rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
 
   if (audio_data) {
-    // Cleanup GPIO
     bcm2835_close();
 
     if (audio_data->audio_buffer) {
@@ -206,4 +213,15 @@ int ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime) {
   return 0;
 }
 
-//#endif // ETHERVOX_PLATFORM_RPI
+#else  // !ETHERVOX_PLATFORM_RPI
+
+#include <errno.h>
+
+#include "ethervox/audio.h"
+
+int ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime) {
+  (void)runtime;
+  return -ENOSYS;
+}
+
+#endif  // ETHERVOX_PLATFORM_RPI

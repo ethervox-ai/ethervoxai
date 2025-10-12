@@ -45,7 +45,7 @@ typedef struct {
 
 // Language identification result
 typedef struct {
-  char language_code[8];  // ISO 639-1 code
+  char language_code[ETHERVOX_LANG_CODE_LEN];  // ISO 639-1 code
   float confidence;
   bool is_ambient;  // True if detected without wake word
 } ethervox_language_detect_t;
@@ -88,7 +88,7 @@ struct ethervox_audio_runtime {
   bool is_playing;
 
   // Language detection state
-  char current_language[8];
+  char current_language[ETHERVOX_LANG_CODE_LEN];
   float language_confidence;
 
   // Callbacks

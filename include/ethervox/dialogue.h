@@ -65,7 +65,7 @@ typedef struct {
   ethervox_intent_type_t type;
   char* raw_text;
   char* normalized_text;
-  char language_code[8];
+  char language_code[ETHERVOX_LANG_CODE_LEN];
   float confidence;
   ethervox_entity_t* entities;
   uint32_t entity_count;
@@ -89,7 +89,7 @@ typedef struct {
 // LLM response
 typedef struct {
   char* text;
-  char language_code[8];
+  char language_code[ETHERVOX_LANG_CODE_LEN];
   float confidence;
   uint32_t processing_time_ms;
   uint32_t token_count;
@@ -105,7 +105,7 @@ typedef struct {
 typedef struct {
   char* conversation_id;
   char* user_id;
-  char current_language[8];
+  char current_language[ETHERVOX_LANG_CODE_LEN];
   ethervox_intent_t* conversation_history;
   uint32_t history_count;
   uint32_t max_history;
@@ -142,13 +142,24 @@ typedef struct {
   bool is_initialized;
 } ethervox_dialogue_engine_t;
 
+typedef struct {
+  const char* text;
+  const char* language_code;
+} ethervox_dialogue_intent_request_t;
+
+typedef struct {
+  const char* user_id;
+  const char* language_code;
+} ethervox_dialogue_context_request_t;
+
 // Public API functions
 int ethervox_dialogue_init(ethervox_dialogue_engine_t* engine, const ethervox_llm_config_t* config);
 void ethervox_dialogue_cleanup(ethervox_dialogue_engine_t* engine);
 
 // Intent processing
-int ethervox_dialogue_parse_intent(ethervox_dialogue_engine_t* engine, const char* text,
-                                   const char* language_code, ethervox_intent_t* intent);
+int ethervox_dialogue_parse_intent(ethervox_dialogue_engine_t* engine,
+                                   const ethervox_dialogue_intent_request_t* request,
+                                   ethervox_intent_t* intent);
 
 // LLM processing
 int ethervox_dialogue_process_llm(ethervox_dialogue_engine_t* engine,
@@ -156,8 +167,9 @@ int ethervox_dialogue_process_llm(ethervox_dialogue_engine_t* engine,
                                   ethervox_llm_response_t* response);
 
 // Context management
-int ethervox_dialogue_create_context(ethervox_dialogue_engine_t* engine, const char* user_id,
-                                     const char* language_code, char** context_id);
+int ethervox_dialogue_create_context(ethervox_dialogue_engine_t* engine,
+                                     const ethervox_dialogue_context_request_t* request,
+                                     char** context_id);
 int ethervox_dialogue_get_context(ethervox_dialogue_engine_t* engine, const char* context_id,
                                   ethervox_dialogue_context_t** context);
 void ethervox_dialogue_destroy_context(ethervox_dialogue_engine_t* engine, const char* context_id);

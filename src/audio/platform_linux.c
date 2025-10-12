@@ -24,6 +24,9 @@
 #include <alsa/asoundlib.h>
 #include <stdbool.h>
 
+static const size_t kLinuxMaxDeviceCandidates = 3U;
+static const unsigned int kLinuxDefaultPeriods = 2U;
+
 typedef struct {
   snd_pcm_t* pcm_capture;
   snd_pcm_t* pcm_playback;
@@ -51,8 +54,8 @@ static int linux_audio_start_capture(ethervox_audio_runtime_t* runtime) {
   snd_pcm_hw_params_t* hw_params = NULL;
 
   const char* env_device = getenv("ETHERVOX_ALSA_DEVICE");
-  const char* candidates[3] = {env_device, "default", "sysdefault"};
-  const size_t candidate_count = env_device && *env_device ? 3 : 2;
+  const char* candidates[kLinuxMaxDeviceCandidates] = {env_device, "default", "sysdefault"};
+  const size_t candidate_count = (env_device && *env_device) ? kLinuxMaxDeviceCandidates : 2U;
 
   const char* opened_device = NULL;
   for (size_t i = 0; i < candidate_count; ++i) {
@@ -67,7 +70,7 @@ static int linux_audio_start_capture(ethervox_audio_runtime_t* runtime) {
       break;
     }
 
-    printf("ALSA: failed to open capture device '%s': %s\n", device, snd_strerror(err));
+  printf("ALSA: failed to open capture device '%s': %s\n", device, snd_strerror(err));
   }
 
   if (!opened_device) {
@@ -95,7 +98,7 @@ static int linux_audio_start_capture(ethervox_audio_runtime_t* runtime) {
   unsigned int sample_rate = runtime->config.sample_rate;
   snd_pcm_hw_params_set_rate_near(audio_data->pcm_capture, hw_params, &sample_rate, 0);
 
-  snd_pcm_hw_params_set_periods(audio_data->pcm_capture, hw_params, 2, 0);
+  snd_pcm_hw_params_set_periods(audio_data->pcm_capture, hw_params, kLinuxDefaultPeriods, 0);
   snd_pcm_hw_params_set_period_size_near(audio_data->pcm_capture, hw_params,
                                          &audio_data->buffer_frames, 0);
 
@@ -137,8 +140,8 @@ static int linux_audio_start_playback(ethervox_audio_runtime_t* runtime) {
   int err;
 
   const char* env_device = getenv("ETHERVOX_ALSA_PLAYBACK");
-  const char* candidates[3] = {env_device, "default", "sysdefault"};
-  const size_t candidate_count = env_device && *env_device ? 3 : 2;
+  const char* candidates[kLinuxMaxDeviceCandidates] = {env_device, "default", "sysdefault"};
+  const size_t candidate_count = (env_device && *env_device) ? kLinuxMaxDeviceCandidates : 2U;
 
   const char* opened_device = NULL;
   for (size_t i = 0; i < candidate_count; ++i) {
@@ -184,7 +187,8 @@ static int linux_audio_stop_playback(ethervox_audio_runtime_t* runtime) {
 static uint64_t linux_get_timestamp_us(void) {
   struct timespec ts;
   clock_gettime(CLOCK_REALTIME, &ts);
-  return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
+  return (uint64_t)ts.tv_sec * ETHERVOX_PLATFORM_US_PER_SEC + (uint64_t)ts.tv_nsec /
+                                                        ETHERVOX_PLATFORM_US_PER_MS;
 }
 
 static int linux_audio_read(ethervox_audio_runtime_t* runtime, ethervox_audio_buffer_t* buffer) {
@@ -219,7 +223,7 @@ static int linux_audio_read(ethervox_audio_runtime_t* runtime, ethervox_audio_bu
     } else if (rc == -EAGAIN) {
       continue;
     } else if (rc < 0) {
-      printf("ALSA capture error: %s\n", snd_strerror(rc));
+  printf("ALSA capture error: %s\n", snd_strerror((int)rc));
       free(capture_buffer);
       return -1;
     }
@@ -228,7 +232,7 @@ static int linux_audio_read(ethervox_audio_runtime_t* runtime, ethervox_audio_bu
   }
 
   buffer->data = (float*)capture_buffer;
-  buffer->size = frames_read * channels * sizeof(int16_t);
+  buffer->size = (size_t)frames_read * channels * sizeof(int16_t);
   buffer->channels = channels;
   buffer->timestamp_us = linux_get_timestamp_us();
 

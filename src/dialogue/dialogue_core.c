@@ -19,6 +19,18 @@
 #include <string.h>
 
 #include "ethervox/dialogue.h"
+
+static const float kEthervoxIntentMatchConfidence = 0.8f;
+static const float kEthervoxIntentUnknownConfidence = 0.1f;
+static const float kEthervoxResponseConfidence = 0.9f;
+static const uint32_t kEthervoxResponseProcessingTimeMs = 50U;
+static const uint32_t kEthervoxTokenEstimateDivisor = 4U;
+static const uint32_t kEthervoxDefaultMaxContexts = 16U;
+static const uint32_t kEthervoxDefaultMaxHistory = 20U;
+static const float kEthervoxWakeConfidenceScale = 2.0f;
+static const size_t kEthervoxLanguageMatchPrefix = 2U;
+static const size_t kEthervoxLanguageTrimIndex = 2U;
+
 static void sanitize_language_code(const char* source, char* target, size_t target_len) {
   if (!target || target_len == 0) {
     return;
@@ -44,13 +56,13 @@ static void sanitize_language_code(const char* source, char* target, size_t targ
 
   target[out_pos] = '\0';
 
-  if (out_pos > 3) {
-    target[2] = '\0';
+  if (out_pos > kEthervoxLanguageTrimIndex) {
+    target[kEthervoxLanguageTrimIndex] = '\0';
   }
 }
 
 const char* ethervox_dialogue_detect_system_language(void) {
-  static char cached_language[8] = "";
+  static char cached_language[ETHERVOX_LANG_CODE_LEN] = "";
   static bool initialized = false;
 
   if (initialized && cached_language[0] != '\0') {
@@ -175,21 +187,21 @@ const char* ethervox_entity_type_to_string(ethervox_entity_type_t type) {
 // Default LLM configuration
 ethervox_llm_config_t ethervox_dialogue_get_default_llm_config(void) {
   ethervox_llm_config_t config = {.model_path = NULL,  // Will be set based on platform
-                                  .model_name = "ethervox-lite",
-                                  .max_tokens = 512,
-                                  .context_length = 2048,
-                                  .temperature = 0.7f,
-                                  .top_p = 0.9f,
-                                  .seed = 42,
-                                  .use_gpu = false,  // Default to CPU for compatibility
-                                  .gpu_layers = 0,
+                                    .model_name = ETHERVOX_LLM_MODEL_NAME,
+                                    .max_tokens = ETHERVOX_LLM_MAX_TOKENS_DEFAULT,
+                                    .context_length = ETHERVOX_LLM_CONTEXT_LENGTH_DEFAULT,
+                                    .temperature = ETHERVOX_LLM_TEMPERATURE_DEFAULT,
+                                    .top_p = ETHERVOX_LLM_TOP_P_DEFAULT,
+                                    .seed = ETHERVOX_LLM_SEED_DEFAULT,
+                                    .use_gpu = false,  // Default to CPU for compatibility
+                                    .gpu_layers = ETHERVOX_LLM_GPU_LAYERS_DEFAULT,
                                   .language_code = NULL};
 
 #ifdef ETHERVOX_PLATFORM_DESKTOP
-  config.max_tokens = 1024;
-  config.context_length = 4096;
+  config.max_tokens = ETHERVOX_LLM_MAX_TOKENS_DESKTOP;
+  config.context_length = ETHERVOX_LLM_CONTEXT_LENGTH_DESKTOP;
   config.use_gpu = true;
-  config.gpu_layers = 10;
+  config.gpu_layers = ETHERVOX_LLM_GPU_LAYERS_DESKTOP;
 #endif
 
   return config;
@@ -197,14 +209,16 @@ ethervox_llm_config_t ethervox_dialogue_get_default_llm_config(void) {
 
 // Check if language is supported
 bool ethervox_dialogue_is_language_supported(const char* language_code) {
-  if (!language_code)
+  if (!language_code) {
     return false;
+  }
 
   for (int i = 0; SUPPORTED_LANGUAGES[i] != NULL; i++) {
-    if (strncmp(language_code, SUPPORTED_LANGUAGES[i], 2) == 0) {
+    if (strncmp(language_code, SUPPORTED_LANGUAGES[i], kEthervoxLanguageMatchPrefix) == 0) {
       return true;
     }
   }
+
   return false;
 }
 
@@ -219,8 +233,9 @@ static char* generate_conversation_id(void) {
 // Initialize dialogue engine
 int ethervox_dialogue_init(ethervox_dialogue_engine_t* engine,
                            const ethervox_llm_config_t* config) {
-  if (!engine)
+  if (!engine){
     return -1;
+  }
 
   memset(engine, 0, sizeof(ethervox_dialogue_engine_t));
 
@@ -252,7 +267,7 @@ int ethervox_dialogue_init(ethervox_dialogue_engine_t* engine,
   }
 
   // Allocate context storage
-  engine->max_contexts = 16;  // Support up to 16 simultaneous conversations
+  engine->max_contexts = kEthervoxDefaultMaxContexts;  // Support up to 16 simultaneous conversations
   engine->contexts = (ethervox_dialogue_context_t*)calloc(engine->max_contexts,
                                                           sizeof(ethervox_dialogue_context_t));
   if (!engine->contexts) {
@@ -271,8 +286,9 @@ int ethervox_dialogue_init(ethervox_dialogue_engine_t* engine,
 
 // Cleanup dialogue engine
 void ethervox_dialogue_cleanup(ethervox_dialogue_engine_t* engine) {
-  if (!engine)
+  if (!engine) {
     return;
+  }
 
   // Cleanup contexts
   if (engine->contexts) {
@@ -311,17 +327,26 @@ void ethervox_dialogue_cleanup(ethervox_dialogue_engine_t* engine) {
 }
 
 // Parse intent from text
-int ethervox_dialogue_parse_intent(ethervox_dialogue_engine_t* engine, const char* text,
-                                   const char* language_code, ethervox_intent_t* intent) {
-  if (!engine || !text || !intent)
+int ethervox_dialogue_parse_intent(ethervox_dialogue_engine_t* engine,
+                                   const ethervox_dialogue_intent_request_t* request,
+                                   ethervox_intent_t* intent) {
+  if (!engine || !request || !request->text || !intent) {
     return -1;
+  }
+
+  const char* language_code = request->language_code;
+  if (!language_code || language_code[0] == '\0') {
+    language_code = engine->llm_config.language_code ? engine->llm_config.language_code : "en";
+  }
+
+  const char* text = request->text;
 
   memset(intent, 0, sizeof(ethervox_intent_t));
 
   // Copy input text
   intent->raw_text = strdup(text);
   intent->normalized_text = strdup(text);  // TODO: Implement normalization
-  snprintf(intent->language_code, sizeof(intent->language_code), "%s", language_code ? language_code : "en");
+  snprintf(intent->language_code, sizeof(intent->language_code), "%s", language_code);
 
   // Simple pattern matching for intent detection
   intent->type = ETHERVOX_INTENT_UNKNOWN;
@@ -358,8 +383,9 @@ int ethervox_dialogue_parse_intent(ethervox_dialogue_engine_t* engine, const cha
 int ethervox_dialogue_process_llm(ethervox_dialogue_engine_t* engine,
                                   const ethervox_intent_t* intent, const char* context_id,
                                   ethervox_llm_response_t* response) {
-  if (!engine || !intent || !response)
+  if (!engine || !intent || !response) {
     return -1;
+  }
 
   memset(response, 0, sizeof(ethervox_llm_response_t));
 
@@ -425,9 +451,9 @@ int ethervox_dialogue_process_llm(ethervox_dialogue_engine_t* engine,
 
   response->text = strdup(response_text);
   snprintf(response->language_code, sizeof(response->language_code), "%s", intent->language_code);
-  response->confidence = 0.9f;
-  response->processing_time_ms = 50;                  // Simulated processing time
-  response->token_count = strlen(response_text) / 4;  // Rough token estimate
+  response->confidence = kEthervoxResponseConfidence;
+  response->processing_time_ms = kEthervoxResponseProcessingTimeMs;  // Simulated processing time
+  response->token_count = strlen(response_text) / kEthervoxTokenEstimateDivisor;  // Rough token estimate
 
   printf("LLM response generated: %s\n", response->text);
 
@@ -435,19 +461,26 @@ int ethervox_dialogue_process_llm(ethervox_dialogue_engine_t* engine,
 }
 
 // Create dialogue context
-int ethervox_dialogue_create_context(ethervox_dialogue_engine_t* engine, const char* user_id,
-                                     const char* language_code, char** context_id) {
-  if (!engine || !user_id || !context_id)
+int ethervox_dialogue_create_context(ethervox_dialogue_engine_t* engine,
+                                     const ethervox_dialogue_context_request_t* request,
+                                     char** context_id) {
+  if (!engine || !request || !request->user_id || !context_id) {
     return -1;
+  }
+
+  const char* language_code = request->language_code;
+  if (!language_code || language_code[0] == '\0') {
+    language_code = engine->llm_config.language_code ? engine->llm_config.language_code : "en";
+  }
 
   // Find available context slot
   for (uint32_t i = 0; i < engine->max_contexts; i++) {
     ethervox_dialogue_context_t* ctx = &engine->contexts[i];
     if (!ctx->conversation_id) {  // Empty slot
       ctx->conversation_id = generate_conversation_id();
-      ctx->user_id = strdup(user_id);
-  snprintf(ctx->current_language, sizeof(ctx->current_language), "%s", language_code ? language_code : "en");
-      ctx->max_history = 20;  // Keep last 20 interactions
+      ctx->user_id = strdup(request->user_id);
+      snprintf(ctx->current_language, sizeof(ctx->current_language), "%s", language_code);
+      ctx->max_history = kEthervoxDefaultMaxHistory;
       ctx->conversation_history =
           (ethervox_intent_t*)calloc(ctx->max_history, sizeof(ethervox_intent_t));
       ctx->last_interaction_time = time(NULL);
@@ -455,7 +488,8 @@ int ethervox_dialogue_create_context(ethervox_dialogue_engine_t* engine, const c
       *context_id = strdup(ctx->conversation_id);
       engine->active_contexts++;
 
-      printf("Created dialogue context: %s for user: %s\n", ctx->conversation_id, user_id);
+      printf("Created dialogue context: %s for user: %s\n", ctx->conversation_id,
+             request->user_id);
       return 0;
     }
   }
@@ -498,7 +532,7 @@ int ethervox_dialogue_set_language(ethervox_dialogue_engine_t* engine, const cha
   for (uint32_t i = 0; i < engine->max_contexts; i++) {
     ethervox_dialogue_context_t* ctx = &engine->contexts[i];
     if (ctx->conversation_id) {
-  snprintf(ctx->current_language, sizeof(ctx->current_language), "%s", normalized);
+      snprintf(ctx->current_language, sizeof(ctx->current_language), "%s", normalized);
       ctx->current_language[sizeof(ctx->current_language) - 1] = '\0';
     }
   }
@@ -515,9 +549,10 @@ const char* ethervox_dialogue_get_language(const ethervox_dialogue_engine_t* eng
 
 // Free intent structure
 void ethervox_intent_free(ethervox_intent_t* intent) {
-  if (!intent)
+  if (!intent){
     return;
-
+  }
+  
   if (intent->raw_text) {
     free(intent->raw_text);
     intent->raw_text = NULL;
@@ -542,8 +577,9 @@ void ethervox_intent_free(ethervox_intent_t* intent) {
 
 // Free LLM response structure
 void ethervox_llm_response_free(ethervox_llm_response_t* response) {
-  if (!response)
+  if (!response) {
     return;
+  }
 
   if (response->text) {
     free(response->text);

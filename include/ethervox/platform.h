@@ -69,9 +69,9 @@ typedef enum { ETHERVOX_SLEEP_LIGHT, ETHERVOX_SLEEP_DEEP } ethervox_sleep_mode_t
 
 // Platform-specific data structures
 typedef struct {
-  char platform_name[32];
-  char hardware_revision[16];
-  char cpu_model[64];
+  char platform_name[ETHERVOX_PLATFORM_NAME_LEN];
+  char hardware_revision[ETHERVOX_PLATFORM_HW_REV_LEN];
+  char cpu_model[ETHERVOX_PLATFORM_CPU_MODEL_LEN];
   uint32_t cpu_frequency_mhz;
   uint32_t core_count;
   ethervox_platform_capabilities_t capabilities;
@@ -126,7 +126,7 @@ typedef struct {
   bool is_initialized;
   uint64_t boot_time;
   uint32_t error_count;
-  char last_error[256];
+  char last_error[ETHERVOX_PLATFORM_ERROR_LEN];
 } ethervox_platform_t;
 
 // Public API functions

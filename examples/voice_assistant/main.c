@@ -245,7 +245,10 @@ int pipeline_init(voice_pipeline_t* pipeline, const char* language_override, boo
   printf("✓ Dialogue engine initialized\n");
 
   // Create dialogue context
-  if (ethervox_dialogue_create_context(&pipeline->dialogue, "demo_user", "en",
+  ethervox_dialogue_context_request_t context_request = {
+      .user_id = "demo_user",
+      .language_code = pipeline->language_code};
+  if (ethervox_dialogue_create_context(&pipeline->dialogue, &context_request,
                                        &pipeline->context_id) != 0) {
     fprintf(stderr, "Failed to create dialogue context\n");
     return -1;
@@ -443,8 +446,10 @@ static void pipeline_run_text(voice_pipeline_t* pipeline) {
     }
 
     ethervox_intent_t intent = {0};
-    if (ethervox_dialogue_parse_intent(&pipeline->dialogue, input, pipeline->language_code,
-                                       &intent) != 0) {
+  ethervox_dialogue_intent_request_t intent_request = {
+    .text = input,
+    .language_code = pipeline->language_code};
+  if (ethervox_dialogue_parse_intent(&pipeline->dialogue, &intent_request, &intent) != 0) {
       printf("⚠️  Couldn't parse intent. Try again.\n");
       continue;
     }

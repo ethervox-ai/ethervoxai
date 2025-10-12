@@ -4,11 +4,19 @@ Checks: >
   bugprone-*,
   performance-inefficient-vector-operation,
   performance-unnecessary-copy-initialization,
+  readability-braces-around-statements,
+  readability-magic-numbers,
   readability-misleading-indentation,
   readability-simplify-boolean-expr
 CheckOptions:
   - key: readability-magic-numbers.IgnoredIntegerValues
-    value: '0,1'
+    value: '0;1;-1'
+  - key: readability-magic-numbers.IgnoredFloatingPointValues
+    value: '0.0;1.0'
+  - key: readability-magic-numbers.IgnorePowersOfTwo
+    value: 'true'
+  - key: readability-magic-numbers.IgnoreAssignmentValues
+    value: 'false'
 WarningsAsErrors: ''
 FormatStyle: file
 UseColor: false
