@@ -1,5 +1,9 @@
-[default]
-dict-paths = ["typos.dic"]
-
-[files."*.md"]
-dict-paths = ["typos.dic"]
+[default.extend-words]
+Bord = "Bord"
+Tableau = "Tableau"
+EtherVox = "EtherVox"
+Enregistrement = "Enregistrement"
+Etat = "Etat"
+État = "État"
+Confidentialité = "Confidentialité"
+Paramètres = "Paramètres"
