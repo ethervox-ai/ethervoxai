@@ -171,12 +171,12 @@ We value working together towards common goals.
 ## **Educational Materials**
 
 - [GitHub's Community Guidelines](https://docs.github.com/en/site-policy/github-terms/github-community-guidelines)
-- [Privacy by Design Principles](https://www.ipc.on.ca/wp-content/uploads/resources/7foundationalprinciples.pdf)
+- [Privacy by Design Principles](https://www.thesedonaconference.org/sites/default/files/conference_papers/Recommended%20%5B08b%5D%20Privacy%20By%20Design_Cavoukian.pdf)
 - [Inclusive Language Guide](https://inclusivenaming.org/)
 
 ## **Support Resources**
 
-- [Mental Health Resources](https://github.com/mental-health-org/awesome-mental-health)
+- [Mental Health Resources](https://github.com/dreamingechoes/awesome-mental-health)
 - [Digital Privacy Guides](https://privacyguides.org/)
 
 ## Attribution
