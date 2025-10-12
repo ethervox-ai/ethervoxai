@@ -68,7 +68,9 @@ EtherVoxAI is an open-source voice AI platform designed for privacy-conscious us
 - Xtensa toolchain
 - (Optional) USB redirection to WSL on Windows 11
 
-## 1. Clone and Setup
+## 1. Installation
+
+### Clone and Setup
 
 ```bash
 
