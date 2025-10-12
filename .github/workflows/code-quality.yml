@@ -86,6 +86,7 @@ jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    permissions: write-all
 
     steps:
     - name: Checkout repository
