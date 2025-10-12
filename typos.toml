@@ -1,0 +1,5 @@
+[default]
+dict-paths = ["typos.dic"]
+
+[files."*.md"]
+dict-paths = ["typos.dic"]
