@@ -54,7 +54,7 @@ int ethervox_sdk_init(ethervox_sdk_t* sdk) {
   // Initialize diagnostics
   sdk->diagnostics = (ethervox_diagnostics_t*)calloc(1, sizeof(ethervox_diagnostics_t));
   if (!sdk->diagnostics) {
-    strcpy(sdk->last_error, "Failed to allocate diagnostics");
+    snprintf(sdk->last_error, sizeof(sdk->last_error), "%s", "Failed to allocate diagnostics");
     return -1;
   }
 
@@ -67,13 +67,13 @@ int ethervox_sdk_init(ethervox_sdk_t* sdk) {
   sdk->device_profile = (ethervox_device_profile_t*)calloc(1, sizeof(ethervox_device_profile_t));
   if (!sdk->device_profile) {
     free(sdk->diagnostics);
-    strcpy(sdk->last_error, "Failed to allocate device profile");
+    snprintf(sdk->last_error, sizeof(sdk->last_error), "%s", "Failed to allocate device profile");
     return -1;
   }
 
   // Set default device profile
-  strcpy(sdk->device_profile->name, "Default");
-  strcpy(sdk->device_profile->platform, "Generic");
+  snprintf(sdk->device_profile->name, sizeof(sdk->device_profile->name), "%s", "Default");
+  snprintf(sdk->device_profile->platform, sizeof(sdk->device_profile->platform), "%s", "Generic");
   sdk->device_profile->sample_rate = 16000;
   sdk->device_profile->bit_depth = 16;
   sdk->device_profile->mic_array_channels = 1;
@@ -204,7 +204,7 @@ int ethervox_sdk_process_intent(ethervox_sdk_t* sdk, const ethervox_stt_input_t*
   result->type = ETHERVOX_INTENT_UNKNOWN;
   result->confidence = 0.0f;
   result->timestamp = time(NULL);
-  strcpy(result->language, input->language);
+  snprintf(result->language, sizeof(result->language), "%s", input->language ? input->language : "");
 
   // Try each intent plugin until one succeeds
   for (uint32_t i = 0; i < sdk->intent_plugin_count; i++) {
@@ -273,14 +273,14 @@ int ethervox_sdk_add_model_config(ethervox_sdk_t* sdk, const ethervox_model_conf
     // Create default model router
     sdk->model_router = (ethervox_model_router_t*)calloc(1, sizeof(ethervox_model_router_t));
     if (!sdk->model_router) {
-      strcpy(sdk->last_error, "Failed to allocate model router");
+  snprintf(sdk->last_error, sizeof(sdk->last_error), "%s", "Failed to allocate model router");
       return -1;
     }
-    strcpy(sdk->model_router->name, "Default Router");
+  snprintf(sdk->model_router->name, sizeof(sdk->model_router->name), "%s", "Default Router");
   }
 
   if (sdk->model_router->model_count >= 16) {
-    strcpy(sdk->last_error, "Maximum number of models reached");
+  snprintf(sdk->last_error, sizeof(sdk->last_error), "%s", "Maximum number of models reached");
     return -1;
   }
 
@@ -317,7 +317,7 @@ void ethervox_sdk_log(ethervox_sdk_t* sdk, ethervox_log_level_t level, const cha
   ethervox_log_entry_t entry = {0};
   entry.timestamp = time(NULL);
   entry.level = level;
-  strncpy(entry.component, component, sizeof(entry.component) - 1);
+  snprintf(entry.component, sizeof(entry.component), "%s", component);
 
   // Format message
   va_list args;

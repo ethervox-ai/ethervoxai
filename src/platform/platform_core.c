@@ -218,27 +218,27 @@ int ethervox_platform_init(ethervox_platform_t* platform) {
   memset(platform, 0, sizeof(ethervox_platform_t));
 
   // Set platform information
-  strncpy(platform->info.platform_name, ethervox_platform_get_name(),
-          sizeof(platform->info.platform_name) - 1);
+  snprintf(platform->info.platform_name, sizeof(platform->info.platform_name), "%s",
+           ethervox_platform_get_name());
   platform->info.capabilities = ethervox_platform_get_capabilities();
   platform->boot_time = get_system_timestamp_us();
 
 // Platform-specific initialization
 #ifdef ETHERVOX_PLATFORM_ESP32
-  strcpy(platform->info.hardware_revision, "ESP32-S3");
-  strcpy(platform->info.cpu_model, "Xtensa LX7");
+  snprintf(platform->info.hardware_revision, sizeof(platform->info.hardware_revision), "%s", "ESP32-S3");
+  snprintf(platform->info.cpu_model, sizeof(platform->info.cpu_model), "%s", "Xtensa LX7");
   platform->info.cpu_frequency_mhz = 240;
   platform->info.core_count = 2;
 
 #elif defined(ETHERVOX_PLATFORM_RPI)
-  strcpy(platform->info.hardware_revision, "4.0");
-  strcpy(platform->info.cpu_model, "ARM Cortex-A76");
+  snprintf(platform->info.hardware_revision, sizeof(platform->info.hardware_revision), "%s", "4.0");
+  snprintf(platform->info.cpu_model, sizeof(platform->info.cpu_model), "%s", "ARM Cortex-A76");
   platform->info.cpu_frequency_mhz = 2400;
   platform->info.core_count = 4;
 
 #elif defined(ETHERVOX_PLATFORM_DESKTOP)
-  strcpy(platform->info.hardware_revision, "1.0");
-  strcpy(platform->info.cpu_model, "x86_64");
+  snprintf(platform->info.hardware_revision, sizeof(platform->info.hardware_revision), "%s", "1.0");
+  snprintf(platform->info.cpu_model, sizeof(platform->info.cpu_model), "%s", "x86_64");
   platform->info.cpu_frequency_mhz = 3000;
   platform->info.core_count = 8;
 #endif

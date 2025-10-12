@@ -80,7 +80,8 @@ void test_language_detection_struct() {
   printf("Testing language detection structure...\n");
 
   ethervox_language_detect_t lang;
-  strcpy(lang.language_code, "en");
+  /* Use snprintf for safe, bounded copy */
+  snprintf(lang.language_code, sizeof(lang.language_code), "%s", "en");
   lang.confidence = 0.95f;
   lang.is_ambient = false;
 

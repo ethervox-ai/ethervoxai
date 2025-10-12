@@ -53,7 +53,7 @@ int ethervox_audio_init(ethervox_audio_runtime_t* runtime, const ethervox_audio_
     result = runtime->driver.init(runtime, config);
     if (result == 0) {
       runtime->is_initialized = true;
-      strcpy(runtime->current_language, "en");  // Default language
+  snprintf(runtime->current_language, sizeof(runtime->current_language), "%s", "en");  // Default language
       runtime->language_confidence = 1.0f;
     } else {
       fprintf(stderr, "Platform audio driver initialization failed (err=%d)\n", result);
@@ -194,7 +194,7 @@ int ethervox_language_detect(const ethervox_audio_buffer_t* buffer,
 
   // Placeholder: Simple heuristic based on audio characteristics
   // In a real implementation, this would use ML models
-  strcpy(result->language_code, "en");
+  snprintf(result->language_code, sizeof(result->language_code), "%s", "en");
   result->confidence = 0.85f;
   result->is_ambient = true;
 

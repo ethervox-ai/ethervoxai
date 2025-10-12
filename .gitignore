@@ -158,7 +158,6 @@ REAL_MODEL_INTEGRATION_COMPLETE.md
 implementations/python/AI_RESPONSE_STATUS.md
 implementations/python/REAL_MODEL_IMPROVEMENTS.md
 INTERNAL-*.md
-<<<<<<< HEAD
 .pio/
 docs/INTERNAL_AI-INTEGRATION-SUMMARY.md
 docs/INTERNAL_BUG_FIX_COMPLETE.md
@@ -174,3 +173,6 @@ esp32-project/sdkconfig
 esp32-project/sdkconfig.old
 esp32-project/.cache/
 esp32-project/dependencies.lock
+
+# CI/CD artifacts
+run-artifacts/

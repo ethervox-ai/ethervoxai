@@ -77,8 +77,7 @@ int ethervox_plugin_manager_init(ethervox_plugin_manager_t* manager, const char*
   const char* resolved_plugin_dir = plugin_dir ? plugin_dir : "./plugins";
 
   // Set plugin directory
-  strncpy(manager->plugin_directory, resolved_plugin_dir, sizeof(manager->plugin_directory) - 1);
-  manager->plugin_directory[sizeof(manager->plugin_directory) - 1] = '\0';
+  snprintf(manager->plugin_directory, sizeof(manager->plugin_directory), "%s", resolved_plugin_dir);
 
   // Build config file path with safety check
   int written = snprintf(manager->config_file, sizeof(manager->config_file), "%s/plugins.conf",
@@ -156,9 +155,9 @@ int ethervox_plugin_load(ethervox_plugin_manager_t* manager, const char* plugin_
     ethervox_plugin_t* plugin = &manager->plugins[i];
     if (plugin->status == ETHERVOX_PLUGIN_STATUS_UNLOADED) {
       // Initialize plugin metadata (simplified)
-      strncpy(plugin->metadata.name, plugin_name, sizeof(plugin->metadata.name) - 1);
-      strcpy(plugin->metadata.version, "1.0.0");
-      strcpy(plugin->metadata.author, "EthervoxAI Team");
+  snprintf(plugin->metadata.name, sizeof(plugin->metadata.name), "%s", plugin_name);
+  snprintf(plugin->metadata.version, sizeof(plugin->metadata.version), "%s", "1.0.0");
+  snprintf(plugin->metadata.author, sizeof(plugin->metadata.author), "%s", "EthervoxAI Team");
       snprintf(plugin->metadata.description, sizeof(plugin->metadata.description),
                "Built-in %s plugin", plugin_name);
 
@@ -228,7 +227,7 @@ int ethervox_llm_plugin_openai(const ethervox_llm_request_t* request,
   // Simulate OpenAI API call
   response->text = (char*)malloc(1024);
   snprintf(response->text, 1024, "OpenAI response to: %s", request->prompt);
-  strncpy(response->language_code, request->language_code, 7);
+  snprintf(response->language_code, sizeof(response->language_code), "%s", request->language_code);
   response->confidence = 0.95f;
   response->processing_time_ms = 100;
   response->token_count = 50;
@@ -254,7 +253,7 @@ int ethervox_llm_plugin_huggingface(const ethervox_llm_request_t* request,
   // Simulate HuggingFace inference
   response->text = (char*)malloc(1024);
   snprintf(response->text, 1024, "HuggingFace (%s) response to: %s", model_name, request->prompt);
-  strncpy(response->language_code, request->language_code, 7);
+  snprintf(response->language_code, sizeof(response->language_code), "%s", request->language_code);
   response->confidence = 0.90f;
   response->processing_time_ms = 150;
   response->token_count = 45;
@@ -277,7 +276,7 @@ int ethervox_llm_plugin_local_rag(const ethervox_llm_request_t* request,
   // Simulate local RAG processing
   response->text = (char*)malloc(1024);
   snprintf(response->text, 1024, "Local RAG response to: %s", request->prompt);
-  strncpy(response->language_code, request->language_code, 7);
+  snprintf(response->language_code, sizeof(response->language_code), "%s", request->language_code);
   response->confidence = 0.85f;
   response->processing_time_ms = 80;
   response->token_count = 60;
@@ -298,8 +297,8 @@ int ethervox_plugin_register_builtin_openai(ethervox_plugin_manager_t* manager) 
 
   ethervox_plugin_t* plugin = &manager->plugins[manager->plugin_count];
 
-  strncpy(plugin->name, "openai", sizeof(plugin->name) - 1);
-  strncpy(plugin->version, "1.0.0", sizeof(plugin->version) - 1);
+  snprintf(plugin->name, sizeof(plugin->name), "%s", "openai");
+  snprintf(plugin->version, sizeof(plugin->version), "%s", "1.0.0");
   plugin->type = ETHERVOX_PLUGIN_LLM;
   plugin->status = ETHERVOX_PLUGIN_STATUS_LOADED;
   plugin->execute = openai_execute_wrapper;  // Use wrapper instead of direct assignment
@@ -316,8 +315,8 @@ int ethervox_plugin_register_builtin_huggingface(ethervox_plugin_manager_t* mana
 
   ethervox_plugin_t* plugin = &manager->plugins[manager->plugin_count];
 
-  strncpy(plugin->name, "huggingface", sizeof(plugin->name) - 1);
-  strncpy(plugin->version, "1.0.0", sizeof(plugin->version) - 1);
+  snprintf(plugin->name, sizeof(plugin->name), "%s", "huggingface");
+  snprintf(plugin->version, sizeof(plugin->version), "%s", "1.0.0");
   plugin->type = ETHERVOX_PLUGIN_LLM;
   plugin->status = ETHERVOX_PLUGIN_STATUS_LOADED;
   plugin->execute = huggingface_execute_wrapper;  // Use wrapper
@@ -334,8 +333,8 @@ int ethervox_plugin_register_builtin_local_rag(ethervox_plugin_manager_t* manage
 
   ethervox_plugin_t* plugin = &manager->plugins[manager->plugin_count];
 
-  strncpy(plugin->name, "local_rag", sizeof(plugin->name) - 1);
-  strncpy(plugin->version, "1.0.0", sizeof(plugin->version) - 1);
+  snprintf(plugin->name, sizeof(plugin->name), "%s", "local_rag");
+  snprintf(plugin->version, sizeof(plugin->version), "%s", "1.0.0");
   plugin->type = ETHERVOX_PLUGIN_LLM;
   plugin->status = ETHERVOX_PLUGIN_STATUS_LOADED;
   plugin->execute = local_rag_execute_wrapper;  // Use wrapper

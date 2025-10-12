@@ -99,8 +99,8 @@ static void sanitize_language(const char* source, char* target, size_t target_le
   target[out_idx] = '\0';
 
   if (out_idx < 2) {
-    strncpy(target, "en", target_len - 1);
-    target[target_len - 1] = '\0';
+    /* Use snprintf for bounded copy and guaranteed null-termination */
+    snprintf(target, target_len, "%s", "en");
     return;
   }
 
@@ -111,23 +111,21 @@ static void sanitize_language(const char* source, char* target, size_t target_le
 
 static void map_stt_language(const char* base_language, char* target, size_t target_len) {
   if (!base_language || !*base_language) {
-    strncpy(target, "en-US", target_len - 1);
-    target[target_len - 1] = '\0';
+    snprintf(target, target_len, "%s", "en-US");
     return;
   }
 
   if (strncmp(base_language, "es", 2) == 0) {
-    strncpy(target, "es-ES", target_len - 1);
+    snprintf(target, target_len, "%s", "es-ES");
   } else if (strncmp(base_language, "zh", 2) == 0) {
-    strncpy(target, "zh-CN", target_len - 1);
+    snprintf(target, target_len, "%s", "zh-CN");
   } else if (strncmp(base_language, "fr", 2) == 0) {
-    strncpy(target, "fr-FR", target_len - 1);
+    snprintf(target, target_len, "%s", "fr-FR");
   } else if (strncmp(base_language, "de", 2) == 0) {
-    strncpy(target, "de-DE", target_len - 1);
+    snprintf(target, target_len, "%s", "de-DE");
   } else {
-    strncpy(target, "en-US", target_len - 1);
+    snprintf(target, target_len, "%s", "en-US");
   }
-  target[target_len - 1] = '\0';
 }
 
 static void pipeline_resolve_language(voice_pipeline_t* pipeline, const char* override_language) {
@@ -148,8 +146,7 @@ static void pipeline_resolve_language(voice_pipeline_t* pipeline, const char* ov
 
   sanitize_language(resolved, pipeline->language_code, sizeof(pipeline->language_code));
   if (pipeline->language_code[0] == '\0') {
-    strncpy(pipeline->language_code, "en", sizeof(pipeline->language_code) - 1);
-    pipeline->language_code[sizeof(pipeline->language_code) - 1] = '\0';
+    snprintf(pipeline->language_code, sizeof(pipeline->language_code), "%s", "en");
   }
 
   map_stt_language(pipeline->language_code, pipeline->stt_language, sizeof(pipeline->stt_language));

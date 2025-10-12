@@ -202,7 +202,7 @@ ethervox_sdk_set_model_router(&sdk, router);
 1. **Create configuration function:**
 ```c
 static void configure_my_device(ethervox_device_profile_t* profile) {
-    strcpy(profile->name, "MyDevice");
+  snprintf(profile->name, sizeof(profile->name), "%s", "MyDevice");
     profile->mic_array_channels = 2;
     // Set other hardware-specific parameters
 }

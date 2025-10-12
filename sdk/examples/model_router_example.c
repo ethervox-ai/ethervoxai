@@ -100,7 +100,7 @@ static int simulate_model_inference(const ethervox_llm_request_t* request,
   response->confidence = 0.85f + (rand() % 15) / 100.0f;  // 0.85-1.00
   response->processing_time_ms = processing_time;
   response->token_count = strlen(response->response) / 4;  // Rough estimate
-  strcpy(response->model_used, model->model_name);
+  snprintf(response->model_used, sizeof(response->model_used), "%s", model->model_name);
 
   // Simulate occasional failures
   if (rand() % 20 == 0) {  // 5% failure rate
@@ -212,7 +212,7 @@ ethervox_model_router_t* create_multi_model_router(void) {
   ethervox_model_router_t* base_router = (ethervox_model_router_t*)router;
 
   // Set router name
-  strcpy(base_router->name, "Multi-Model Smart Router");
+  snprintf(base_router->name, sizeof(base_router->name), "%s", "Multi-Model Smart Router");
 
   // Configure routing thresholds
   router->complexity_threshold_gpt4 = 0.7f;
@@ -269,7 +269,7 @@ int main() {
                                        .timeout_ms = 30000}};
 
   for (int i = 0; i < 3; i++) {
-    strcpy(models[i].api_key, "sk-example-key");
+  snprintf(models[i].api_key, sizeof(models[i].api_key), "%s", "sk-example-key");
     router->models[router->model_count] = models[i];
     router->model_count++;
 
@@ -297,9 +297,9 @@ int main() {
        .creativity_level = 0.9f,
        .stream_response = false}};
 
-  strcpy(requests[0].language, "en");
-  strcpy(requests[1].language, "en");
-  strcpy(requests[2].language, "en");
+  snprintf(requests[0].language, sizeof(requests[0].language), "%s", "en");
+  snprintf(requests[1].language, sizeof(requests[1].language), "%s", "en");
+  snprintf(requests[2].language, sizeof(requests[2].language), "%s", "en");
 
   for (int i = 0; i < 3; i++) {
     printf("Request %d: \"%.50s%s\"\n", i + 1, requests[i].prompt,

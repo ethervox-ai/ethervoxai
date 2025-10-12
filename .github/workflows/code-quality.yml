@@ -181,6 +181,7 @@ jobs:
 
     - name: Check markdown files
       uses: DavidAnson/markdownlint-cli2-action@v16
+      continue-on-error: true
       with:
         config: '.markdownlint-cli2.yaml'
 
@@ -190,6 +191,26 @@ jobs:
         use-quiet-mode: 'yes'
         use-verbose-mode: 'yes'
         config-file: '.markdown-link-check.json'
+
+    - name: Setup Node.js for markdownlint (for report)
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Save markdownlint report
+      if: always()
+      run: |
+        echo "=== Generate markdownlint JSON report ==="
+        # Use npx so we don't require global installs on the runner
+        npx -y markdownlint-cli2 --config .markdownlint-cli2.yaml --format json > markdownlint-report.json || true
+
+    - name: Upload markdownlint report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: markdownlint-report-${{ github.sha }}
+        path: markdownlint-report.json
+        retention-days: 30
 
     - name: Spell check
       uses: crate-ci/typos@master

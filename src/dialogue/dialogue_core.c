@@ -67,7 +67,7 @@ const char* ethervox_dialogue_detect_system_language(void) {
   }
 
   if (cached_language[0] == '\0') {
-    strcpy(cached_language, "en");
+    snprintf(cached_language, sizeof(cached_language), "%s", "en");
   }
 
   initialized = true;
@@ -321,7 +321,7 @@ int ethervox_dialogue_parse_intent(ethervox_dialogue_engine_t* engine, const cha
   // Copy input text
   intent->raw_text = strdup(text);
   intent->normalized_text = strdup(text);  // TODO: Implement normalization
-  strncpy(intent->language_code, language_code ? language_code : "en", 7);
+  snprintf(intent->language_code, sizeof(intent->language_code), "%s", language_code ? language_code : "en");
 
   // Simple pattern matching for intent detection
   intent->type = ETHERVOX_INTENT_UNKNOWN;
@@ -424,7 +424,7 @@ int ethervox_dialogue_process_llm(ethervox_dialogue_engine_t* engine,
   }
 
   response->text = strdup(response_text);
-  strncpy(response->language_code, intent->language_code, 7);
+  snprintf(response->language_code, sizeof(response->language_code), "%s", intent->language_code);
   response->confidence = 0.9f;
   response->processing_time_ms = 50;                  // Simulated processing time
   response->token_count = strlen(response_text) / 4;  // Rough token estimate
@@ -446,7 +446,7 @@ int ethervox_dialogue_create_context(ethervox_dialogue_engine_t* engine, const c
     if (!ctx->conversation_id) {  // Empty slot
       ctx->conversation_id = generate_conversation_id();
       ctx->user_id = strdup(user_id);
-      strncpy(ctx->current_language, language_code ? language_code : "en", 7);
+  snprintf(ctx->current_language, sizeof(ctx->current_language), "%s", language_code ? language_code : "en");
       ctx->max_history = 20;  // Keep last 20 interactions
       ctx->conversation_history =
           (ethervox_intent_t*)calloc(ctx->max_history, sizeof(ethervox_intent_t));
@@ -498,7 +498,7 @@ int ethervox_dialogue_set_language(ethervox_dialogue_engine_t* engine, const cha
   for (uint32_t i = 0; i < engine->max_contexts; i++) {
     ethervox_dialogue_context_t* ctx = &engine->contexts[i];
     if (ctx->conversation_id) {
-      strncpy(ctx->current_language, normalized, sizeof(ctx->current_language) - 1);
+  snprintf(ctx->current_language, sizeof(ctx->current_language), "%s", normalized);
       ctx->current_language[sizeof(ctx->current_language) - 1] = '\0';
     }
   }

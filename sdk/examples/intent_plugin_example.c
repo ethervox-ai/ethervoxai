@@ -41,7 +41,7 @@ static int extract_smart_home_entities(const char* text, smart_home_command_t* c
 
   // Simple keyword matching (in production, use NLP libraries)
   char text_lower[1024];
-  strncpy(text_lower, text, sizeof(text_lower) - 1);
+  snprintf(text_lower, sizeof(text_lower), "%s", text);
 
   // Convert to lowercase for easier matching
   for (int i = 0; text_lower[i]; i++) {
@@ -52,13 +52,13 @@ static int extract_smart_home_entities(const char* text, smart_home_command_t* c
 
   // Device detection
   if (strstr(text_lower, "light") || strstr(text_lower, "lamp")) {
-    strcpy(command->device_name, "light");
+  snprintf(command->device_name, sizeof(command->device_name), "%s", "light");
   } else if (strstr(text_lower, "thermostat") || strstr(text_lower, "temperature")) {
-    strcpy(command->device_name, "thermostat");
+  snprintf(command->device_name, sizeof(command->device_name), "%s", "thermostat");
   } else if (strstr(text_lower, "fan")) {
-    strcpy(command->device_name, "fan");
+  snprintf(command->device_name, sizeof(command->device_name), "%s", "fan");
   } else if (strstr(text_lower, "tv") || strstr(text_lower, "television")) {
-    strcpy(command->device_name, "tv");
+  snprintf(command->device_name, sizeof(command->device_name), "%s", "tv");
   } else {
     return -1;  // Unknown device
   }
@@ -66,31 +66,31 @@ static int extract_smart_home_entities(const char* text, smart_home_command_t* c
   // Action detection
   if (strstr(text_lower, "turn on") || strstr(text_lower, "switch on") ||
       strstr(text_lower, "enable")) {
-    strcpy(command->action, "turn_on");
+  snprintf(command->action, sizeof(command->action), "%s", "turn_on");
   } else if (strstr(text_lower, "turn off") || strstr(text_lower, "switch off") ||
              strstr(text_lower, "disable")) {
-    strcpy(command->action, "turn_off");
+  snprintf(command->action, sizeof(command->action), "%s", "turn_off");
   } else if (strstr(text_lower, "dim") || strstr(text_lower, "lower")) {
-    strcpy(command->action, "dim");
+  snprintf(command->action, sizeof(command->action), "%s", "dim");
   } else if (strstr(text_lower, "brighten") || strstr(text_lower, "increase")) {
-    strcpy(command->action, "brighten");
+  snprintf(command->action, sizeof(command->action), "%s", "brighten");
   } else if (strstr(text_lower, "set")) {
-    strcpy(command->action, "set");
+  snprintf(command->action, sizeof(command->action), "%s", "set");
   } else {
     return -1;  // Unknown action
   }
 
   // Room detection
   if (strstr(text_lower, "living room")) {
-    strcpy(command->room, "living_room");
+  snprintf(command->room, sizeof(command->room), "%s", "living_room");
   } else if (strstr(text_lower, "bedroom")) {
-    strcpy(command->room, "bedroom");
+  snprintf(command->room, sizeof(command->room), "%s", "bedroom");
   } else if (strstr(text_lower, "kitchen")) {
-    strcpy(command->room, "kitchen");
+  snprintf(command->room, sizeof(command->room), "%s", "kitchen");
   } else if (strstr(text_lower, "bathroom")) {
-    strcpy(command->room, "bathroom");
+  snprintf(command->room, sizeof(command->room), "%s", "bathroom");
   } else {
-    strcpy(command->room, "all");
+  snprintf(command->room, sizeof(command->room), "%s", "all");
   }
 
   // Value extraction for temperature/brightness
@@ -152,14 +152,14 @@ ethervox_intent_plugin_t* create_smart_home_plugin(void) {
     return NULL;
 
   // Plugin metadata
-  strcpy(plugin->name, "SmartHomeController");
-  strcpy(plugin->version, "1.0.0");
-  strcpy(plugin->description, "Recognizes smart home device control commands");
+  snprintf(plugin->name, sizeof(plugin->name), "%s", "SmartHomeController");
+  snprintf(plugin->version, sizeof(plugin->version), "%s", "1.0.0");
+  snprintf(plugin->description, sizeof(plugin->description), "%s", "Recognizes smart home device control commands");
 
   // Supported languages
   plugin->supported_languages_count = 2;
-  strcpy(plugin->supported_languages[0], "en");
-  strcpy(plugin->supported_languages[1], "es");
+  snprintf(plugin->supported_languages[0], sizeof(plugin->supported_languages[0]), "%s", "en");
+  snprintf(plugin->supported_languages[1], sizeof(plugin->supported_languages[1]), "%s", "es");
 
   // Plugin functions
   plugin->parse = smart_home_parse_intent;
@@ -213,8 +213,8 @@ int main() {
     printf("Input: \"%s\"\n", test_phrases[i]);
 
     ethervox_stt_input_t input = {0};
-    strncpy(input.text, test_phrases[i], sizeof(input.text) - 1);
-    strcpy(input.language, "en");
+  snprintf(input.text, sizeof(input.text), "%s", test_phrases[i]);
+  snprintf(input.language, sizeof(input.language), "%s", "en");
     input.audio_confidence = 0.95f;
     input.processing_time_ms = 150;
 

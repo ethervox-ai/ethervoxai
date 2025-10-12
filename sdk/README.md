@@ -66,9 +66,9 @@ static int my_parse_intent(const ethervox_stt_input_t* input,
     
     // Your NLU logic here
     if (strstr(input->text, "my_command")) {
-        result->type = ETHERVOX_INTENT_COMMAND;
-        result->confidence = 0.9f;
-        strcpy(result->entities, "{\"action\":\"my_command\"}");
+    result->type = ETHERVOX_INTENT_COMMAND;
+    result->confidence = 0.9f;
+    snprintf(result->entities, sizeof(result->entities), "%s", "{\"action\":\"my_command\"}");
         data->processed_commands++;
         return 0;  // Success
     }
@@ -78,8 +78,8 @@ static int my_parse_intent(const ethervox_stt_input_t* input,
 
 // Create and register plugin
 ethervox_intent_plugin_t* plugin = calloc(1, sizeof(ethervox_intent_plugin_t));
-strcpy(plugin->name, "MyPlugin");
-strcpy(plugin->version, "1.0.0");
+    snprintf(plugin->name, sizeof(plugin->name), "%s", "MyPlugin");
+    snprintf(plugin->version, sizeof(plugin->version), "%s", "1.0.0");
 plugin->parse = my_parse_intent;
 plugin->user_data = calloc(1, sizeof(my_plugin_data_t));
 
@@ -98,7 +98,7 @@ ethervox_model_config_t config = {
     .temperature = 0.8f,
     .timeout_ms = 10000
 };
-strcpy(config.api_key, "your-api-key");
+    snprintf(config.api_key, sizeof(config.api_key), "%s", "your-api-key");
 
 ethervox_sdk_add_model_config(&sdk, &config);
 ```
@@ -107,8 +107,8 @@ ethervox_sdk_add_model_config(&sdk, &config);
 
 ```c
 ethervox_device_profile_t profile = {0};
-strcpy(profile.name, "MyDevice");
-strcpy(profile.platform, "Raspberry Pi");
+    snprintf(profile.name, sizeof(profile.name), "%s", "MyDevice");
+    snprintf(profile.platform, sizeof(profile.platform), "%s", "Raspberry Pi");
 profile.mic_array_channels = 4;
 profile.sample_rate = 48000;
 profile.gpio_pins.led_status = 12;
@@ -374,7 +374,7 @@ ethervox_sdk_log(&sdk, ETHERVOX_LOG_DEBUG, "MyComponent",
 int process_voice_command(const char* audio_data, char* response) {
     ethervox_stt_input_t input;
     // Convert audio to text (using audio runtime)
-    strcpy(input.text, transcribed_text);
+    snprintf(input.text, sizeof(input.text), "%s", transcribed_text);
     
     ethervox_intent_result_t result;
     if (ethervox_sdk_process_intent(&sdk, &input, &result) == 0) {
@@ -413,7 +413,7 @@ typedef struct {
 
 tenant_context_t* create_tenant_context(const char* tenant_id) {
     tenant_context_t* ctx = calloc(1, sizeof(tenant_context_t));
-    strcpy(ctx->tenant_id, tenant_id);
+    snprintf(ctx->tenant_id, sizeof(ctx->tenant_id), "%s", tenant_id);
     ethervox_sdk_init(&ctx->sdk);
     // Load tenant-specific plugins and configuration
     return ctx;

@@ -33,9 +33,9 @@ typedef struct {
 
 // Configure Raspberry Pi 4 with ReSpeaker 4-Mic Array
 static void configure_rpi4_respeaker(ethervox_device_profile_t* profile) {
-  strcpy(profile->name, "RaspberryPi-ReSpeaker");
-  strcpy(profile->hardware_revision, "4.0");
-  strcpy(profile->platform, "Raspberry Pi");
+  snprintf(profile->name, sizeof(profile->name), "%s", "RaspberryPi-ReSpeaker");
+  snprintf(profile->hardware_revision, sizeof(profile->hardware_revision), "%s", "4.0");
+  snprintf(profile->platform, sizeof(profile->platform), "%s", "Raspberry Pi");
 
   // Audio configuration for 4-mic array
   profile->mic_array_channels = 4;
@@ -66,19 +66,19 @@ static void configure_rpi4_respeaker(ethervox_device_profile_t* profile) {
   profile->has_wifi = true;
   profile->has_ethernet = true;
   profile->has_bluetooth = true;
-  strcpy(profile->default_ssid, "EtherVox-RPI");
+  snprintf(profile->default_ssid, sizeof(profile->default_ssid), "%s", "EtherVox-RPI");
 
   // Processing capabilities
   profile->supports_edge_inference = true;
   profile->max_concurrent_streams = 4;
-  strcpy(profile->preferred_model, "whisper-base");
+  snprintf(profile->preferred_model, sizeof(profile->preferred_model), "%s", "whisper-base");
 }
 
 // Configure ESP32-S3 with built-in microphone
 static void configure_esp32_s3_builtin(ethervox_device_profile_t* profile) {
-  strcpy(profile->name, "ESP32-S3-Builtin");
-  strcpy(profile->hardware_revision, "S3");
-  strcpy(profile->platform, "ESP32");
+  snprintf(profile->name, sizeof(profile->name), "%s", "ESP32-S3-Builtin");
+  snprintf(profile->hardware_revision, sizeof(profile->hardware_revision), "%s", "S3");
+  snprintf(profile->platform, sizeof(profile->platform), "%s", "ESP32");
 
   // Audio configuration for single microphone
   profile->mic_array_channels = 1;
@@ -109,19 +109,19 @@ static void configure_esp32_s3_builtin(ethervox_device_profile_t* profile) {
   profile->has_wifi = true;
   profile->has_ethernet = false;
   profile->has_bluetooth = true;
-  strcpy(profile->default_ssid, "EtherVox-ESP32");
+  snprintf(profile->default_ssid, sizeof(profile->default_ssid), "%s", "EtherVox-ESP32");
 
   // Processing capabilities
   profile->supports_edge_inference = false;  // Limited memory
   profile->max_concurrent_streams = 1;
-  strcpy(profile->preferred_model, "whisper-tiny");
+  snprintf(profile->preferred_model, sizeof(profile->preferred_model), "%s", "whisper-tiny");
 }
 
 // Configure desktop development setup
 static void configure_desktop_dev(ethervox_device_profile_t* profile) {
-  strcpy(profile->name, "Desktop-Development");
-  strcpy(profile->hardware_revision, "1.0");
-  strcpy(profile->platform, "Desktop");
+  snprintf(profile->name, sizeof(profile->name), "%s", "Desktop-Development");
+  snprintf(profile->hardware_revision, sizeof(profile->hardware_revision), "%s", "1.0");
+  snprintf(profile->platform, sizeof(profile->platform), "%s", "Desktop");
 
   // Audio configuration for USB microphone
   profile->mic_array_channels = 2;  // Stereo USB mic
@@ -143,12 +143,12 @@ static void configure_desktop_dev(ethervox_device_profile_t* profile) {
   profile->has_wifi = true;
   profile->has_ethernet = true;
   profile->has_bluetooth = true;
-  strcpy(profile->default_ssid, "EtherVox-Desktop");
+  snprintf(profile->default_ssid, sizeof(profile->default_ssid), "%s", "EtherVox-Desktop");
 
   // Processing capabilities
   profile->supports_edge_inference = true;
   profile->max_concurrent_streams = 8;
-  strcpy(profile->preferred_model, "whisper-large");
+  snprintf(profile->preferred_model, sizeof(profile->preferred_model), "%s", "whisper-large");
 }
 
 // Available device templates
