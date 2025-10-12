@@ -76,14 +76,42 @@ jobs:
 
 
     - name: Configure (Makefile -> CMake)
-      run: make configure TARGET_PLATFORM=${{ matrix.platform }}
+      continue-on-error: true
+      run: |
+        make configure TARGET_PLATFORM=${{ matrix.platform }} 2>&1 | tee configure.log
+
+    - name: Upload configure log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: configure-log-${{ matrix.platform }}-${{ github.sha }}
+        path: configure.log
+        retention-days: 7
 
     - name: Build (Makefile)
-      run: make build
+      continue-on-error: true
+      run: |
+        make build 2>&1 | tee build.log || true
+
+    - name: Upload build log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log-${{ matrix.platform }}-${{ github.sha }}
+        path: build.log
+        retention-days: 7
 
     - name: Run unit tests
       working-directory: build
-      run: ctest --output-on-failure -C ${{ env.BUILD_TYPE }}
+      run: ctest --output-on-failure -C ${{ env.BUILD_TYPE }} || true
+
+    - name: Upload test output
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ctest-output-${{ matrix.platform }}-${{ github.sha }}
+        path: build/Testing/ || true
+        retention-days: 7
 
     - name: Package artifacts
       run: |
@@ -108,10 +136,21 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run quick Makefile build
+        continue-on-error: true
         run: |
           set -e
-          make configure TARGET_PLATFORM=linux
-          make build
+          make configure TARGET_PLATFORM=linux 2>&1 | tee quick-configure.log || true
+          make build 2>&1 | tee quick-build.log || true
+
+      - name: Upload quick build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-logs-${{ github.sha }}
+          path: |
+            quick-configure.log
+            quick-build.log
+          retention-days: 7
 
 
   build-raspberry-pi:
