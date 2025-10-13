@@ -282,6 +282,14 @@ const buttonText = computed(() =>
 </style>
 ```text
 
+## 🔍 Code Quality & Static Analysis
+
+- Generate compile commands before running linters: `cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON` (rerun when project files change).
+- On Linux desktops install ALSA headers (`sudo apt install libasound2-dev`) so clang-tidy can parse the audio backends.
+- Invoke clang-tidy with the repo defaults: `find src -type f \( -name "*.c" -o -name "*.cpp" \) | xargs clang-tidy -p build`.
+- Keep NOLINT annotations rare—only add them when a signature is fixed by a public HAL contract (for example the desktop GPIO/I2C stubs).
+- When refactoring to silence `readability-magic-numbers`, prefer pulling shared constants into the appropriate header (`include/ethervox/config.h`) instead of repeating literals.
+
 ## 🧪 Testing Guidelines
 
 ## Unit Testing

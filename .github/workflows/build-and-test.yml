@@ -19,12 +19,15 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             cmake_preset: linux-release
+            cmake_platform: LINUX
           - os: windows-latest
             platform: windows
             cmake_preset: windows-release
+            cmake_platform: WINDOWS
           - os: macos-latest
             platform: macos
             cmake_preset: macos-release
+            cmake_platform: MACOS
 
     runs-on: ${{ matrix.os }}
 
@@ -75,47 +78,22 @@ jobs:
         brew install ninja pkg-config
 
 
-    - name: Configure (Makefile -> CMake)
-      continue-on-error: true
+    - name: Configure CMake
       run: |
-        make configure TARGET_PLATFORM=${{ matrix.platform }} 2>&1 | tee configure.log
+        cmake -S . -B build \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+          -DTARGET_PLATFORM=${{ matrix.cmake_platform }}
 
-    - name: Upload configure log
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: configure-log-${{ matrix.platform }}-${{ github.sha }}
-        path: configure.log
-        retention-days: 7
-
-    - name: Build (Makefile)
-      continue-on-error: true
-      run: |
-        make build 2>&1 | tee build.log || true
-
-    - name: Upload build log
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-log-${{ matrix.platform }}-${{ github.sha }}
-        path: build.log
-        retention-days: 7
+    - name: Build
+      run: cmake --build build --config ${{ env.BUILD_TYPE }}
 
     - name: Run unit tests
-      working-directory: build
-      run: ctest --output-on-failure -C ${{ env.BUILD_TYPE }} || true
-
-    - name: Upload test output
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: ctest-output-${{ matrix.platform }}-${{ github.sha }}
-        path: build/Testing/ || true
-        retention-days: 7
+      run: ctest --test-dir build --output-on-failure -C ${{ env.BUILD_TYPE }} || true
 
     - name: Package artifacts
       run: |
-        cmake --build build --target package
+        cmake --build build --config ${{ env.BUILD_TYPE }} --target package
         mkdir -p artifacts
         cp build/EtherVoxAI-*.* artifacts/ || true
 
