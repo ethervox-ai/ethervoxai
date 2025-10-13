@@ -216,7 +216,6 @@ jobs:
           libssl-dev \
           pkg-config \
           ninja-build \
-          gcov \
           lcov
 
     - name: Configure Makefile build with coverage
