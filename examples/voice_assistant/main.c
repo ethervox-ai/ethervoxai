@@ -20,13 +20,26 @@
 #include <stdlib.h>
 #include <string.h>
 #if defined(_WIN32)
+#include <windows.h>
 #if !defined(strcasecmp)
 #define strcasecmp _stricmp
 #endif
 #else
 #include <strings.h>
-#endif
 #include <unistd.h>
+#endif
+static void voice_assistant_sleep_us(unsigned int microseconds) {
+#if defined(_WIN32)
+  /* Convert microseconds to milliseconds, ensure minimum Sleep interval */
+  DWORD millis = (DWORD)((microseconds + 999U) / 1000U);
+  if (millis == 0U) {
+    millis = 1U;
+  }
+  Sleep(millis);
+#else
+  usleep(microseconds);
+#endif
+}
 
 #include "ethervox/audio.h"
 #include "ethervox/dialogue.h"
@@ -327,7 +340,7 @@ static void pipeline_run_voice(voice_pipeline_t* pipeline) {
   while (pipeline->running) {
     ethervox_audio_buffer_t audio_buffer = {0};
     if (ethervox_audio_read(&pipeline->audio, &audio_buffer) != 0) {
-      usleep(10000);
+      voice_assistant_sleep_us(10000);
       continue;
     }
 
