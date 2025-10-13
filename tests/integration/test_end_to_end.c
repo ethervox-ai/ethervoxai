@@ -17,7 +17,6 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "ethervox/audio.h"
 #include "ethervox/config.h"
