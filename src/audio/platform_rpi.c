@@ -22,7 +22,24 @@
 #ifdef ETHERVOX_PLATFORM_RPI
 
 #include "ethervox/audio.h"
+
+// TODO: Include I2S and ALSA headers as needed
+// TODO: Bring in bcm2835.h for GPIO control if available
+
+#if defined(__has_include)
+#if __has_include(<bcm2835.h>)
+#define ETHERVOX_HAVE_BCM2835 1
+#else
+#define ETHERVOX_HAVE_BCM2835 0
+#endif
+#else
+#define ETHERVOX_HAVE_BCM2835 1
+#endif
+
+#if ETHERVOX_HAVE_BCM2835
 #include <bcm2835.h>
+#endif
+
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
@@ -40,13 +57,13 @@ typedef struct {
   char* audio_buffer;
 } rpi_audio_data_t;
 
+#if ETHERVOX_HAVE_BCM2835
 static int rpi_gpio_init(rpi_audio_data_t* audio_data) {
   if (!bcm2835_init()) {
     printf("Failed to initialize BCM2835 library\n");
     return -1;
   }
 
-  // Configure GPIO pins for mic array
   audio_data->mic_array_enable_pin = RPI_GPIO_P1_18;
   audio_data->mic_array_sel_pins[0] = RPI_GPIO_P1_22;
   audio_data->mic_array_sel_pins[1] = RPI_GPIO_P1_24;
@@ -57,12 +74,18 @@ static int rpi_gpio_init(rpi_audio_data_t* audio_data) {
     bcm2835_gpio_fsel(audio_data->mic_array_sel_pins[i], BCM2835_GPIO_FSEL_OUTP);
   }
 
-  // Enable mic array
   bcm2835_gpio_write(audio_data->mic_array_enable_pin, HIGH);
 
   printf("Raspberry Pi GPIO initialized for mic array\n");
   return 0;
 }
+#else
+static int rpi_gpio_init(rpi_audio_data_t* audio_data) {
+  (void)audio_data;
+  printf("BCM2835 library unavailable; skipping GPIO initialization\n");
+  return -1;
+}
+#endif
 
 static int rpi_audio_init(ethervox_audio_runtime_t* runtime,
                           const ethervox_audio_config_t* config) {
@@ -88,6 +111,7 @@ static int rpi_audio_init(ethervox_audio_runtime_t* runtime,
   return 0;
 }
 
+#if ETHERVOX_HAVE_BCM2835
 static int rpi_select_microphone(rpi_audio_data_t* audio_data, int mic_index) {
   if (mic_index < 0 || mic_index > 7) {
     return -1;
@@ -103,6 +127,13 @@ static int rpi_select_microphone(rpi_audio_data_t* audio_data, int mic_index) {
 
   return 0;
 }
+#else
+static int rpi_select_microphone(rpi_audio_data_t* audio_data, int mic_index) {
+  (void)audio_data;
+  (void)mic_index;
+  return -1;
+}
+#endif
 
 static int rpi_audio_start_capture(ethervox_audio_runtime_t* runtime) {
   if (!runtime || !runtime->platform_data) {
@@ -191,7 +222,9 @@ static void rpi_audio_cleanup(ethervox_audio_runtime_t* runtime) {
   rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
 
   if (audio_data) {
+#if ETHERVOX_HAVE_BCM2835
     bcm2835_close();
+#endif
 
     if (audio_data->audio_buffer) {
       free(audio_data->audio_buffer);
