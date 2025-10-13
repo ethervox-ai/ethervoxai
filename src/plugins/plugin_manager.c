@@ -373,7 +373,7 @@ void ethervox_llm_request_free(ethervox_llm_request_t* request) {
         free(request->stop_sequences[i]);
       }
     }
-    free(request->stop_sequences);
+  free((void*)request->stop_sequences);
     request->stop_sequences = NULL;
   }
 }

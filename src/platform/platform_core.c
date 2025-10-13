@@ -26,7 +26,6 @@
 #ifdef ETHERVOX_PLATFORM_WINDOWS
 #include <windows.h>
 #endif
-#include <linux/time.h>
 
 // Forward declarations ONLY (no function bodies)
 #ifdef ETHERVOX_PLATFORM_RPI

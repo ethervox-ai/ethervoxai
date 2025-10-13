@@ -26,7 +26,8 @@ jobs:
           cppcheck \
           iwyu \
           cmake \
-          ninja-build
+          ninja-build \
+          libasound2-dev
 
     - name: Check C++ formatting
       continue-on-error: true

@@ -50,6 +50,7 @@ static void desktop_cleanup(ethervox_platform_info_t* info) {
 }
 
 // GPIO functions not available on desktop - return error
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters) -- signature fixed by HAL contract
 static int desktop_gpio_configure(uint32_t pin, ethervox_gpio_mode_t mode) {
   (void)pin;
   (void)mode;
@@ -68,6 +69,7 @@ static bool desktop_gpio_read(uint32_t pin) {
 }
 
 // I2C functions not available on standard desktop - return error
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters) -- signature fixed by HAL contract
 static int desktop_i2c_write(uint32_t bus, uint8_t device_addr, const uint8_t* data, uint32_t len) {
   (void)bus;
   (void)device_addr;
@@ -76,6 +78,7 @@ static int desktop_i2c_write(uint32_t bus, uint8_t device_addr, const uint8_t* d
   return -1;  // Not supported on desktop
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters) -- signature fixed by HAL contract
 static int desktop_i2c_read(uint32_t bus, uint8_t device_addr, uint8_t* data, uint32_t len) {
   (void)bus;
   (void)device_addr;
@@ -205,7 +208,7 @@ static float desktop_get_cpu_temperature(void) {
     int temp_millicelsius;
     if (fscanf(temp_file, "%d", &temp_millicelsius) == 1) {
       fclose(temp_file);
-      return temp_millicelsius / 1000.0f;
+  return (float)temp_millicelsius / 1000.0f;
     }
     fclose(temp_file);
   }

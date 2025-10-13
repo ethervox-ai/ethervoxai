@@ -121,7 +121,8 @@ int ethervox_stt_process(ethervox_stt_runtime_t* runtime,
 
   for (uint32_t i = 0;
        i < sample_count && runtime->accumulator_write_pos < runtime->accumulator_size; i++) {
-    runtime->audio_accumulator[runtime->accumulator_write_pos++] = samples[i] / 32768.0f;
+  runtime->audio_accumulator[runtime->accumulator_write_pos++] =
+    (float)samples[i] / 32768.0f;
   }
 
   // For demo: simple word detection based on audio patterns
