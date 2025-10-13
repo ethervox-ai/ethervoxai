@@ -166,6 +166,11 @@ jobs:
           g++-aarch64-linux-gnu \
           ninja-build
 
+    - name: Prepare Raspberry Pi sysroot
+      run: |
+        chmod +x scripts/setup-rpi-toolchain.sh
+        ./scripts/setup-rpi-toolchain.sh
+
     - name: Configure for Raspberry Pi (Makefile)
       run: make configure-rpi
 

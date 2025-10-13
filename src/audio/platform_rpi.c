@@ -26,6 +26,7 @@
 // TODO: Include I2S and ALSA headers as needed
 // TODO: Bring in bcm2835.h for GPIO control if available
 
+#ifndef ETHERVOX_HAVE_BCM2835
 #if defined(__has_include)
 #if __has_include(<bcm2835.h>)
 #define ETHERVOX_HAVE_BCM2835 1
@@ -34,6 +35,7 @@
 #endif
 #else
 #define ETHERVOX_HAVE_BCM2835 1
+#endif
 #endif
 
 #if ETHERVOX_HAVE_BCM2835

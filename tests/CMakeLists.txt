@@ -68,17 +68,9 @@ foreach(TEST_SOURCE ${UNIT_TEST_SOURCES})
         target_link_libraries(${TEST_NAME} PRIVATE ethervox_audio)
     endif()
 
-    # Platform-specific linking (same as main CMakeLists.txt)
-    if(WIN32)
-        target_link_libraries(${TEST_NAME} winmm ws2_32 crypt32)
-    elseif(TARGET_PLATFORM STREQUAL "RPI")
-        # Raspberry Pi - use bcm2835 library from sysroot
-        link_directories(${CMAKE_SYSROOT}/lib)
-        target_link_libraries(${TEST_NAME} bcm2835 pthread curl ssl crypto m)
-    elseif(UNIX AND NOT APPLE)
-        target_link_libraries(${TEST_NAME} asound pthread curl ssl crypto m)
-    elseif(APPLE)
-        target_link_libraries(${TEST_NAME} "-framework CoreAudio" "-framework AudioUnit" "-framework CoreFoundation" pthread curl)
+    get_property(_ethervox_platform_libs GLOBAL PROPERTY ETHERVOXAI_PLATFORM_LIBS)
+    if(_ethervox_platform_libs)
+        target_link_libraries(${TEST_NAME} PRIVATE ${_ethervox_platform_libs})
     endif()
     
     # Add the test to CTest
@@ -106,17 +98,10 @@ foreach(TEST_SOURCE ${INTEGRATION_TEST_SOURCES})
     if(TARGET ethervox_audio)
         target_link_libraries(${TEST_NAME} PRIVATE ethervox_audio)
     endif()
-    
-    if(WIN32)
-        target_link_libraries(${TEST_NAME} winmm ws2_32 crypt32)
-    elseif(TARGET_PLATFORM STREQUAL "RPI")
-        # Raspberry Pi - use bcm2835 library from sysroot
-        link_directories(${CMAKE_SYSROOT}/lib)
-        target_link_libraries(${TEST_NAME} bcm2835 pthread curl ssl crypto m)
-    elseif(UNIX AND NOT APPLE)
-        target_link_libraries(${TEST_NAME} asound pthread curl ssl crypto m)
-    elseif(APPLE)
-        target_link_libraries(${TEST_NAME} "-framework CoreAudio" "-framework AudioUnit" "-framework CoreFoundation" pthread curl)
+
+    get_property(_ethervox_platform_libs GLOBAL PROPERTY ETHERVOXAI_PLATFORM_LIBS)
+    if(_ethervox_platform_libs)
+        target_link_libraries(${TEST_NAME} PRIVATE ${_ethervox_platform_libs})
     endif()
     
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})

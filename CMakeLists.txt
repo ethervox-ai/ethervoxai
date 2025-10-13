@@ -167,15 +167,49 @@ target_include_directories(ethervoxai
         ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # Platform-specific linking for library consumers
+set(ETHERVOXAI_PLATFORM_LIBS "")
+
 if(WIN32)
-    target_link_libraries(ethervoxai PUBLIC winmm ws2_32 crypt32)
+    set(ETHERVOXAI_PLATFORM_LIBS winmm ws2_32 crypt32)
 elseif(TARGET_PLATFORM STREQUAL "RPI")
-    target_link_libraries(ethervoxai PUBLIC bcm2835 pthread curl ssl crypto m)
+    set(ETHERVOXAI_PLATFORM_LIBS pthread m)
+
+    set(_ethervox_rpi_lib_paths
+        ${CMAKE_SYSROOT}/lib
+        ${CMAKE_SYSROOT}/lib/arm-linux-gnueabihf
+        ${CMAKE_SYSROOT}/../lib
+        ${CMAKE_SYSROOT}/../lib/arm-linux-gnueabihf
+    )
+
+    find_library(BCM2835_LIB bcm2835 PATHS ${_ethervox_rpi_lib_paths} NO_DEFAULT_PATH)
+    if(BCM2835_LIB)
+        list(APPEND ETHERVOXAI_PLATFORM_LIBS ${BCM2835_LIB})
+        target_compile_definitions(ethervoxai PUBLIC ETHERVOX_HAVE_BCM2835=1)
+    else()
+        target_compile_definitions(ethervoxai PUBLIC ETHERVOX_HAVE_BCM2835=0)
+        message(WARNING "bcm2835 library not found in Raspberry Pi sysroot; GPIO features disabled")
+    endif()
+
+    foreach(_lib_name curl ssl crypto)
+        find_library(_found_lib_${_lib_name} ${_lib_name} PATHS ${_ethervox_rpi_lib_paths} NO_DEFAULT_PATH)
+        if(_found_lib_${_lib_name})
+            list(APPEND ETHERVOXAI_PLATFORM_LIBS ${_found_lib_${_lib_name}})
+        else()
+            message(WARNING "${_lib_name} library not found in Raspberry Pi sysroot; skipping link")
+        endif()
+    endforeach()
+
 elseif(UNIX AND NOT APPLE)
-    target_link_libraries(ethervoxai PUBLIC asound pthread curl ssl crypto m)
+    set(ETHERVOXAI_PLATFORM_LIBS asound pthread curl ssl crypto m)
 elseif(APPLE)
-    target_link_libraries(ethervoxai PUBLIC "-framework CoreAudio" "-framework AudioUnit" "-framework CoreFoundation" pthread curl)
+    set(ETHERVOXAI_PLATFORM_LIBS "-framework CoreAudio" "-framework AudioUnit" "-framework CoreFoundation" pthread curl)
 endif()
+
+if(ETHERVOXAI_PLATFORM_LIBS)
+    target_link_libraries(ethervoxai PUBLIC ${ETHERVOXAI_PLATFORM_LIBS})
+endif()
+
+set_property(GLOBAL PROPERTY ETHERVOXAI_PLATFORM_LIBS "${ETHERVOXAI_PLATFORM_LIBS}")
 
 # CLI executable built on top of the reusable library
 add_executable(ethervoxai_app src/main.c)

@@ -54,14 +54,9 @@ if(VOICE_ASSISTANT_SOURCES)
         ${CMAKE_SOURCE_DIR}/src
     )
 
-    if(WIN32)
-        target_link_libraries(voice_assistant_demo PRIVATE winmm ws2_32 crypt32)
-    elseif(TARGET_PLATFORM STREQUAL "RPI")
-        target_link_libraries(voice_assistant_demo PRIVATE bcm2835 pthread curl ssl crypto m)
-    elseif(UNIX AND NOT APPLE)
-        target_link_libraries(voice_assistant_demo PRIVATE asound pthread curl ssl crypto m)
-    elseif(APPLE)
-        target_link_libraries(voice_assistant_demo PRIVATE "-framework CoreAudio" "-framework AudioUnit" "-framework CoreFoundation" pthread curl)
+    get_property(_ethervox_platform_libs GLOBAL PROPERTY ETHERVOXAI_PLATFORM_LIBS)
+    if(_ethervox_platform_libs)
+        target_link_libraries(voice_assistant_demo PRIVATE ${_ethervox_platform_libs})
     endif()
 
     # Mirror compile definitions from core target when available
