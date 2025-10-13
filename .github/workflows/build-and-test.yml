@@ -72,6 +72,10 @@ jobs:
         choco install ninja
         # Windows SDK and MSVC are pre-installed on GitHub runners
 
+    - name: Setup MSVC environment
+      if: matrix.platform == 'windows'
+      uses: ilammy/msvc-dev-cmd@v1
+
     - name: Install macOS dependencies
       if: matrix.platform == 'macos'
       run: |
@@ -79,11 +83,7 @@ jobs:
 
 
     - name: Configure CMake
-      run: |
-        cmake -S . -B build \
-          -G Ninja \
-          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-          -DTARGET_PLATFORM=${{ matrix.cmake_platform }}
+      run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DTARGET_PLATFORM=${{ matrix.cmake_platform }}
 
     - name: Build
       run: cmake --build build --config ${{ env.BUILD_TYPE }}
