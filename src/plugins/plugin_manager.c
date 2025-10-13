@@ -69,7 +69,7 @@ const char* ethervox_plugin_status_to_string(ethervox_plugin_status_t status) {
 
 // Initialize plugin manager
 int ethervox_plugin_manager_init(ethervox_plugin_manager_t* manager, const char* plugin_dir) {
-  if (!manager)
+  if (!manager) {
     return -1;
 
   memset(manager, 0, sizeof(ethervox_plugin_manager_t));
@@ -106,8 +106,9 @@ int ethervox_plugin_manager_init(ethervox_plugin_manager_t* manager, const char*
 
 // Cleanup plugin manager
 void ethervox_plugin_manager_cleanup(ethervox_plugin_manager_t* manager) {
-  if (!manager)
+  if (!manager) {
     return;
+  }
 
   // Unload all plugins
   for (size_t i = 0; i < manager->plugin_count; i++) {
@@ -131,8 +132,9 @@ void ethervox_plugin_manager_cleanup(ethervox_plugin_manager_t* manager) {
 // Find plugin by name
 ethervox_plugin_t* ethervox_plugin_find(ethervox_plugin_manager_t* manager,
                                         const char* plugin_name) {
-  if (!manager || !plugin_name)
+  if (!manager || !plugin_name) {
     return NULL;
+  }
 
   for (uint32_t i = 0; i < manager->max_plugins; i++) {
     ethervox_plugin_t* plugin = &manager->plugins[i];
@@ -147,8 +149,9 @@ ethervox_plugin_t* ethervox_plugin_find(ethervox_plugin_manager_t* manager,
 
 // Load plugin (placeholder implementation)
 int ethervox_plugin_load(ethervox_plugin_manager_t* manager, const char* plugin_name) {
-  if (!manager || !plugin_name)
+  if (!manager || !plugin_name) {
     return -1;
+  }
 
   // Find empty slot
   for (uint32_t i = 0; i < manager->max_plugins; i++) {
@@ -221,8 +224,9 @@ int ethervox_plugin_execute(ethervox_plugin_t* plugin, const void* input, void* 
 // OpenAI plugin implementation (keep only ONE definition)
 int ethervox_llm_plugin_openai(const ethervox_llm_request_t* request,
                                ethervox_llm_response_t* response, void* user_data) {
-  if (!request || !response)
+  if (!request || !response) {
     return -1;
+  }
 
   // Simulate OpenAI API call
   response->text = (char*)malloc(1024);
@@ -244,8 +248,9 @@ int ethervox_llm_plugin_openai(const ethervox_llm_request_t* request,
 // HuggingFace plugin implementation
 int ethervox_llm_plugin_huggingface(const ethervox_llm_request_t* request,
                                     ethervox_llm_response_t* response, void* user_data) {
-  if (!request || !response)
+  if (!request || !response) {
     return -1;
+  }
 
   // user_data can contain model name if needed
   const char* model_name = (user_data && strlen((char*)user_data) > 0) ? (char*)user_data : "gpt2";
@@ -270,8 +275,9 @@ int ethervox_llm_plugin_huggingface(const ethervox_llm_request_t* request,
 // Local RAG plugin implementation
 int ethervox_llm_plugin_local_rag(const ethervox_llm_request_t* request,
                                   ethervox_llm_response_t* response, void* user_data) {
-  if (!request || !response)
+  if (!request || !response) {
     return -1;
+  }
 
   // Simulate local RAG processing
   response->text = (char*)malloc(1024);
@@ -292,8 +298,9 @@ int ethervox_llm_plugin_local_rag(const ethervox_llm_request_t* request,
 
 // Register built-in OpenAI plugin
 int ethervox_plugin_register_builtin_openai(ethervox_plugin_manager_t* manager) {
-  if (!manager || manager->plugin_count >= ETHERVOX_MAX_PLUGINS)
+  if (!manager || manager->plugin_count >= ETHERVOX_MAX_PLUGINS) {
     return -1;
+  }
 
   ethervox_plugin_t* plugin = &manager->plugins[manager->plugin_count];
 
@@ -310,8 +317,9 @@ int ethervox_plugin_register_builtin_openai(ethervox_plugin_manager_t* manager) 
 
 // Register built-in HuggingFace plugin
 int ethervox_plugin_register_builtin_huggingface(ethervox_plugin_manager_t* manager) {
-  if (!manager || manager->plugin_count >= ETHERVOX_MAX_PLUGINS)
+  if (!manager || manager->plugin_count >= ETHERVOX_MAX_PLUGINS) {
     return -1;
+  }
 
   ethervox_plugin_t* plugin = &manager->plugins[manager->plugin_count];
 
@@ -328,8 +336,9 @@ int ethervox_plugin_register_builtin_huggingface(ethervox_plugin_manager_t* mana
 
 // Register built-in Local RAG plugin
 int ethervox_plugin_register_builtin_local_rag(ethervox_plugin_manager_t* manager) {
-  if (!manager || manager->plugin_count >= ETHERVOX_MAX_PLUGINS)
+  if (!manager || manager->plugin_count >= ETHERVOX_MAX_PLUGINS) {
     return -1;
+  }
 
   ethervox_plugin_t* plugin = &manager->plugins[manager->plugin_count];
 
@@ -346,8 +355,9 @@ int ethervox_plugin_register_builtin_local_rag(ethervox_plugin_manager_t* manage
 
 // Free LLM request
 void ethervox_llm_request_free(ethervox_llm_request_t* request) {
-  if (!request)
+  if (!request) {
     return;
+  }
 
   if (request->prompt) {
     free(request->prompt);

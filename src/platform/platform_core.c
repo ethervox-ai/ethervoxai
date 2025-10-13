@@ -140,7 +140,7 @@ ethervox_platform_capabilities_t ethervox_platform_get_capabilities(void) {
   caps.ram_size_mb = 16384;  // 16GB typical
   caps.flash_size_mb = 0;    // SSD storage
 #else
-  // Safe defaults for unknown platforms
+  // Safe defaultim_spec for unknown platforms
   caps.has_audio_input = false;
   caps.has_audio_output = false;
   caps.has_microphone_array = false;
@@ -208,16 +208,17 @@ static uint64_t get_system_timestamp_us(void) {
   QueryPerformanceCounter(&counter);
   return (uint64_t)(counter.QuadPart * 1000000 / frequency.QuadPart);
 #else
-  struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  return (uint64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+  struct timespec tim_spec;
+  clock_gettime(CLOCK_MONOTONIC, &tim_spec);
+  return (uint64_t)tim_spec.tv_sec * 1000000 + tim_spec.tv_nsec / 1000;
 #endif
 }
 
 // Initialize platform
 int ethervox_platform_init(ethervox_platform_t* platform) {
-  if (!platform)
+  if (!platform) {
     return -1;
+  }
 
   memset(platform, 0, sizeof(ethervox_platform_t));
 
@@ -338,7 +339,7 @@ int ethervox_platform_load_device_profile(ethervox_platform_t* platform, const c
 
   // In a real implementation, this would load configuration from a file
   // and configure hardware-specific settings like mic array geometry,
-  // GPIO pin assignments, audio routing, etc.
+  // GPIO pin assignmentim_spec, audio routing, etc.
 
   return 0;
 }

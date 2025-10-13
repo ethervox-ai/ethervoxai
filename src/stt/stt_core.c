@@ -33,8 +33,9 @@ ethervox_stt_config_t ethervox_stt_get_default_config(void) {
 
 // Initialize STT engine
 int ethervox_stt_init(ethervox_stt_runtime_t* runtime, const ethervox_stt_config_t* config) {
-  if (!runtime)
+  if (!runtime) {
     return -1;
+  } 
 
   memset(runtime, 0, sizeof(ethervox_stt_runtime_t));
 
@@ -93,8 +94,9 @@ int ethervox_stt_init(ethervox_stt_runtime_t* runtime, const ethervox_stt_config
 
 // Start STT session
 int ethervox_stt_start(ethervox_stt_runtime_t* runtime) {
-  if (!runtime || !runtime->is_initialized)
+  if (!runtime || !runtime->is_initialized) {
     return -1;
+  }
 
   runtime->is_processing = true;
   runtime->accumulator_write_pos = 0;
@@ -144,8 +146,9 @@ int ethervox_stt_process(ethervox_stt_runtime_t* runtime,
 
 // Finalize and get final result
 int ethervox_stt_finalize(ethervox_stt_runtime_t* runtime, ethervox_stt_result_t* result) {
-  if (!runtime || !result)
+  if (!runtime || !result) {
     return -1;
+  }
 
   memset(result, 0, sizeof(ethervox_stt_result_t));
 
@@ -163,8 +166,9 @@ int ethervox_stt_finalize(ethervox_stt_runtime_t* runtime, ethervox_stt_result_t
 
 // Stop STT session
 void ethervox_stt_stop(ethervox_stt_runtime_t* runtime) {
-  if (!runtime)
+  if (!runtime) {
     return;
+  }
 
   runtime->is_processing = false;
   runtime->accumulator_write_pos = 0;
@@ -185,8 +189,9 @@ void ethervox_stt_result_free(ethervox_stt_result_t* result) {
 
 // Cleanup
 void ethervox_stt_cleanup(ethervox_stt_runtime_t* runtime) {
-  if (!runtime)
+  if (!runtime) {
     return;
+  }
 
   if (runtime->audio_accumulator) {
     free(runtime->audio_accumulator);
@@ -203,8 +208,9 @@ void ethervox_stt_cleanup(ethervox_stt_runtime_t* runtime) {
   if (runtime->backend_context) {
     if (runtime->config.backend == ETHERVOX_STT_BACKEND_VOSK) {
       vosk_context_t* ctx = (vosk_context_t*)runtime->backend_context;
-      if (ctx->last_result)
+      if (ctx->last_result) {
         free(ctx->last_result);
+      }
     }
     free(runtime->backend_context);
   }
