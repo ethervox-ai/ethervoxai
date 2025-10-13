@@ -20,14 +20,22 @@
 
 #include "ethervox/dialogue.h"
 
-static const float kEthervoxIntentMatchConfidence = 0.8f;
-static const float kEthervoxIntentUnknownConfidence = 0.1f;
+#ifndef ETHERVOX_UNUSED
+#if defined(__GNUC__)
+#define ETHERVOX_UNUSED __attribute__((unused))
+#else
+#define ETHERVOX_UNUSED
+#endif
+#endif
+
+static const float kEthervoxIntentMatchConfidence ETHERVOX_UNUSED = 0.8f;
+static const float kEthervoxIntentUnknownConfidence ETHERVOX_UNUSED = 0.1f;
 static const float kEthervoxResponseConfidence = 0.9f;
 static const uint32_t kEthervoxResponseProcessingTimeMs = 50U;
 static const uint32_t kEthervoxTokenEstimateDivisor = 4U;
 static const uint32_t kEthervoxDefaultMaxContexts = 16U;
 static const uint32_t kEthervoxDefaultMaxHistory = 20U;
-static const float kEthervoxWakeConfidenceScale = 2.0f;
+static const float kEthervoxWakeConfidenceScale ETHERVOX_UNUSED = 2.0f;
 static const size_t kEthervoxLanguageMatchPrefix = 2U;
 static const size_t kEthervoxLanguageTrimIndex = 2U;
 
