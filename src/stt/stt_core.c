@@ -178,8 +178,9 @@ void ethervox_stt_stop(ethervox_stt_runtime_t* runtime) {
 
 // Free result
 void ethervox_stt_result_free(ethervox_stt_result_t* result) {
-  if (!result)
+  if (!result) {
     return;
+  }
 
   if (result->text) {
     free(result->text);

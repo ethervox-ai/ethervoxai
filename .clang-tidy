@@ -5,16 +5,9 @@ Checks: >
   performance-inefficient-vector-operation,
   performance-unnecessary-copy-initialization,
   readability-braces-around-statements,
-  readability-magic-numbers,
   readability-misleading-indentation,
   readability-simplify-boolean-expr
 CheckOptions:
-  - key: readability-magic-numbers.IgnoredIntegerValues
-    value: '0;1;2;3;4;5;6;7;8;9;10;-1;1000;1024;2048;4096;8192;16000;16384;32768;65536;100000;100000;1000000;10000000;100000000;1000000000'
-  - key: readability-magic-numbers.IgnoredFloatingPointValues
-    value: '0.0;1.0;0.5;0.25;0.75;3.14;2.71;1.41;1.73;1.618'
-  - key: readability-magic-numbers.IgnorePowersOfTwo
-    value: 'true'
   - key: readability-magic-numbers.IgnoreAssignmentValues
     value: 'true'
 WarningsAsErrors: ''
