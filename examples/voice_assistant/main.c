@@ -19,7 +19,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(_WIN32)
+#if !defined(strcasecmp)
+#define strcasecmp _stricmp
+#endif
+#else
 #include <strings.h>
+#endif
 #include <unistd.h>
 
 #include "ethervox/audio.h"
