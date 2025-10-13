@@ -27,9 +27,14 @@
 #include <windows.h>
 #pragma comment(lib, "powrprof.lib")
 #else
-#include <sys/sysinfo.h>
 #include <sys/time.h>
 #include <unistd.h>
+#ifdef __linux__
+#include <sys/sysinfo.h>
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#include <mach/mach_host.h>
+#endif
 #endif
 
 // Desktop platform HAL implementation (Windows/Linux/macOS)
@@ -188,12 +193,29 @@ static uint32_t desktop_get_free_heap_size(void) {
   memInfo.dwLength = sizeof(MEMORYSTATUSEX);
   GlobalMemoryStatusEx(&memInfo);
   return (uint32_t)(memInfo.ullAvailPhys / 1024);  // Return KB
-#else
+#elif defined(__linux__)
   struct sysinfo info;
   if (sysinfo(&info) == 0) {
     return (uint32_t)(info.freeram * info.mem_unit / 1024);  // Return KB
   }
   return 0;
+#elif defined(__APPLE__)
+  mach_port_t host = mach_host_self();
+  vm_size_t page_size = 0;
+  host_page_size(host, &page_size);
+
+  vm_statistics64_data_t vm_stats;
+  mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+  kern_return_t kr = host_statistics64(host, HOST_VM_INFO64, (host_info64_t)&vm_stats, &count);
+  if (kr != KERN_SUCCESS) {
+    mach_port_deallocate(mach_task_self(), host);
+    return 0;
+  }
+
+  uint64_t free_bytes = ((uint64_t)vm_stats.free_count + (uint64_t)vm_stats.inactive_count) *
+                        (uint64_t)page_size;
+  mach_port_deallocate(mach_task_self(), host);
+  return (uint32_t)(free_bytes / 1024);
 #endif
 }
 
