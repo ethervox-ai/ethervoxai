@@ -260,5 +260,4 @@ jobs:
       with:
         esp_idf_version: v5.1.2
         target: esp32
-        path: esp32-project
-        command: idf.py build
+        command: cd esp32-project && idf.py build
