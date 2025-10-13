@@ -14,13 +14,15 @@
  * SPDX-License-Identifier: CC-BY-NC-SA-4.0
  */
 
-#include <stdio.h>
-
 #include "ethervox/audio.h"
 
 #ifdef ETHERVOX_PLATFORM_WINDOWS
-#include <mmsystem.h>
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
+#include <mmsystem.h>
+#include <stdio.h>
 #pragma comment(lib, "winmm.lib")
 
 typedef struct {

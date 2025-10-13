@@ -23,8 +23,11 @@
 #include "ethervox/platform.h"
 
 #ifdef ETHERVOX_PLATFORM_WINDOWS
-#include <powrprof.h>
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
+#include <powrprof.h>
 #pragma comment(lib, "powrprof.lib")
 #else
 #include <sys/time.h>
