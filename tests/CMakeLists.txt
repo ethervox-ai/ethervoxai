@@ -45,10 +45,11 @@ foreach(TEST_SOURCE ${UNIT_TEST_SOURCES})
             "${CMAKE_SOURCE_DIR}/src/platform/desktop_hal.c"
         )
     elseif(APPLE OR TARGET_PLATFORM STREQUAL "MACOS")
-        list(APPEND ETHERVOXXAI_CORE_TEST_SOURCES
+        list(APPEND ETHERVOXAI_CORE_TEST_SOURCES
             "${CMAKE_SOURCE_DIR}/src/audio/platform_macos.c"
             "${CMAKE_SOURCE_DIR}/src/audio/audio_core.c"
             "${CMAKE_SOURCE_DIR}/src/platform/desktop_hal.c"
+            "${CMAKE_SOURCE_DIR}/src/platform/platform_core.c"
         )
     else()
         # Linux default
@@ -62,6 +63,11 @@ foreach(TEST_SOURCE ${UNIT_TEST_SOURCES})
     
     target_sources(${TEST_NAME} PRIVATE ${ETHERVOXAI_CORE_TEST_SOURCES})
     
+    # Link against shared audio library for common symbols
+    if(TARGET ethervox_audio)
+        target_link_libraries(${TEST_NAME} PRIVATE ethervox_audio)
+    endif()
+
     # Platform-specific linking (same as main CMakeLists.txt)
     if(WIN32)
         target_link_libraries(${TEST_NAME} winmm ws2_32 crypt32)
@@ -96,6 +102,10 @@ foreach(TEST_SOURCE ${INTEGRATION_TEST_SOURCES})
     
     # Use the same platform-specific sources as unit tests
     target_sources(${TEST_NAME} PRIVATE ${ETHERVOXAI_CORE_TEST_SOURCES})
+
+    if(TARGET ethervox_audio)
+        target_link_libraries(${TEST_NAME} PRIVATE ethervox_audio)
+    endif()
     
     if(WIN32)
         target_link_libraries(${TEST_NAME} winmm ws2_32 crypt32)
