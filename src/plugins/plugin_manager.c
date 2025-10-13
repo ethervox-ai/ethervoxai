@@ -71,7 +71,7 @@ const char* ethervox_plugin_status_to_string(ethervox_plugin_status_t status) {
 int ethervox_plugin_manager_init(ethervox_plugin_manager_t* manager, const char* plugin_dir) {
   if (!manager) {
     return -1;
-
+  }
   memset(manager, 0, sizeof(ethervox_plugin_manager_t));
 
   const char* resolved_plugin_dir = plugin_dir ? plugin_dir : "./plugins";
