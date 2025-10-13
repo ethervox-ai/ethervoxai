@@ -199,3 +199,13 @@ endif()
 install(TARGETS ethervoxai DESTINATION bin)
 install(DIRECTORY include/ DESTINATION include)
 install(FILES README.md LICENSE DESTINATION share/doc/ethervoxai)
+
+# Basic CPack configuration so `cmake --build --target package` works everywhere
+set(CPACK_PACKAGE_NAME "EthervoxAI")
+set(CPACK_PACKAGE_VENDOR "EtherVoxAI")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "EtherVoxAI Voice Runtime")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+set(CPACK_GENERATOR "TGZ")
+include(CPack)
