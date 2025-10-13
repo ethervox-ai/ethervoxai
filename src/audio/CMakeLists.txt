@@ -1,5 +1,6 @@
 add_library(ethervox_audio STATIC
     audio_core.c
+    platform_macos.c
     platform_windows.c
     platform_linux.c
     platform_esp32.c
