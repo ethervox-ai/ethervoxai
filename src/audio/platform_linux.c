@@ -54,8 +54,14 @@ static int linux_audio_start_capture(ethervox_audio_runtime_t* runtime) {
   snd_pcm_hw_params_t* hw_params = NULL;
 
   const char* env_device = getenv("ETHERVOX_ALSA_DEVICE");
-  const char* candidates[kLinuxMaxDeviceCandidates] = {env_device, "default", "sysdefault"};
-  const size_t candidate_count = (env_device && *env_device) ? kLinuxMaxDeviceCandidates : 2U;
+  const char* candidates[kLinuxMaxDeviceCandidates] = {0};
+  size_t candidate_count = 0;
+
+  if (env_device && *env_device) {
+    candidates[candidate_count++] = env_device;
+  }
+  candidates[candidate_count++] = "default";
+  candidates[candidate_count++] = "sysdefault";
 
   const char* opened_device = NULL;
   for (size_t i = 0; i < candidate_count; ++i) {
@@ -70,7 +76,7 @@ static int linux_audio_start_capture(ethervox_audio_runtime_t* runtime) {
       break;
     }
 
-  printf("ALSA: failed to open capture device '%s': %s\n", device, snd_strerror(err));
+    printf("ALSA: failed to open capture device '%s': %s\n", device, snd_strerror(err));
   }
 
   if (!opened_device) {
@@ -140,8 +146,14 @@ static int linux_audio_start_playback(ethervox_audio_runtime_t* runtime) {
   int err;
 
   const char* env_device = getenv("ETHERVOX_ALSA_PLAYBACK");
-  const char* candidates[kLinuxMaxDeviceCandidates] = {env_device, "default", "sysdefault"};
-  const size_t candidate_count = (env_device && *env_device) ? kLinuxMaxDeviceCandidates : 2U;
+  const char* candidates[kLinuxMaxDeviceCandidates] = {0};
+  size_t candidate_count = 0;
+
+  if (env_device && *env_device) {
+    candidates[candidate_count++] = env_device;
+  }
+  candidates[candidate_count++] = "default";
+  candidates[candidate_count++] = "sysdefault";
 
   const char* opened_device = NULL;
   for (size_t i = 0; i < candidate_count; ++i) {
@@ -223,7 +235,7 @@ static int linux_audio_read(ethervox_audio_runtime_t* runtime, ethervox_audio_bu
     } else if (rc == -EAGAIN) {
       continue;
     } else if (rc < 0) {
-  printf("ALSA capture error: %s\n", snd_strerror((int)rc));
+      printf("ALSA capture error: %s\n", snd_strerror((int)rc));
       free(capture_buffer);
       return -1;
     }
