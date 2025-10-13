@@ -14,6 +14,8 @@
  * SPDX-License-Identifier: CC-BY-NC-SA-4.0
  */
 
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -169,35 +171,36 @@ bool ethervox_platform_has_capability(const char* capability) {
     return false;
   }
 
-  ethervox_platform_capabilities_t caps = ethervox_platform_get_capabilities();
+  typedef struct {
+    const char* name;
+    size_t offset;
+  } capability_entry_t;
 
-  if (strcmp(capability, "audio_input") == 0) {
-    return caps.has_audio_input;
-  } else if (strcmp(capability, "audio_output") == 0) {
-    return caps.has_audio_output;
-  } else if (strcmp(capability, "microphone_array") == 0) {
-    return caps.has_microphone_array;
-  } else if (strcmp(capability, "gpio") == 0) {
-    return caps.has_gpio;
-  } else if (strcmp(capability, "spi") == 0) {
-    return caps.has_spi;
-  } else if (strcmp(capability, "i2c") == 0) {
-    return caps.has_i2c;
-  } else if (strcmp(capability, "uart") == 0) {
-    return caps.has_uart;
-  } else if (strcmp(capability, "wifi") == 0) {
-    return caps.has_wifi;
-  } else if (strcmp(capability, "bluetooth") == 0) {
-    return caps.has_bluetooth;
-  } else if (strcmp(capability, "ethernet") == 0) {
-    return caps.has_ethernet;
-  } else if (strcmp(capability, "display") == 0) {
-    return caps.has_display;
-  } else if (strcmp(capability, "camera") == 0) {
-    return caps.has_camera;
-  } else {
-    return false;
+  static const capability_entry_t kCapabilityTable[] = {
+      {"audio_input", offsetof(ethervox_platform_capabilities_t, has_audio_input)},
+      {"audio_output", offsetof(ethervox_platform_capabilities_t, has_audio_output)},
+      {"microphone_array", offsetof(ethervox_platform_capabilities_t, has_microphone_array)},
+      {"gpio", offsetof(ethervox_platform_capabilities_t, has_gpio)},
+      {"spi", offsetof(ethervox_platform_capabilities_t, has_spi)},
+      {"i2c", offsetof(ethervox_platform_capabilities_t, has_i2c)},
+      {"uart", offsetof(ethervox_platform_capabilities_t, has_uart)},
+      {"wifi", offsetof(ethervox_platform_capabilities_t, has_wifi)},
+      {"bluetooth", offsetof(ethervox_platform_capabilities_t, has_bluetooth)},
+      {"ethernet", offsetof(ethervox_platform_capabilities_t, has_ethernet)},
+      {"display", offsetof(ethervox_platform_capabilities_t, has_display)},
+      {"camera", offsetof(ethervox_platform_capabilities_t, has_camera)},
+  };
+
+  const ethervox_platform_capabilities_t caps = ethervox_platform_get_capabilities();
+
+  for (size_t i = 0; i < sizeof(kCapabilityTable) / sizeof(kCapabilityTable[0]); i++) {
+    if (strcmp(capability, kCapabilityTable[i].name) == 0) {
+      const bool* field = (const bool*)((const uint8_t*)&caps + kCapabilityTable[i].offset);
+      return *field;
+    }
   }
+
+  return false;
 }
 
 // Get system timestamp in microseconds
