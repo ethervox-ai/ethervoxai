@@ -235,5 +235,11 @@ jobs:
         lcov --capture --directory . --output-file coverage.info
         lcov --remove coverage.info '/usr/*' --ignore-errors unused --output-file coverage.info
         lcov --list coverage.info
-
     
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5.5.1
+      with:
+        token: ${{ env.CODECOV_TOKEN }}
+        files: build-coverage/coverage.info
+        fail_ci_if_error: true
+        verbose: true    
