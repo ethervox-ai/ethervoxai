@@ -111,8 +111,8 @@ file(GLOB ETHERVOXAI_CORE_SOURCES
     "src/stt/*.c"
 )
 
-# Add main entry point
-list(APPEND ETHERVOXAI_CORE_SOURCES "src/main.c")
+# Shared audio core implementation (excluding platform-specific files)
+list(APPEND ETHERVOXAI_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/audio/audio_core.c")
 
 # Platform-specific source files
 # Check multiple conditions for RPI detection
@@ -151,39 +151,36 @@ else()
     )
 endif()
 
-# Combine core and platform sources
-set(ETHERVOXAI_SOURCES ${ETHERVOXAI_CORE_SOURCES} ${PLATFORM_SOURCES})
-
-# Add platform_core.c which is common to all platforms
-list(APPEND ETHERVOXAI_SOURCES src/platform/platform_core.c)
+# Combine core and platform sources for the reusable library
+set(ETHERVOXAI_SOURCES ${ETHERVOXAI_CORE_SOURCES} ${PLATFORM_SOURCES} src/platform/platform_core.c)
 
 # Debug: Print sources being compiled
 message(STATUS "Core sources: ${ETHERVOXAI_CORE_SOURCES}")
 message(STATUS "Platform sources: ${PLATFORM_SOURCES}")
 
-# Collect header files
-file(GLOB_RECURSE ETHERVOXAI_HEADERS
-    "include/*.h"
-    "include/*.hpp"
-    "src/*.h"
-    "src/*.hpp"
-)
+# Static library that can be reused by examples/tests
+add_library(ethervoxai STATIC ${ETHERVOXAI_SOURCES})
+target_include_directories(ethervoxai
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-# Main executable target
-add_executable(ethervoxai ${ETHERVOXAI_SOURCES} ${ETHERVOXAI_HEADERS})
-
-# Platform-specific linking
+# Platform-specific linking for library consumers
 if(WIN32)
-    target_link_libraries(ethervoxai winmm ws2_32 crypt32)
+    target_link_libraries(ethervoxai PUBLIC winmm ws2_32 crypt32)
 elseif(TARGET_PLATFORM STREQUAL "RPI")
-    # Raspberry Pi - use bcm2835 library from sysroot
-    target_link_libraries(ethervoxai bcm2835 pthread curl ssl crypto m)
+    target_link_libraries(ethervoxai PUBLIC bcm2835 pthread curl ssl crypto m)
 elseif(UNIX AND NOT APPLE)
-    # Linux desktop - use ALSA
-    target_link_libraries(ethervoxai asound pthread curl ssl crypto m)
+    target_link_libraries(ethervoxai PUBLIC asound pthread curl ssl crypto m)
 elseif(APPLE)
-    target_link_libraries(ethervoxai "-framework CoreAudio" "-framework AudioUnit" "-framework CoreFoundation" pthread curl)
+    target_link_libraries(ethervoxai PUBLIC "-framework CoreAudio" "-framework AudioUnit" "-framework CoreFoundation" pthread curl)
 endif()
+
+# CLI executable built on top of the reusable library
+add_executable(ethervoxai_app src/main.c)
+target_link_libraries(ethervoxai_app PRIVATE ethervoxai)
+set_target_properties(ethervoxai_app PROPERTIES OUTPUT_NAME ethervoxai)
 
 # Optional: Examples and tests (if directories exist)
 if(BUILD_EXAMPLES AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples")
@@ -196,7 +193,10 @@ if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
 endif()
 
 # Installation
-install(TARGETS ethervoxai DESTINATION bin)
+install(TARGETS ethervoxai
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib)
+install(TARGETS ethervoxai_app RUNTIME DESTINATION bin)
 install(DIRECTORY include/ DESTINATION include)
 install(FILES README.md LICENSE DESTINATION share/doc/ethervoxai)
 

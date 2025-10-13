@@ -161,8 +161,10 @@ clean-esp32:
 	fi
 	@rm -rf esp32-project/sdkconfig esp32-project/sdkconfig.old
 
-build-voice-assistant: $(TARGET)
+build-voice-assistant: configure
 	@echo "Building voice assistant example..."
+	@cmake --build build --target ethervoxai
+	@cmake --build build --target ethervoxai_app
 	@$(MAKE) -C examples/voice_assistant
 
 run-voice-assistant: build-voice-assistant

@@ -54,14 +54,20 @@ static int linux_audio_start_capture(ethervox_audio_runtime_t* runtime) {
   snd_pcm_hw_params_t* hw_params = NULL;
 
   const char* env_device = getenv("ETHERVOX_ALSA_DEVICE");
-  const char* candidates[kLinuxMaxDeviceCandidates] = {0};
+  const char* candidates[kLinuxMaxDeviceCandidates];
   size_t candidate_count = 0;
+
+  for (size_t i = 0; i < kLinuxMaxDeviceCandidates; ++i) {
+    candidates[i] = NULL;
+  }
 
   if (env_device && *env_device) {
     candidates[candidate_count++] = env_device;
   }
   candidates[candidate_count++] = "default";
-  candidates[candidate_count++] = "sysdefault";
+  if (candidate_count < kLinuxMaxDeviceCandidates) {
+    candidates[candidate_count++] = "sysdefault";
+  }
 
   const char* opened_device = NULL;
   for (size_t i = 0; i < candidate_count; ++i) {
@@ -146,14 +152,20 @@ static int linux_audio_start_playback(ethervox_audio_runtime_t* runtime) {
   int err;
 
   const char* env_device = getenv("ETHERVOX_ALSA_PLAYBACK");
-  const char* candidates[kLinuxMaxDeviceCandidates] = {0};
+  const char* candidates[kLinuxMaxDeviceCandidates];
   size_t candidate_count = 0;
+
+  for (size_t i = 0; i < kLinuxMaxDeviceCandidates; ++i) {
+    candidates[i] = NULL;
+  }
 
   if (env_device && *env_device) {
     candidates[candidate_count++] = env_device;
   }
   candidates[candidate_count++] = "default";
-  candidates[candidate_count++] = "sysdefault";
+  if (candidate_count < kLinuxMaxDeviceCandidates) {
+    candidates[candidate_count++] = "sysdefault";
+  }
 
   const char* opened_device = NULL;
   for (size_t i = 0; i < candidate_count; ++i) {
