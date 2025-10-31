@@ -103,6 +103,12 @@ endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+# Common infrastructure sources
+set(COMMON_SOURCES
+    src/common/error.c
+    src/common/logging.c
+)
+
 # Collect core source files (non-platform specific)
 file(GLOB ETHERVOXAI_CORE_SOURCES 
     "src/dialogue/*.c"
@@ -152,9 +158,17 @@ else()
 endif()
 
 # Combine core and platform sources for the reusable library
-set(ETHERVOXAI_SOURCES ${ETHERVOXAI_CORE_SOURCES} ${PLATFORM_SOURCES} src/platform/platform_core.c)
+# set(ETHERVOXAI_SOURCES ${ETHERVOXAI_CORE_SOURCES} ${PLATFORM_SOURCES} src/platform/platform_core.c)
+
+# Combine core and platform sources for the reusable library
+set(ETHERVOXAI_SOURCES ${COMMON_SOURCES} ${ETHERVOXAI_CORE_SOURCES} ${PLATFORM_SOURCES} src/platform/platform_core.c)
 
 # Debug: Print sources being compiled
+# message(STATUS "Core sources: ${ETHERVOXAI_CORE_SOURCES}")
+# message(STATUS "Platform sources: ${PLATFORM_SOURCES}")
+
+# Debug: Print sources being compiled
+message(STATUS "Common sources: ${COMMON_SOURCES}")
 message(STATUS "Core sources: ${ETHERVOXAI_CORE_SOURCES}")
 message(STATUS "Platform sources: ${PLATFORM_SOURCES}")
 
