@@ -68,12 +68,4 @@ _(Scalable to >15 languages post-MVP)_
 - MVP includes sandbox examples for kitchen appliance and robot use cases
 - All data is processed locally unless explicitly triggered by user query
 
----
-
-## 🧑‍🤝‍🧑 Want to Join?
-
-Start by reading [`CONTRIBUTING.md`](../CONTRIBUTING.md) and [`ethical-ai.md`](./ethical-ai.md). We welcome collaborators who share our values and want to help shape ambient intelligence with integrity.
-
-Have questions or ideas? Reach us at:  
-📧 team@ethervox.ai
 
