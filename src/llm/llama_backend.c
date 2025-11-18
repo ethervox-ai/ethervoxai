@@ -164,7 +164,7 @@ static int llama_backend_init(ethervox_llm_backend_t* backend, const ethervox_ll
 }
 
 static void llama_backend_cleanup(ethervox_llm_backend_t* backend) {
-  if (!backend || !backend->handle) {
+  if (!backend) {
     return;
   }
   
