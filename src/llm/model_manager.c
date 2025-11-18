@@ -210,8 +210,20 @@ ethervox_model_manager_t* ethervox_model_manager_create(
     }
     
     // Create directories if they don't exist
-    mkdir(manager->models_dir, 0755);
-    mkdir(manager->cache_dir, 0755);
+    if (mkdir(manager->models_dir, 0755) != 0 && errno != EEXIST) {
+        ETHERVOX_LOG_ERROR("Failed to create models directory '%s': %s", manager->models_dir, strerror(errno));
+        free(manager->models_dir);
+        free(manager->cache_dir);
+        free(manager);
+        return NULL;
+    }
+    if (mkdir(manager->cache_dir, 0755) != 0 && errno != EEXIST) {
+        ETHERVOX_LOG_ERROR("Failed to create cache directory '%s': %s", manager->cache_dir, strerror(errno));
+        free(manager->models_dir);
+        free(manager->cache_dir);
+        free(manager);
+        return NULL;
+    }
     
     ETHERVOX_LOG_INFO("Model manager created (models_dir=%s)", manager->models_dir);
     
