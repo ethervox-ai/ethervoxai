@@ -13,6 +13,15 @@ endif()
 
 if(VOICE_ASSISTANT_SOURCES)
     set(EXAMPLE_CORE_SOURCES)
+    
+    # Include common sources with absolute paths (error and logging)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/src/common/error.c")
+        list(APPEND EXAMPLE_CORE_SOURCES "${CMAKE_SOURCE_DIR}/src/common/error.c")
+    endif()
+    if(EXISTS "${CMAKE_SOURCE_DIR}/src/common/logging.c")
+        list(APPEND EXAMPLE_CORE_SOURCES "${CMAKE_SOURCE_DIR}/src/common/logging.c")
+    endif()
+    
     if(DEFINED ETHERVOXAI_CORE_SOURCES)
         list(APPEND EXAMPLE_CORE_SOURCES ${ETHERVOXAI_CORE_SOURCES})
     endif()

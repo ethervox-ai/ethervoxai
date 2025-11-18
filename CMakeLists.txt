@@ -94,9 +94,22 @@ endif()
 option(BUILD_TESTS "Build test suite" ON)
 option(BUILD_EXAMPLES "Build example applications" ON)
 option(ENABLE_DEBUG "Enable debug logging" OFF)
+option(WITH_LLAMA "Enable Llama.cpp backend support" ON)
+option(WITH_TINYLLAMA "Enable TinyLlama backend support" ON)
 
 if(ENABLE_DEBUG)
     add_definitions(-DDEBUG_ENABLED=1)
+endif()
+
+# LLM backend configuration
+if(WITH_LLAMA)
+    add_definitions(-DETHERVOX_WITH_LLAMA=1)
+    message(STATUS "Llama.cpp backend enabled")
+endif()
+
+if(WITH_TINYLLAMA)
+    add_definitions(-DETHERVOX_WITH_TINYLLAMA=1)
+    message(STATUS "TinyLlama backend enabled")
 endif()
 
 # Include directories
@@ -115,6 +128,7 @@ file(GLOB ETHERVOXAI_CORE_SOURCES
     "src/plugins/*.c"
     "src/wake_word/*.c"
     "src/stt/*.c"
+    "src/llm/*.c"
 )
 
 # Shared audio core implementation (excluding platform-specific files)
@@ -184,7 +198,7 @@ target_include_directories(ethervoxai
 set(ETHERVOXAI_PLATFORM_LIBS "")
 
 if(WIN32)
-    set(ETHERVOXAI_PLATFORM_LIBS winmm ws2_32 crypt32)
+    set(ETHERVOXAI_PLATFORM_LIBS winmm ws2_32 crypt32 wininet)
 elseif(TARGET_PLATFORM STREQUAL "RPI")
     set(ETHERVOXAI_PLATFORM_LIBS pthread m)
 

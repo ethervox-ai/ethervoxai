@@ -47,7 +47,11 @@ void ethervox_log(ethervox_log_level_t level, const char* file, int line,
     time_t now = time(NULL);
     struct tm tm_info;
     char timestamp[20];
-    localtime_r(&now, &tm_info);
+#ifdef _WIN32
+    localtime_s(&tm_info, &now);  // Windows: different parameter order
+#else
+    localtime_r(&now, &tm_info);  // POSIX
+#endif
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &tm_info);
     
     // Print log prefix
