@@ -120,9 +120,9 @@ typedef struct {
 } download_context_t;
 
 #ifdef USE_LIBCURL
-// libcurl progress callback
-static int curl_progress_callback(void* clientp, curl_off_t dltotal, curl_off_t dlnow,
-                                  curl_off_t ultotal, curl_off_t ulnow) {
+// libcurl progress callback - renamed to avoid conflict with curl typedef
+static int ethervox_curl_progress_cb(void* clientp, curl_off_t dltotal, curl_off_t dlnow,
+                                     curl_off_t ultotal, curl_off_t ulnow) {
     (void)ultotal;
     (void)ulnow;
     
@@ -142,8 +142,8 @@ static int curl_progress_callback(void* clientp, curl_off_t dltotal, curl_off_t 
     return ctx->cancelled ? 1 : 0;  // Return 1 to abort
 }
 
-// libcurl write callback
-static size_t curl_write_callback(void* ptr, size_t size, size_t nmemb, void* userdata) {
+// libcurl write callback - renamed to avoid conflict with curl typedef
+static size_t ethervox_curl_write_cb(void* ptr, size_t size, size_t nmemb, void* userdata) {
     download_context_t* ctx = (download_context_t*)userdata;
     size_t written = fwrite(ptr, size, nmemb, ctx->fp);
     ctx->downloaded += written;
@@ -316,9 +316,9 @@ static int download_with_curl(ethervox_model_manager_t* manager,
     
     // Configure CURL
     curl_easy_setopt(curl, CURLOPT_URL, model_info->url);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ethervox_curl_write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ctx);
-    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, curl_progress_callback);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, ethervox_curl_progress_cb);
     curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &ctx);
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);

@@ -36,6 +36,9 @@ const char* ethervox_error_string(ethervox_result_t result) {
         case ETHERVOX_ERROR_TIMEOUT: return "Timeout";
         case ETHERVOX_ERROR_NOT_SUPPORTED: return "Not supported";
         case ETHERVOX_ERROR_BUFFER_TOO_SMALL: return "Buffer too small";
+        case ETHERVOX_ERROR_NOT_IMPLEMENTED: return "Not implemented";
+        case ETHERVOX_ERROR_FAILED: return "Operation failed";
+        case ETHERVOX_ERROR_NOT_FOUND: return "Not found";
         
         // Platform/HAL errors
         case ETHERVOX_ERROR_PLATFORM_INIT: return "Platform initialization failed";

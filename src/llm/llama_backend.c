@@ -27,7 +27,13 @@
 
 #ifdef ETHERVOX_WITH_LLAMA
 // Include llama.cpp headers if available
+#if __has_include(<llama.h>)
 #include <llama.h>
+#define LLAMA_HEADER_AVAILABLE 1
+#else
+#warning "llama.h not found - llama backend will use stub implementation"
+#define LLAMA_HEADER_AVAILABLE 0
+#endif
 #endif
 
 // Default configuration values
@@ -41,7 +47,7 @@
 
 // Llama backend context
 typedef struct {
-#ifdef ETHERVOX_WITH_LLAMA
+#if defined(ETHERVOX_WITH_LLAMA) && LLAMA_HEADER_AVAILABLE
   struct llama_model* model;
   struct llama_context* ctx;
   struct llama_context_params ctx_params;
@@ -106,8 +112,8 @@ static int llama_backend_init(ethervox_llm_backend_t* backend, const ethervox_ll
     return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
   
-#ifndef ETHERVOX_WITH_LLAMA
-  ETHERVOX_LOG_ERROR("Llama backend not compiled in (missing ETHERVOX_WITH_LLAMA)");
+#if !defined(ETHERVOX_WITH_LLAMA) || !LLAMA_HEADER_AVAILABLE
+  ETHERVOX_LOG_ERROR("Llama backend not available - llama.cpp library not compiled in or header not found");
   return ETHERVOX_ERROR_NOT_IMPLEMENTED;
 #else
   
@@ -157,7 +163,7 @@ static void llama_backend_cleanup(ethervox_llm_backend_t* backend) {
     return;
   }
   
-#ifdef ETHERVOX_WITH_LLAMA
+#if defined(ETHERVOX_WITH_LLAMA) && LLAMA_HEADER_AVAILABLE
   llama_backend_context_t* ctx = (llama_backend_context_t*)backend->handle;
   
   // Unload model if loaded
@@ -183,6 +189,10 @@ static void llama_backend_cleanup(ethervox_llm_backend_t* backend) {
   backend->handle = NULL;
   
   ETHERVOX_LOG_INFO("Llama backend cleaned up");
+#else
+  // Just free the stub context
+  free(backend->handle);
+  backend->handle = NULL;
 #endif
 }
 
@@ -191,7 +201,7 @@ static int llama_backend_load_model(ethervox_llm_backend_t* backend, const char*
     return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
   
-#ifndef ETHERVOX_WITH_LLAMA
+#if !defined(ETHERVOX_WITH_LLAMA) || !LLAMA_HEADER_AVAILABLE
   ETHERVOX_LOG_ERROR("Llama backend not available");
   return ETHERVOX_ERROR_NOT_IMPLEMENTED;
 #else
@@ -249,7 +259,7 @@ static void llama_backend_unload_model(ethervox_llm_backend_t* backend) {
     return;
   }
   
-#ifdef ETHERVOX_WITH_LLAMA
+#if defined(ETHERVOX_WITH_LLAMA) && LLAMA_HEADER_AVAILABLE
   llama_backend_context_t* ctx = (llama_backend_context_t*)backend->handle;
   
   if (ctx->ctx) {
@@ -281,7 +291,7 @@ static int llama_backend_generate(ethervox_llm_backend_t* backend,
     return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
   
-#ifndef ETHERVOX_WITH_LLAMA
+#if !defined(ETHERVOX_WITH_LLAMA) || !LLAMA_HEADER_AVAILABLE
   ETHERVOX_LOG_ERROR("Llama backend not available");
   return ETHERVOX_ERROR_NOT_IMPLEMENTED;
 #else
