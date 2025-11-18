@@ -31,7 +31,12 @@
 #include <llama.h>
 #define LLAMA_HEADER_AVAILABLE 1
 #else
+/* MSVC doesn't support #warning, use #pragma message instead */
+#ifdef _MSC_VER
+#pragma message("llama.h not found - llama backend will use stub implementation")
+#else
 #warning "llama.h not found - llama backend will use stub implementation"
+#endif
 #define LLAMA_HEADER_AVAILABLE 0
 #endif
 #endif

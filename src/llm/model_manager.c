@@ -40,8 +40,20 @@
 #pragma comment(lib, "wininet.lib")
 #define USE_WININET
 #elif defined(__linux__) || defined(__APPLE__)
+/* Check if curl/curl.h is available (may not be present in cross-compilation environments) */
+#if __has_include(<curl/curl.h>)
 #include <curl/curl.h>
 #define USE_LIBCURL
+#define CURL_AVAILABLE 1
+#else
+/* curl not available - HTTP download functionality will be disabled */
+#ifdef _MSC_VER
+#pragma message("curl/curl.h not found - HTTP download functionality disabled")
+#else
+#warning "curl/curl.h not found - HTTP download functionality disabled"
+#endif
+#define CURL_AVAILABLE 0
+#endif
 #endif
 
 // Predefined model registry
