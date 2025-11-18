@@ -540,15 +540,15 @@ bool ethervox_model_manager_has_enough_space(const char* path, uint64_t required
     // Add 10% buffer to required space for safety.
     // Rationale: Filesystem overhead, fragmentation, and other uncertainties may cause actual usage to exceed the nominal model size.
     // The overflow check ensures that multiplying by 11 does not exceed UINT64_MAX, which would cause integer overflow.
-    ethervox_model_manager_t* manager,
+    ethervox_model_manager_t* g_manager,
     const ethervox_model_info_t* model_info) {
     
-    if (!manager || !model_info) {
+    if (!g_manager || !model_info) {
         return ETHERVOX_ERROR_INVALID_ARGUMENT;
     }
     
     char path[1024];
-    int result = ethervox_model_manager_get_path(manager, model_info, path, sizeof(path));
+    int result = ethervox_model_manager_get_path(g_manager, model_info, path, sizeof(path));
     if (result != ETHERVOX_SUCCESS) {
         return result;
     }
