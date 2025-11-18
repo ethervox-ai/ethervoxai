@@ -529,7 +529,9 @@ bool ethervox_model_manager_has_enough_space(const char* path, uint64_t required
     return available >= required_with_buffer;
 }
 
-int ethervox_model_manager_delete_model(
+    // Add 10% buffer to required space for safety.
+    // Rationale: Filesystem overhead, fragmentation, and other uncertainties may cause actual usage to exceed the nominal model size.
+    // The overflow check ensures that multiplying by 11 does not exceed UINT64_MAX, which would cause integer overflow.
     ethervox_model_manager_t* manager,
     const ethervox_model_info_t* model_info) {
     
