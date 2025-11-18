@@ -28,7 +28,6 @@ Demonstrates how to create custom intent recognition plugins for domain-specific
 ```bash
 gcc -o intent_plugin_example intent_plugin_example.c ../ethervox_sdk.c
 ./intent_plugin_example
-```text
 
 ## 2. Model Router Example (`model_router_example.c`)
 
