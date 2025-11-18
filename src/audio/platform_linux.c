@@ -65,9 +65,7 @@ static int linux_audio_start_capture(ethervox_audio_runtime_t* runtime) {
     candidates[candidate_count++] = env_device;
   }
   candidates[candidate_count++] = "default";
-  if (candidate_count < kLinuxMaxDeviceCandidates) {
-    candidates[candidate_count++] = "sysdefault";
-  }
+  candidates[candidate_count++] = "sysdefault";
 
   const char* opened_device = NULL;
   for (size_t i = 0; i < candidate_count; ++i) {
