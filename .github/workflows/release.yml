@@ -1,0 +1,434 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      is_prerelease: ${{ steps.check_prerelease.outputs.is_prerelease }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Get version
+      id: get_version
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+
+    - name: Check if pre-release
+      id: check_prerelease
+      run: |
+        VERSION="${{ steps.get_version.outputs.version }}"
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
+        elif [[ $VERSION =~ (alpha|beta|rc|pre) ]]; then
+          IS_PRERELEASE=true
+        else
+          IS_PRERELEASE=false
+        fi
+        echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+        echo "Pre-release: $IS_PRERELEASE"
+
+    - name: Validate version format
+      run: |
+        VERSION="${{ steps.get_version.outputs.version }}"
+        if [[ ! $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[0-9]+)?)?$ ]]; then
+          echo "Invalid version format: $VERSION"
+          echo "Expected format: v1.2.3 or v1.2.3-alpha.1"
+          exit 1
+        fi
+
+  build-release-assets:
+    name: Build Release Assets
+    needs: validate-release
+    strategy:
+      matrix:
+        include:
+          # Desktop platforms
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            target: linux-x64
+          - os: windows-latest
+            platform: windows
+            arch: x64
+            target: windows-x64
+          - os: macos-latest
+            platform: macos
+            arch: x64
+            target: macos-x64
+          # ARM platforms
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
+            target: linux-arm64
+          - os: ubuntu-latest
+            platform: linux
+            arch: armhf
+            target: rpi-zero
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
+            target: rpi-4
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Setup build environment
+      run: |
+        if [ "${{ matrix.platform }}" = "linux" ]; then
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build \
+            libasound2-dev libcurl4-openssl-dev libssl-dev pkg-config
+          
+          if [ "${{ matrix.target }}" = "rpi-zero" ]; then
+            sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+          elif [ "${{ matrix.target }}" = "rpi-4" ] || [ "${{ matrix.target }}" = "linux-arm64" ]; then
+            sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          fi
+        elif [ "${{ matrix.platform }}" = "windows" ]; then
+          choco install ninja
+        elif [ "${{ matrix.platform }}" = "macos" ]; then
+          brew install ninja pkg-config
+        fi
+
+    - name: Configure CMake
+      run: |
+        if [[ "${{ matrix.target }}" == rpi-* ]]; then
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/raspberry-pi.cmake \
+            -DTARGET_PLATFORM=${{ matrix.target }} \
+            -G Ninja
+        elif [[ "${{ matrix.target }}" == "linux-arm64" ]]; then
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/linux-arm64.cmake \
+            -G Ninja
+        else
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -G Ninja
+        fi
+
+    - name: Build
+      run: cmake --build build --config ${{ env.BUILD_TYPE }} -j$(nproc)
+
+    - name: Create distribution package
+      run: |
+        cmake --build build --target package
+        
+        # Create release directory
+        mkdir -p release-${{ matrix.target }}
+        
+        # Copy binaries
+        if [ "${{ matrix.platform }}" = "windows" ]; then
+          cp build/src/ethervoxai.exe release-${{ matrix.target }}/
+          cp build/*.dll release-${{ matrix.target }}/ 2>/dev/null || true
+        else
+          cp build/src/ethervoxai release-${{ matrix.target }}/
+          cp build/*.so release-${{ matrix.target }}/ 2>/dev/null || true
+        fi
+        
+        # Copy dashboard
+        if [ -d "build/dashboard/dist" ]; then
+          cp -r build/dashboard/dist release-${{ matrix.target }}/dashboard
+        fi
+        
+        # Copy documentation
+        cp README.md CONTRIBUTING.md LICENSE release-${{ matrix.target }}/
+        
+        # Copy platform-specific files
+        if [[ "${{ matrix.target }}" == rpi-* ]]; then
+          echo "# Raspberry Pi Installation" > release-${{ matrix.target }}/INSTALL.md
+          echo "" >> release-${{ matrix.target }}/INSTALL.md
+          echo "This build is optimized for ${{ matrix.target }}" >> release-${{ matrix.target }}/INSTALL.md
+          echo "See README.md for detailed installation instructions." >> release-${{ matrix.target }}/INSTALL.md
+        fi
+        
+        # Create archive
+        if [ "${{ matrix.platform }}" = "windows" ]; then
+          7z a ethervoxai-${{ needs.validate-release.outputs.version }}-${{ matrix.target }}.zip release-${{ matrix.target }}/*
+        else
+          tar -czf ethervoxai-${{ needs.validate-release.outputs.version }}-${{ matrix.target }}.tar.gz -C release-${{ matrix.target }} .
+        fi
+
+    - name: Upload release asset
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-${{ matrix.target }}
+        path: |
+          *.zip
+          *.tar.gz
+        retention-days: 1
+
+  build-esp32-release:
+    name: Build ESP32 Release
+    needs: validate-release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: ['esp32', 'esp32s3', 'esp32c3']
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Setup ESP-IDF
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: 'v5.1.2'
+        target: ${{ matrix.target }}
+
+    - name: Build ESP32 firmware
+      run: |
+        cd src/platform/esp32
+        idf.py set-target ${{ matrix.target }}
+        idf.py build
+
+    - name: Package ESP32 release
+      run: |
+        mkdir -p esp32-release-${{ matrix.target }}
+        cd src/platform/esp32/build
+        
+        # Copy firmware files
+        cp ethervoxai.bin ../../../esp32-release-${{ matrix.target }}/
+        cp ethervoxai.elf ../../../esp32-release-${{ matrix.target }}/
+        cp bootloader/bootloader.bin ../../../esp32-release-${{ matrix.target }}/
+        cp partition_table/partition-table.bin ../../../esp32-release-${{ matrix.target }}/
+        
+        # Copy configuration
+        cp ../partitions.csv ../../../esp32-release-${{ matrix.target }}/
+        cp ../sdkconfig ../../../esp32-release-${{ matrix.target }}/
+        
+        # Create flash script
+        cd ../../../esp32-release-${{ matrix.target }}
+        cat > flash.sh << 'EOF'
+        #!/bin/bash
+        # ESP32 Flash Script
+        # Usage: ./flash.sh [port]
+        PORT=${1:-/dev/ttyUSB0}
+        
+        esptool.py --chip ${{ matrix.target }} --port $PORT --baud 460800 write_flash -z \
+          --flash_mode dio --flash_freq 40m --flash_size detect \
+          0x1000 bootloader.bin \
+          0x8000 partition-table.bin \
+          0x10000 ethervoxai.bin
+        EOF
+        chmod +x flash.sh
+        
+        # Create Windows flash script
+        cat > flash.bat << 'EOF'
+        @echo off
+        REM ESP32 Flash Script for Windows
+        REM Usage: flash.bat [COM port]
+        set PORT=%1
+        if "%PORT%"=="" set PORT=COM3
+        
+        esptool.py --chip ${{ matrix.target }} --port %PORT% --baud 460800 write_flash -z ^
+          --flash_mode dio --flash_freq 40m --flash_size detect ^
+          0x1000 bootloader.bin ^
+          0x8000 partition-table.bin ^
+          0x10000 ethervoxai.bin
+        EOF
+        
+        # Copy documentation
+        cp ../README.md ../LICENSE .
+        echo "# ESP32 ${{ matrix.target }} Firmware" > README-ESP32.md
+        echo "" >> README-ESP32.md
+        echo "Version: ${{ needs.validate-release.outputs.version }}" >> README-ESP32.md
+        echo "Target: ${{ matrix.target }}" >> README-ESP32.md
+        echo "Build Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> README-ESP32.md
+        echo "" >> README-ESP32.md
+        echo "## Flashing Instructions" >> README-ESP32.md
+        echo "" >> README-ESP32.md
+        echo "### Linux/macOS:" >> README-ESP32.md
+        echo '```bash' >> README-ESP32.md
+        echo "./flash.sh /dev/ttyUSB0" >> README-ESP32.md
+        echo '```' >> README-ESP32.md
+        echo "" >> README-ESP32.md
+        echo "### Windows:" >> README-ESP32.md
+        echo '```cmd' >> README-ESP32.md
+        echo "flash.bat COM3" >> README-ESP32.md
+        echo '```' >> README-ESP32.md
+        
+        # Create archive
+        cd ..
+        tar -czf ethervoxai-esp32-${{ matrix.target }}-${{ needs.validate-release.outputs.version }}.tar.gz esp32-release-${{ matrix.target }}/
+
+    - name: Upload ESP32 release asset
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-esp32-${{ matrix.target }}
+        path: "*.tar.gz"
+        retention-days: 1
+
+  create-release:
+    name: Create GitHub Release
+    needs: [validate-release, build-release-assets, build-esp32-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: release-assets/
+
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        VERSION="${{ needs.validate-release.outputs.version }}"
+        echo "Generating release notes for $VERSION"
+        
+        # Create release notes
+        cat > release-notes.md << EOF
+        # EtherVoxAI $VERSION
+        
+        ## What's Changed
+        
+        This release includes builds for the following platforms:
+        
+        ### Desktop Platforms
+        - **Windows x64**: Full-featured build with dashboard
+        - **Linux x64**: Full-featured build with dashboard
+        - **macOS x64**: Full-featured build with dashboard
+        - **Linux ARM64**: Optimized for 64-bit ARM systems
+        
+        ### Embedded Platforms
+        - **Raspberry Pi Zero**: Lightweight build for Pi Zero/Zero 2 W
+        - **Raspberry Pi 4/5**: Full-featured build for Pi 4/5 series
+        - **ESP32**: Firmware for ESP32 DevKits
+        - **ESP32-S3**: Firmware for ESP32-S3 with advanced features
+        - **ESP32-C3**: Compact firmware for ESP32-C3 RISC-V
+        
+        ## Installation
+        
+        1. Download the appropriate package for your platform
+        2. Extract the archive
+        3. Follow the platform-specific installation instructions in the README
+        
+        ## ESP32 Flashing
+        
+        For ESP32 devices, use the included flash scripts:
+        - Linux/macOS: \`./flash.sh /dev/ttyUSB0\`
+        - Windows: \`flash.bat COM3\`
+        
+        ## Support
+        
+        - Documentation: See README.md in each package
+        - Issues: Report on GitHub Issues
+        - Discussions: GitHub Discussions
+        
+        EOF
+        
+        # Add changelog if exists
+        if [ -f CHANGELOG.md ]; then
+          echo "## Changelog" >> release-notes.md
+          echo "" >> release-notes.md
+          awk "/^## \[$VERSION\]/,/^## \[/" CHANGELOG.md | head -n -1 >> release-notes.md
+        fi
+
+    - name: Collect release assets
+      run: |
+        mkdir -p final-release/
+        find release-assets/ -name "*.zip" -o -name "*.tar.gz" | while read file; do
+          cp "$file" final-release/
+        done
+        
+        echo "Release assets:"
+        ls -la final-release/
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ needs.validate-release.outputs.version }}
+        name: EtherVoxAI ${{ needs.validate-release.outputs.version }}
+        body_path: release-notes.md
+        prerelease: ${{ needs.validate-release.outputs.is_prerelease }}
+        files: final-release/*
+        generate_release_notes: true
+        make_latest: ${{ needs.validate-release.outputs.is_prerelease == 'false' }}
+
+  update-documentation:
+    name: Update Release Documentation
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    if: needs.validate-release.outputs.is_prerelease == 'false'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: Update version references
+      run: |
+        VERSION="${{ needs.validate-release.outputs.version }}"
+        
+        # Update README badges if they exist
+        if grep -q "version-" README.md; then
+          sed -i "s/version-[^-]*-/version-${VERSION#v}-/" README.md
+        fi
+        
+        # Update documentation version references
+        find docs/ -name "*.md" -exec sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/$VERSION/g" {} \; 2>/dev/null || true
+
+    - name: Commit documentation updates
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        if git diff --quiet; then
+          echo "No documentation changes needed"
+        else
+          git add -A
+          git commit -m "docs: update version references to ${{ needs.validate-release.outputs.version }}"
+          git push
+        fi

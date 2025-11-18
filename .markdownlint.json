@@ -1,0 +1,8 @@
+{
+  "extends": ["@markdownlint/markdownlint/style/prettier"],
+  "MD013": false,
+  "MD033": {
+    "allowed_elements": ["br", "details", "summary", "img"]
+  },
+  "MD041": false
+}

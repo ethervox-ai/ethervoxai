@@ -1,0 +1,207 @@
+name: Build ESP32 Firmware
+
+on:
+  push:
+    branches: [ main, develop, 'feature/**', 'hotfix/**' ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'ESP32 target board'
+        required: true
+        default: 'esp32'
+        type: choice
+        options:
+          - esp32
+          - esp32s2
+          - esp32s3
+          - esp32c3
+          - esp32c6
+
+env:
+  IDF_VERSION: 'v5.1.2'
+
+jobs:
+  build-esp32:
+    name: Build ESP32 Firmware
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: ['esp32', 'esp32s2', 'esp32s3', 'esp32c3', 'esp32c6']
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Setup ESP-IDF
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: ${{ env.IDF_VERSION }}
+        target: ${{ matrix.target }}
+
+    - name: Cache ESP-IDF tools
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.espressif
+          ~/.cache/pip
+        key: ${{ runner.os }}-esp-idf-${{ env.IDF_VERSION }}-${{ matrix.target }}
+        restore-keys: |
+          ${{ runner.os }}-esp-idf-${{ env.IDF_VERSION }}-
+          ${{ runner.os }}-esp-idf-
+
+    - name: Configure ESP32 project
+      run: |
+        cd src/platform/esp32
+        idf.py set-target ${{ matrix.target }}
+        idf.py reconfigure
+
+    - name: Build ESP32 firmware
+      run: |
+        cd src/platform/esp32
+        idf.py build
+
+    - name: Generate build info
+      run: |
+        cd src/platform/esp32
+        echo "ESP32_TARGET=${{ matrix.target }}" >> build_info.txt
+        echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> build_info.txt
+        echo "COMMIT_SHA=${{ github.sha }}" >> build_info.txt
+        echo "IDF_VERSION=${{ env.IDF_VERSION }}" >> build_info.txt
+
+    - name: Package ESP32 artifacts
+      run: |
+        mkdir -p esp32-artifacts-${{ matrix.target }}
+        cd src/platform/esp32/build
+        
+        # Copy firmware binaries
+        cp ethervoxai.bin ../../../esp32-artifacts-${{ matrix.target }}/
+        cp ethervoxai.elf ../../../esp32-artifacts-${{ matrix.target }}/
+        cp bootloader/bootloader.bin ../../../esp32-artifacts-${{ matrix.target }}/
+        cp partition_table/partition-table.bin ../../../esp32-artifacts-${{ matrix.target }}/
+        
+        # Copy partition table and other config files
+        cp ../partitions.csv ../../../esp32-artifacts-${{ matrix.target }}/
+        cp ../sdkconfig ../../../esp32-artifacts-${{ matrix.target }}/
+        cp ../build_info.txt ../../../esp32-artifacts-${{ matrix.target }}/
+        
+        # Generate flash instructions
+        echo "# ESP32 Flash Instructions" > ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
+        echo "" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
+        echo "Target: ${{ matrix.target }}" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
+        echo "Built: $(date)" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
+        echo "" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
+        echo "## Flash Command:" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
+        echo '```bash' >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
+        echo "esptool.py --chip ${{ matrix.target }} --port /dev/ttyUSB0 --baud 460800 write_flash -z \\" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
+        echo "  --flash_mode dio --flash_freq 40m --flash_size detect \\" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
+        echo "  0x1000 bootloader.bin \\" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
+        echo "  0x8000 partition-table.bin \\" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
+        echo "  0x10000 ethervoxai.bin" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
+        echo '```' >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
+
+    - name: Upload ESP32 artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ethervoxai-esp32-${{ matrix.target }}-${{ github.sha }}
+        path: esp32-artifacts-${{ matrix.target }}/
+        retention-days: 30
+
+    - name: Check firmware size
+      run: |
+        cd src/platform/esp32/build
+        echo "=== Firmware Size Analysis ==="
+        echo "Target: ${{ matrix.target }}"
+        echo "Firmware size: $(stat -c%s ethervoxai.bin) bytes"
+        echo "Bootloader size: $(stat -c%s bootloader/bootloader.bin) bytes"
+        echo "Partition table size: $(stat -c%s partition_table/partition-table.bin) bytes"
+        
+        # Show memory usage
+        if [ -f ethervoxai.map ]; then
+          echo "=== Memory Usage ==="
+          grep -A 20 "Memory Configuration" ethervoxai.map || echo "Memory info not available"
+        fi
+
+  validate-esp32-config:
+    name: Validate ESP32 Configuration
+    runs-on: ubuntu-latest
+    needs: build-esp32
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup ESP-IDF
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: ${{ env.IDF_VERSION }}
+        target: esp32
+
+    - name: Validate sdkconfig
+      run: |
+        cd src/platform/esp32
+        echo "=== Validating ESP32 Configuration ==="
+        
+        # Check for required configs
+        if ! grep -q "CONFIG_ETHERVOXAI_ENABLE=y" sdkconfig.defaults; then
+          echo "Warning: EtherVoxAI not enabled in default config"
+        fi
+        
+        # Validate memory settings
+        if grep -q "CONFIG_SPIRAM_SUPPORT=y" sdkconfig.defaults; then
+          echo "✓ PSRAM support enabled"
+        else
+          echo "Warning: PSRAM support not enabled - may limit functionality"
+        fi
+        
+        # Check WiFi settings
+        if grep -q "CONFIG_ESP32_WIFI_SW_COEXIST_ENABLE=y" sdkconfig.defaults; then
+          echo "✓ WiFi coexistence enabled"
+        fi
+        
+        echo "Configuration validation complete"
+
+  security-check-esp32:
+    name: ESP32 Security Check
+    runs-on: ubuntu-latest
+    needs: build-esp32
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup ESP-IDF
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: ${{ env.IDF_VERSION }}
+        target: esp32
+
+    - name: Security configuration check
+      run: |
+        cd src/platform/esp32
+        echo "=== ESP32 Security Check ==="
+        
+        # Check for secure boot configuration
+        if grep -q "CONFIG_SECURE_BOOT=y" sdkconfig.defaults; then
+          echo "✓ Secure boot enabled"
+        else
+          echo "Info: Secure boot not enabled (recommended for production)"
+        fi
+        
+        # Check for flash encryption
+        if grep -q "CONFIG_SECURE_FLASH_ENC_ENABLED=y" sdkconfig.defaults; then
+          echo "✓ Flash encryption enabled"
+        else
+          echo "Info: Flash encryption not enabled (recommended for production)"
+        fi
+        
+        # Check for debug settings in production
+        if grep -q "CONFIG_LOG_DEFAULT_LEVEL_DEBUG=y" sdkconfig.defaults; then
+          echo "Warning: Debug logging enabled - not recommended for production"
+        fi
+        
+        echo "Security check complete"
