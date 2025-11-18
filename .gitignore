@@ -1,7 +1,57 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+.venv/
+build
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+.env.test
+.env.production
+.env.local
+
+# Logs
+logs
+*.log
+
 # Build outputs
 dist/
 build/
 out/
+build-*/
+sysroot/
+esp32-project/build/
 
 # OS generated files
 .DS_Store
@@ -32,3 +82,23 @@ implementations/python/AI_RESPONSE_STATUS.md
 implementations/python/REAL_MODEL_IMPROVEMENTS.md
 INTERNAL-*.md
 INTERNAL_*.md
+.pio/
+docs/INTERNAL_AI-INTEGRATION-SUMMARY.md
+docs/INTERNAL_BUG_FIX_COMPLETE.md
+docs/INTERNAL_README_WINDOWS_DEMO.md
+docs/INTERNAL_WINDOWS_DESKTOP_DEMO.md
+docs/INTERNAL_REFACTORING-SUMMARY.md
+docs/INTERNAL_MULTI-LANGUAGE-STRATEGY.md
+docs/INTERNAL_MODEL-INTEGRATION-STRATEGY.md
+
+# ESP32 build artifacts
+esp32-project/build/
+esp32-project/sdkconfig
+esp32-project/sdkconfig.old
+esp32-project/.cache/
+esp32-project/dependencies.lock
+
+# CI/CD artifacts
+run-artifacts/
+*.md.bak
+bin/act
