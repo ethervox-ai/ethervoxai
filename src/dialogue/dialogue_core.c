@@ -305,9 +305,9 @@ void ethervox_dialogue_cleanup(ethervox_dialogue_engine_t* engine) {
       if (ctx->conversation_id) {
         free(ctx->conversation_id);
       }
-      if (ctx->user_id) {
-        free(ctx->user_id);
-      }
+      free(ctx->user_id);
+      
+      
       if (ctx->conversation_history) {
         for (uint32_t j = 0; j < ctx->history_count; j++) {
           ethervox_intent_free(&ctx->conversation_history[j]);
