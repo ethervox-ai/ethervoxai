@@ -45,9 +45,10 @@ void ethervox_log(ethervox_log_level_t level, const char* file, int line,
     
     // Get timestamp
     time_t now = time(NULL);
-    struct tm* tm_info = localtime(&now);
+    struct tm tm_info;
     char timestamp[20];
-    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", tm_info);
+    localtime_r(&now, &tm_info);
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &tm_info);
     
     // Print log prefix
     fprintf(stderr, "[%s] [%s] [%s:%d %s] ", 
