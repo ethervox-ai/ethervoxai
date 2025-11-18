@@ -420,10 +420,6 @@ void pipeline_cleanup(voice_pipeline_t* pipeline) {
     pipeline->model_manager = NULL;
   }
   
-  if (pipeline->model_manager) {
-    ethervox_model_manager_destroy(pipeline->model_manager);
-    pipeline->model_manager = NULL;
-  }
 
   ethervox_dialogue_cleanup(&pipeline->dialogue);
 
