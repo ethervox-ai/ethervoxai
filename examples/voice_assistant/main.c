@@ -374,8 +374,6 @@ int pipeline_init(voice_pipeline_t* pipeline, const char* language_override, boo
             }
           }
         }
-skip_llm_load:
-        (void)0;  // Label target
       }
     }
   } else {
