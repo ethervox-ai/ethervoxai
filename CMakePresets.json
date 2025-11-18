@@ -1,0 +1,194 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 16,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default Desktop Build",
+      "description": "Default configuration for desktop development",
+      "generator": "Ninja",
+      "binaryDir": "build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTS": "ON",
+        "BUILD_EXAMPLES": "ON"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug Desktop Build", 
+      "description": "Debug configuration with full symbols and coverage",
+      "generator": "Ninja",
+      "binaryDir": "build-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_TESTS": "ON",
+        "BUILD_EXAMPLES": "ON",
+        "ENABLE_DEBUG": "ON",
+        "ENABLE_COVERAGE": "ON"
+      }
+    },
+    {
+      "name": "esp32-s3",
+      "displayName": "ESP32-S3 Cross-compilation",
+      "description": "Cross-compilation build for ESP32-S3 platform",
+      "generator": "Ninja", 
+      "binaryDir": "build-esp32-s3",
+      "toolchainFile": "cmake/esp32-toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "TARGET_PLATFORM": "ESP32",
+        "ESP32_TARGET": "esp32s3",
+        "BUILD_TESTS": "OFF",
+        "BUILD_EXAMPLES": "OFF",
+        "ENABLE_DEBUG": "OFF"
+      },
+      "environment": {
+        "IDF_TARGET": "esp32s3"
+      }
+    },
+    {
+      "name": "esp32-c3",
+      "displayName": "ESP32-C3 Cross-compilation",
+      "description": "Cross-compilation build for ESP32-C3 RISC-V platform",
+      "generator": "Ninja",
+      "binaryDir": "build-esp32-c3", 
+      "toolchainFile": "cmake/esp32-toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "TARGET_PLATFORM": "ESP32",
+        "ESP32_TARGET": "esp32c3",
+        "BUILD_TESTS": "OFF",
+        "BUILD_EXAMPLES": "OFF",
+        "ENABLE_DEBUG": "OFF"
+      },
+      "environment": {
+        "IDF_TARGET": "esp32c3"
+      }
+    },
+    {
+      "name": "esp32-original",
+      "displayName": "ESP32 Original Cross-compilation",
+      "description": "Cross-compilation build for original ESP32 platform",
+      "generator": "Ninja",
+      "binaryDir": "build-esp32-original",
+      "toolchainFile": "cmake/esp32-toolchain.cmake", 
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "TARGET_PLATFORM": "ESP32",
+        "ESP32_TARGET": "esp32",
+        "BUILD_TESTS": "OFF",
+        "BUILD_EXAMPLES": "ON",
+        "ENABLE_DEBUG": "OFF"
+      },
+      "environment": {
+        "IDF_TARGET": "esp32"
+      }
+    },
+    {
+      "name": "rpi-zero",
+      "displayName": "Raspberry Pi Zero Cross-compilation",
+      "description": "Cross-compilation build for Raspberry Pi Zero (ARMv6)",
+      "generator": "Ninja",
+      "binaryDir": "build-rpi-zero",
+      "toolchainFile": "cmake/rpi-toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release", 
+        "TARGET_PLATFORM": "RPI",
+        "RPI_TARGET": "zero",
+        "BUILD_TESTS": "ON",
+        "BUILD_EXAMPLES": "ON"
+      }
+    },
+    {
+      "name": "rpi-4",
+      "displayName": "Raspberry Pi 4/5 Cross-compilation", 
+      "description": "Cross-compilation build for Raspberry Pi 4/5 (ARMv8)",
+      "generator": "Ninja",
+      "binaryDir": "build-rpi-4",
+      "toolchainFile": "cmake/rpi-toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "TARGET_PLATFORM": "RPI", 
+        "RPI_TARGET": "rpi4",
+        "BUILD_TESTS": "ON",
+        "BUILD_EXAMPLES": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "jobs": 0
+    },
+    {
+      "name": "debug", 
+      "configurePreset": "debug",
+      "jobs": 0
+    },
+    {
+      "name": "esp32-s3",
+      "configurePreset": "esp32-s3",
+      "jobs": 0
+    },
+    {
+      "name": "esp32-c3",
+      "configurePreset": "esp32-c3", 
+      "jobs": 0
+    },
+    {
+      "name": "esp32-original",
+      "configurePreset": "esp32-original",
+      "jobs": 0
+    },
+    {
+      "name": "rpi-zero",
+      "configurePreset": "rpi-zero",
+      "jobs": 0
+    },
+    {
+      "name": "rpi-4",
+      "configurePreset": "rpi-4",
+      "jobs": 0
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "output": {
+        "outputOnFailure": true,
+        "verbosity": "default"
+      }
+    },
+    {
+      "name": "debug",
+      "configurePreset": "debug", 
+      "output": {
+        "outputOnFailure": true,
+        "verbosity": "verbose"
+      }
+    },
+    {
+      "name": "rpi-zero",
+      "configurePreset": "rpi-zero",
+      "output": {
+        "outputOnFailure": true,
+        "verbosity": "default"
+      }
+    },
+    {
+      "name": "rpi-4",
+      "configurePreset": "rpi-4",
+      "output": {
+        "outputOnFailure": true,
+        "verbosity": "default" 
+      }
+    }
+  ]
+}

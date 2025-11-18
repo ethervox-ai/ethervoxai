@@ -36,21 +36,42 @@ jobs:
 
     - name: Get version
       id: get_version
+      env:
+        INPUT_VERSION: "${{ github.event.inputs.version }}"
+        EVENT_NAME: "${{ github.event_name }}"
       run: |
-        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-          VERSION="${{ github.event.inputs.version }}"
+        # Use env variables (populated from expressions) inside the shell to avoid
+        # direct expression interpolation in the run block.
+        if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+          VERSION="$INPUT_VERSION"
         else
           VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        # Basic whitelist: allow v prefixed semver-like strings with letters/numbers/.-_
+        if ! [[ "$VERSION" =~ ^v[0-9A-Za-z._-]+$ ]]; then
+          echo "Invalid or unsafe version value: $VERSION" >&2
+          exit 1
         fi
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Version: $VERSION"
 
     - name: Check if pre-release
       id: check_prerelease
+      env:
+        VERSION_OUT: "${{ steps.get_version.outputs.version }}"
+        EVENT_NAME: "${{ github.event_name }}"
+        INPUT_PRERELEASE: "${{ github.event.inputs.prerelease }}"
       run: |
-        VERSION="${{ steps.get_version.outputs.version }}"
-        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-          IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
+        # Read values from env (populated from action expressions) to avoid
+        # embedding expressions directly in the run script.
+        VERSION="$VERSION_OUT"
+        # Re-validate VERSION here in case it's propagated from outputs
+        if ! [[ "$VERSION" =~ ^v[0-9A-Za-z._-]+$ ]]; then
+          echo "Invalid or unsafe version value at check_prerelease: $VERSION" >&2
+          exit 1
+        fi
+        if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+          IS_PRERELEASE="$INPUT_PRERELEASE"
         elif [[ $VERSION =~ (alpha|beta|rc|pre) ]]; then
           IS_PRERELEASE=true
         else
@@ -128,27 +149,16 @@ jobs:
           brew install ninja pkg-config
         fi
 
-    - name: Configure CMake
+    - name: Configure (Makefile)
       run: |
         if [[ "${{ matrix.target }}" == rpi-* ]]; then
-          cmake -B build \
-            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/raspberry-pi.cmake \
-            -DTARGET_PLATFORM=${{ matrix.target }} \
-            -G Ninja
-        elif [[ "${{ matrix.target }}" == "linux-arm64" ]]; then
-          cmake -B build \
-            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/linux-arm64.cmake \
-            -G Ninja
+          make configure-rpi
         else
-          cmake -B build \
-            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -G Ninja
+          make configure TARGET_PLATFORM=${{ matrix.platform }}
         fi
 
-    - name: Build
-      run: cmake --build build --config ${{ env.BUILD_TYPE }} -j$(nproc)
+    - name: Build (Makefile)
+      run: make build
 
     - name: Create distribution package
       run: |
@@ -326,11 +336,49 @@ jobs:
         VERSION="${{ needs.validate-release.outputs.version }}"
         echo "Generating release notes for $VERSION"
         
-        # Create release notes
+        # Get the previous tag for changelog generation
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+        
+        # Create release notes with auto-generated changelog
         cat > release-notes.md << EOF
         # EtherVoxAI $VERSION
         
         ## What's Changed
+        
+        EOF
+        
+        # Generate changelog from commits if previous tag exists
+        if [[ -n "$PREVIOUS_TAG" ]]; then
+          echo "### Changes since $PREVIOUS_TAG" >> release-notes.md
+          echo "" >> release-notes.md
+          
+          # Get commits between tags, categorize them
+          git log $PREVIOUS_TAG..HEAD --oneline --format="format:%s" | while read -r commit; do
+            if [[ $commit =~ ^feat(\(.*\))?:.*|^add.*|^implement.* ]]; then
+              echo "- ✨ $commit" >> release-notes.md
+            elif [[ $commit =~ ^fix(\(.*\))?:.*|^bug.*|^resolve.* ]]; then
+              echo "- 🐛 $commit" >> release-notes.md
+            elif [[ $commit =~ ^docs(\(.*\))?:.*|^update.*README|^improve.*docs ]]; then
+              echo "- 📚 $commit" >> release-notes.md
+            elif [[ $commit =~ ^perf(\(.*\))?:.*|^optimize.*|^improve.*performance ]]; then
+              echo "- ⚡ $commit" >> release-notes.md
+            elif [[ $commit =~ ^refactor(\(.*\))?:.*|^restructure.*|^cleanup.* ]]; then
+              echo "- ♻️ $commit" >> release-notes.md
+            elif [[ $commit =~ ^test(\(.*\))?:.*|^add.*test|^update.*test ]]; then
+              echo "- 🧪 $commit" >> release-notes.md
+            elif [[ $commit =~ ^ci(\(.*\))?:.*|^github.*action|^workflow.* ]]; then
+              echo "- 🔧 $commit" >> release-notes.md
+            else
+              echo "- 📝 $commit" >> release-notes.md
+            fi
+          done
+          
+          echo "" >> release-notes.md
+        fi
+        
+        cat >> release-notes.md << EOF
+        
+        ## Platform Support
         
         This release includes builds for the following platforms:
         

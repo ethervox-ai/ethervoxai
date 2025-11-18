@@ -14,6 +14,8 @@ pids
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov
+.venv/
+build
 
 # nyc test coverage
 .nyc_output
@@ -47,6 +49,9 @@ logs
 dist/
 build/
 out/
+build-*/
+sysroot/
+esp32-project/build/
 
 # TypeScript incremental build info
 *.tsbuildinfo
@@ -153,7 +158,6 @@ REAL_MODEL_INTEGRATION_COMPLETE.md
 implementations/python/AI_RESPONSE_STATUS.md
 implementations/python/REAL_MODEL_IMPROVEMENTS.md
 INTERNAL-*.md
-<<<<<<< HEAD
 .pio/
 docs/INTERNAL_AI-INTEGRATION-SUMMARY.md
 docs/INTERNAL_BUG_FIX_COMPLETE.md
@@ -161,15 +165,16 @@ docs/INTERNAL_README_WINDOWS_DEMO.md
 docs/INTERNAL_WINDOWS_DESKTOP_DEMO.md
 docs/INTERNAL_REFACTORING-SUMMARY.md
 docs/INTERNAL_MULTI-LANGUAGE-STRATEGY.md
-=======
-INTERNAL_*.md
-.pio/
-org-*.md
-package-lock.json
+docs/INTERNAL_MODEL-INTEGRATION-STRATEGY.md
 
-# Private implementations moved to separate repositories
-# ===================================================
+# ESP32 build artifacts
+esp32-project/build/
+esp32-project/sdkconfig
+esp32-project/sdkconfig.old
+esp32-project/.cache/
+esp32-project/dependencies.lock
 
-# Android implementation (moved to private repo)
-implementations/android/
->>>>>>> adb2855380b923fb4a5786acdc70450e196d3c03
+# CI/CD artifacts
+run-artifacts/
+*.md.bak
+bin/act

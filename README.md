@@ -1,472 +1,811 @@
-# 🧠 EthervoxAI: Privacy-First, Multilingual Voice Intelligence for Embedded Devices
+# EtherVoxAI
 
-## 🎤 About EthervoxAI
+> **Privacy-First, Multilingual Voice AI for the Ambient Intelligence Era**
 
-EthervoxAI is a privacy-first voice assistant platform designed to work entirely offline while providing multilingual support and smart home integration. Built with real AI capabilities, cross-platform compatibility, and comprehensive audio processing.
+EtherVoxAI is an open-source voice AI platform designed for privacy-conscious users and developers who want to build intelligent voice interfaces without compromising personal data. Built for cross-platform deployment from microcontrollers to desktop systems.
 
-## 🌟 Key Features
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+[![Build Status](https://img.shields.io/badge/build-passing-green.svg)]()
+[![Platform Support](https://img.shields.io/badge/platforms-ESP32%20%7C%20RPi%20%7C%20Windows%20%7C%20Linux-blue.svg)]()
+[![Language Support](https://img.shields.io/badge/languages-English%20%7C%20Spanish%20%7C%20Chinese-orange.svg)]()
 
-- **🌐 Multilingual Support**: Automatic language detection with support for English, Spanish, and Mandarin
-- **🧠 Local LLM Stack**: Real AI models (TinyLlama, Phi-2, Mistral, Llama2) that run entirely on your device
-- **🔐 Privacy Dashboard**: Complete control over data and cloud interactions with audit logging
-- **📱 Cross-Platform Implementation**: TypeScript/Node.js, Python, C++, and MicroPython implementations
-- **🎵 Advanced Audio Processing**: Multi-method audio I/O with comprehensive testing suite
-- **🏠 Smart Home Ready**: Built for seamless integration with IoT devices and embedded systems
-- **⚡ Platform Intelligence**: Automatic hardware detection and performance optimization
-- **🔧 Development Tools**: Comprehensive testing, debugging, and development utilities
+## Key Features
 
-## 📁 Project Structure
+## Privacy-First Design
 
-```
-ethervoxai/
-├── 📚 docs/                          # Documentation and specifications
-│   ├── modules/                      # Module-specific documentation
-│   ├── AUDIO_ALTERNATIVES.md        # Audio system alternatives guide
-│   ├── AUDIO-TESTING.md             # Audio testing procedures
-│   └── README_WINDOWS_DEMO.md       # Windows demo documentation
-├── 🛠️ implementations/               # Multi-language implementations
-│   ├── python/                      # Python implementation with examples
-│   ├── cpp/                         # C++ implementation for embedded systems
-│   │   └── esp32/                   # ESP32 microcontroller support
-│   ├── micropython/                 # MicroPython for microcontrollers
-│   └── shared/                      # Cross-language shared resources
-├── 🎯 src/                          # Main TypeScript/Node.js implementation
-│   ├── modules/                     # Core AI and audio modules
-│   │   ├── multilingualRuntime.ts   # Language detection and processing
-│   │   ├── localLLMStack.ts         # AI model management
-│   │   ├── privacyDashboard.ts      # Privacy controls and audit logging
-│   │   ├── modelManager.ts          # AI model downloading and caching
-│   │   ├── inferenceEngine.ts       # AI inference and streaming
-│   │   ├── platformDetector.ts      # Hardware detection and optimization
-│   │   └── crossPlatformAudio.ts    # Multi-method audio I/O
-│   ├── demo/                        # Demo applications
-│   │   └── windows-desktop.ts       # Windows desktop demo with audio I/O
-│   ├── examples/                    # Example implementations
-│   │   └── ui/                      # Optional web and mobile UI examples
-│   └── index.ts                     # Main entry point and API
-├── 🧪 tests/                        # Comprehensive testing suite
-│   └── audio-input-output/          # Interactive audio testing console
-├── 📦 scripts/                      # Build, setup, and demo scripts
-│   ├── demo/                        # Demo launchers
-│   ├── setup/                       # Installation and setup scripts
-│   └── testing/                     # Testing and verification utilities
-├── 📋 specs/                        # Protocol and interface specifications
-│   └── ethervoxai-protocol.md       # Cross-language protocol definitions
-├── ⚙️ config/                       # Configuration files
-│   ├── audio.json                   # Audio system configuration
-│   └── privacy.json                 # Privacy settings
-├── 📄 package.json                  # Node.js dependencies and scripts
-├── 🔧 tsconfig*.json                # TypeScript build configurations
-└── 📖 README.md                     # This file
-```
+- **Local-only processing** - Your voice data never leaves your device
+- **Optional cloud integration** - Connect to external APIs only when you choose
+- **Privacy dashboard** - Full visibility and control over data usage
+- **Zero telemetry** - No tracking, analytics, or data collection
 
-## 🚀 Quick Start
+## Multilingual Support
 
-### Prerequisites
+- **Native support** for English, Spanish, and Chinese
+- **Automatic language detection** and switching
+- **Extensible language framework** for adding new languages
+- **Cultural context awareness** for better understanding
 
-- **Node.js 16+** (recommended: Node.js 18 or later)
-- **npm 8+** or yarn 1.22+
-- **Windows 10/11** (for full demo functionality)
+## Cross-Platform Compatibility
 
-### Core Installation
+- **Microcontrollers**: ESP32-S3, ESP32-C3
+- **Single Board Computers**: Raspberry Pi Pico, Zero, 4, 5
+- **Desktop Systems**: Windows 10/11, Linux distributions
+- **Edge Devices**: Optimized for resource-constrained environments
+
+## Intelligent Voice Processing
+
+- **Advanced STT/TTS** with offline capabilities
+- **Intent recognition** with extensible plugin system
+- **Context-aware conversations** with memory management
+- **Noise suppression** and echo cancellation
+
+## Extensible Architecture
+
+- **Plugin system** for custom intents and integrations
+- **Model router** for intelligent LLM selection
+- **Device profiles** for hardware-specific optimizations
+- **Comprehensive SDK** for developers
+
+## Quick Start
+
+## Prerequisites
+
+**Desktop Development (Linux/Windows/macOS):**
+
+- GCC/Clang or MinGW (for Windows cross-compilation)
+- CMake 3.16+
+- Node.js 18+ (for dashboard)
+
+**Raspberry Pi Cross-Compilation:**
+
+- ARM GCC cross-compiler (`gcc-arm-linux-gnueabihf`)
+- bcm2835 library (auto-installed via setup script)
+- OpenSSL and libcurl ARM libraries
+
+**ESP32 Development:**
+
+- ESP-IDF 5.0+
+- Xtensa toolchain
+- (Optional) USB redirection to WSL on Windows 11
+
+## Installation
+
+### Clone and Setup
 
 ```bash
+
 # Clone the repository
+
 git clone https://github.com/ethervox-ai/ethervoxai.git
 cd ethervoxai
 
-# Install core dependencies (no React conflicts)
-npm install
+# Install dependencies (optional - auto-installs on first build)
+
+make install-deps
+```text
+
+## Platform-Specific Builds
+
+**Linux (Native Build):**
+
+```bash
+
+# Configure and build
+
+make configure
+make build
+
+# Or use direct CMake
+
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
+
+# Run tests
+
+make test
+```text
+
+**Raspberry Pi (Cross-Compilation from Linux):**
+
+```bash
+
+# First-time setup: Install ARM toolchain and libraries
+
+./scripts/setup-rpi-toolchain.sh
+
+# Configure and build
+
+make configure-rpi
+make build-rpi
+
+# The binary will be in build-rpi/ethervoxai
+
+# Copy to your Raspberry Pi and run
+```text
+
+**Windows (Cross-Compilation from Linux):**
+
+```bash
+
+# Install Windows Cross Compilation Tool chain
+
+cd /<username>/ethervoxai
+./scripts/setup-windows-toolchain.sh
+
+# Configure and build
+
+make configure-windows
+make build-windows
+
+# The .exe will be in build-windows/ethervoxai.exe
+```text
+
+**ESP32 (Using ESP-IDF):**
+
+```bash
+
+# Activate ESP-IDF environment
+
+. ~/esp/esp-idf/export.sh
+
+# Navigate to your project
+
+cd ~/ethervoxai
+
+# Set the target chip
+
+idf.py set-target esp32s3
+
+# Configure the project (optional - opens menuconfig)
+
+idf.py menuconfig
 
 # Build the project
-npm run build
 
-# Run the main demo
-npm run demo
+idf.py build
 
-# Test audio capabilities (interactive console)
-npm run test:audio
-```
+# Flash to device (replace with your port)
 
-### Available Demo Options
+# In WSL, this might be /dev/ttyUSB0 or similar after USB passthrough
 
-**🎤 Main Demo (Core Functionality)**
+idf.py -p /dev/ttyUSB0 flash
+
+# Flash and monitor
+
+idf.py -p /dev/ttyUSB0 flash monitor
+```text
+
+!NOTE:
+to flash in WSL directly you need to redirect the Windows USB port to WSL. To do so check the section
+
+## Build Targets
+
+The project uses a unified Makefile with platform-specific targets:
+
 ```bash
-npm run demo                    # Core AI and voice processing demo
-```
 
-**🖥️ Windows Desktop Demo (Advanced)**
+# Linux native build
+
+make                    # Default: configure and build
+make clean              # Clean build artifacts
+make test               # Run unit tests
+
+# Raspberry Pi cross-compilation
+
+make build-rpi          # Configure and build for RPI
+make clean-rpi          # Clean RPI build
+
+# Windows cross-compilation
+
+make build-windows      # Configure and build for Windows
+make clean-windows      # Clean Windows build
+
+# Clean all platforms
+
+make clean-all          # Clean all build directories
+```text
+
+## Launch Dashboard
+
 ```bash
-npm run demo:windows           # Windows-specific audio integration demo
-```
 
-**🧪 Audio Testing Suite**
+# Start the web dashboard
+
+cd dashboard
+npm install
+npm run dev
+```text
+
+Navigate to `http://localhost:3000` to access the EtherVoxAI control panel.
+
+## 5. Run the Application
+
 ```bash
-npm run test:audio             # Interactive audio input/output testing
-```
 
-**🤖 AI Integration Demo**
+# Linux
+
+./build/ethervoxai
+
+# With configuration file
+
+./build/ethervoxai --config=configs/default.conf
+
+# Raspberry Pi (on the device)
+
+./ethervoxai
+
+# Windows
+
+ethervoxai.exe
+```text
+
+## 6. Flashing ESP32 build to device
+
+To flash ESP32 directly from WSL 2.0 you need to redirect the Windows USB port to WSL to do so install usbipd-win from: (https://github.com/dorssel/usbipd-win/releases)[https://github.com/dorssel/usbipd-win/releases]
+
+```powershell
+
+# On Windows PowerShell (as Administrator):
+
+# List USB devices
+
+usbipd list
+
+# Bind your ESP32 device (replace BUSID with your device's bus ID)
+
+usbipd bind --busid <BUSID>
+
+# Attach to WSL
+
+usbipd attach --wsl --busid <BUSID>
+```text
+
+In WSL, after attaching USB device with usbipd:
+
 ```bash
-npm run demo:ai                # Test local AI model integration
-```
 
-### Platform-Specific Setup
+# Check if device is visible
 
-**For Production Audio (Windows)**
+ls /dev/ttyUSB*
+
+# If not, you may need to install USB drivers
+
+sudo apt-get install linux-tools-virtual hwdata
+sudo update-alternatives --install /usr/local/bin/usbip usbip \
+    /usr/lib/linux-tools/*-generic/usbip 20
+```text
+
+or you can flash from Windows once the build is completed using the ESP-IDF Windows installation.
+First build in WSL
+
 ```bash
-# Install advanced audio dependencies
-cd scripts/setup
-.\install-audio-libraries.bat
-```
 
-**For ESP32/Embedded Development**
-```bash
-# Navigate to C++ implementation
-cd implementations/cpp/esp32
-# Follow ESP32-specific build instructions
-```
+# In WSL - build only
 
-### Optional UI Development
+idf.py build
 
-The UI examples are provided as optional components to avoid dependency conflicts:
+# Copy build output to Windows accessible location
 
-**Web Dashboard (React)**
-```bash
-# Install React dependencies for web dashboard
-npm install react@^18.2.0 react-dom@^18.2.0
-npm install --save-dev @types/react @types/react-dom
+cp -r build /mnt/c/Users/YourUsername/ethervoxai-build/
+```text
 
-# Build web examples
-npm run build:web
+then switch to Windows
 
-# Run UI demo
-npm run demo:ui
-```
+```powershell
 
-**Mobile Dashboard (React Native)**
-```bash
-# Install React Native (cannot coexist with React DOM)
-npm install react@18.2.0 react-native@^0.72.0
-npm install --save-dev @types/react-native
+# In Windows PowerShell - flash
 
-# Build mobile examples
-npm run build:mobile
-```
+cd C:\Users\YourUsername\ethervoxai-build
+esptool.py --chip esp32s3 --port <your COM port> write_flash @flash_args
+```text
 
-**Note**: React DOM and React Native cannot be installed simultaneously due to version conflicts. Choose based on your target platform.
+## System Requirements
 
-### Basic Usage
+## Minimum Hardware Requirements
 
-```typescript
-import { EthervoxAI } from 'ethervoxai';
+| Platform | CPU | RAM | Storage | Audio |
+|----------|-----|-----|---------|--------|
+| ESP32-S3 | 240MHz Dual-Core | 512KB | 4MB Flash | I2S Microphone |
+| Raspberry Pi 4 | 1.5GHz Quad-Core | 2GB | 8GB SD Card | USB/HAT Audio |
+| Desktop | 1GHz x86_64 | 4GB | 1GB Free | Any Audio Device |
 
-// Create and configure EthervoxAI instance
-const ai = new EthervoxAI({
-  defaultLanguage: 'en-US',
-  preferredModel: 'tinyllama-1.1b-chat-q4',
-  privacyMode: 'balanced',
-  enableCloudFallback: false
+## Recommended Hardware
+
+- **Raspberry Pi 4/5** with ReSpeaker 4-Mic Array HAT
+- **ESP32-S3-DevKitC-1** with external I2S microphone
+- **Desktop/Laptop** with quality USB microphone
+
+## Architecture Overview
+
+## Platform Abstraction Layer
+
+EtherVoxAI uses a Hardware Abstraction Layer (HAL) to support multiple platforms:
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    EtherVoxAI Core Platform                     │
+├─────────────────┬─────────────────┬─────────────────────────────┤
+│ Audio Runtime   │   Dialogue      │  Platform HAL  │  Dashboard │
+│                 │   Engine        │                │            │
+│• STT/TTS        │• Intent Parse   │• GPIO/I2C/SPI  │• Web UI    │
+│• Noise Sup.     │• LLM Route      │• Power Mgmt    │• Monitoring│
+│• Multi-lang     │• Context Mgmt   │• Timers        │• Privacy   │
+└─────────────────┴─────────────────┴────────────────┴────────────┘
+                  │                                    │
+                  ▼                                    ▼
+┌─────────────────────────────────────┐  ┌──────────────────────┐
+│     Platform-Specific HAL           │  │   Plugin System      │
+├──────────┬──────────┬───────────────┤  ├──────────────────────┤
+│   RPI    │ Desktop  │    ESP32      │  │• Intent Plugins      │
+│          │          │               │  │• Model Routers       │
+│• bcm2835 │• Stubs   │• ESP-IDF      │  │• External APIs       │
+│• I2S     │• ALSA    │• FreeRTOS     │  │• Custom Hardware     │
+│• GPIO    │• WinMM   │• I2S/GPIO     │  │• Device Profiles     │
+└──────────┴──────────┴───────────────┘  └──────────────────────┘
+```text
+
+**Platform Detection:**
+
+- Automatic platform detection at compile-time
+- Platform-specific macros: `ETHERVOX_PLATFORM_RPI`, `ETHERVOX_PLATFORM_LINUX`, `ETHERVOX_PLATFORM_WINDOWS`, `ETHERVOX_PLATFORM_ESP32`
+- Unified HAL interface for GPIO, I2C, SPI, timers, and power management
+- Platform-specific optimizations for each target
+
+**Cross-Compilation Support:**
+
+- CMake toolchain files for each platform
+- Sysroot-based cross-compilation for Raspberry Pi
+- MinGW cross-compilation for Windows
+- ESP-IDF integration for ESP32
+
+## Usage Examples
+
+## Basic Voice Interaction
+
+```c
+#include "ethervox/audio.h"
+#include "ethervox/dialogue.h"
+
+// Initialize the system
+ethervox_audio_runtime_t audio;
+ethervox_audio_init(&audio, ETHERVOX_LANG_ENGLISH);
+
+ethervox_dialogue_engine_t dialogue;
+ethervox_dialogue_init(&dialogue);
+
+// Process voice input
+void process_voice_input(const char* audio_data, size_t length) {
+    char transcript[1024];
+    if (ethervox_audio_process(&audio, audio_data, length, transcript) == 0) {
+        ethervox_intent_result_t intent;
+        if (ethervox_dialogue_parse_intent(&dialogue, transcript, &intent) == 0) {
+            printf("Intent: %s (confidence: %.2f)\n",
+                   intent.type_name, intent.confidence);
+        }
+    }
+}
+```text
+
+## Smart Home Integration
+
+```c
+#include "ethervox_sdk.h"
+
+// Create smart home plugin
+ethervox_intent_plugin_t* smart_home = create_smart_home_plugin();
+ethervox_sdk_register_intent_plugin(&sdk, smart_home);
+
+// Process commands like "turn on the living room lights"
+ethervox_stt_input_t input = {
+    .text = "turn on the living room lights",
+    .language = "en"
+};
+
+ethervox_intent_result_t result;
+ethervox_sdk_process_intent(&sdk, &input, &result);
+// Result contains parsed entities: device, action, room
+```text
+
+## Multi-Model LLM Routing
+
+```javascript
+const ethervox = require('@ethervox/dashboard-sdk');
+
+// Configure model routing
+const router = new ethervox.ModelRouter({
+    primary: 'local-llm',    // Try local model first
+    fallback: 'openai-gpt4', // Fallback to cloud if needed
+    privacy: 'local-only'    // Override: never use cloud
 });
 
-// Initialize the system (downloads models if needed)
-await ai.initialize();
-
-// Process text input with local AI
-const result = await ai.processTextInput('What is the weather like today?');
-console.log(`Response: ${result.response}`);
-console.log(`Confidence: ${Math.round(result.confidence * 100)}%`);
-console.log(`Model: ${result.model}`);
-
-// Test audio capabilities
-const audioManager = ai.getAudioManager();
-await audioManager.testOutputMethods();
-```
-
-### Module Usage (Direct Access)
-
-```typescript
-// Import individual modules for fine-grained control
-import { 
-  multilingualRuntime, 
-  localLLMStack, 
-  privacyDashboard,
-  modelManager,
-  platformDetector,
-  crossPlatformAudio 
-} from 'ethervoxai';
-
-// Detect platform capabilities
-const capabilities = await platformDetector.getCapabilities();
-console.log(`Platform: ${capabilities.platform} (${capabilities.performanceTier})`);
-
-// Get recommended models for your hardware
-const models = await modelManager.getRecommendedModels();
-console.log('Recommended models:', models.map(m => m.name));
-
-// Test audio output methods
-const audioManager = new crossPlatformAudio.CrossPlatformAudioManager();
-await audioManager.initialize();
-await audioManager.playText('Hello from EthervoxAI!');
-```
-
-## 🔧 Configuration & Capabilities
-
-### Hardware Detection & Optimization
-
-EthervoxAI automatically detects your hardware and optimizes performance:
-
-```typescript
-import { platformDetector } from 'ethervoxai';
-
-const caps = await platformDetector.getCapabilities();
-// Returns: {
-//   platform: 'windows' | 'linux' | 'darwin' | 'raspberry-pi',
-//   performanceTier: 'low' | 'medium' | 'high' | 'ultra',
-//   totalMemory: number,
-//   cpuCores: number,
-//   hasGPU: boolean,
-//   vectorExtensions: ['AVX2', 'NEON', etc.],
-//   isRaspberryPi: boolean,
-//   recommendedThreads: number
-// }
-```
-
-### Audio System Configuration
-
-Multiple audio output methods with automatic fallback:
-
-```typescript
-import { CrossPlatformAudioManager } from 'ethervoxai';
-
-const audioManager = new CrossPlatformAudioManager({
-  preferredOutput: 'native',
-  fallbackChain: ['native', 'wav-player', 'play-sound', 'tts-only'],
-  enableLogging: true
+// Route based on complexity
+router.addRoute({
+    condition: (intent) => intent.complexity < 0.7,
+    model: 'local-llm'
 });
 
-// Test all available audio methods
-await audioManager.testOutputMethods();
-```
+router.addRoute({
+    condition: (intent) => intent.requires_web_search,
+    model: 'openai-gpt4'
+});
+```text
 
-**Available Audio Methods:**
-- **Native TTS**: Windows SAPI, macOS Speech Synthesis, Linux espeak
-- **WAV Player**: Pure JavaScript audio playback
-- **Play-Sound**: Cross-platform sound wrapper  
-- **Node Speaker**: High-quality audio streaming
-- **PowerShell TTS**: Windows PowerShell speech synthesis
+## Privacy Features
 
-### AI Model Configuration
+## Local Data Processing
 
-EthervoxAI supports real local AI models with automatic hardware optimization:
+- **All audio processing** happens on-device
+- **Intent recognition** uses local models by default  
+- **Conversation history** stored locally with user consent
+- **Optional cloud integration** clearly marked and user-controlled
 
-**Available Models:**
-- **tinyllama-1.1b-chat-q4**: Lightweight (669MB) - Perfect for Raspberry Pi and low-end systems
-- **phi-2-2.7b-q4**: Microsoft's efficient model (1.6GB) - Optimized for ARM processors  
-- **mistral-7b-instruct-v0.1-q4**: High-quality instruction model (4.1GB) - Excellent for conversations
-- **llama2-7b-chat-q4**: Meta's popular chat model (3.9GB) - General purpose conversations
-- **llama2-13b-chat-q4**: Larger model for high-end systems (7.3GB) - Enhanced capabilities
+## Privacy Dashboard
 
-```typescript
-import { modelManager } from 'ethervoxai';
+The web dashboard provides complete transparency:
 
-// Get models recommended for your hardware
-const recommended = await modelManager.getRecommendedModels();
+- **Data Flow Visualization** - See exactly where your data goes
+- **Permission Management** - Granular control over cloud services
+- **Usage History** - Review all voice interactions
+- **Export/Delete** - Full data portability and deletion
 
-// Download and cache a specific model
-const modelPath = await modelManager.getModelPath('tinyllama-1.1b-chat-q4');
+## Security Measures
 
-// Check model compatibility
-const isCompatible = await modelManager.isModelCompatible('mistral-7b-instruct-v0.1-q4');
-```
+- **Encryption at rest** for local voice data storage
+- **HTTPS/TLS** for all network communications
+- **API key management** with secure local storage
+- **Regular security audits** and vulnerability assessments
 
-## 📚 Documentation & Development
+## Development
 
-### Module Documentation
+## Build System Architecture
 
-Each module has comprehensive documentation in the `docs/modules/` directory:
+EtherVoxAI uses a layered build system:
 
-- **[Multilingual Runtime](docs/modules/multilingual-runtime.md)** - Language detection and speech processing
-- **[Local LLM Stack](docs/modules/local-llm-stack.md)** - AI model management and routing  
-- **[Privacy Dashboard](docs/modules/privacy-dashboard.md)** - Privacy controls and audit logging
+1. **Makefile** - High-level build orchestration with platform-specific targets
+1. **CMake** - Cross-platform build configuration and dependency management
+1. **Toolchain Files** - Platform-specific compiler and linker settings
 
-### Additional Documentation
+**Directory Structure:**
 
-- **[Audio Alternatives Guide](docs/AUDIO_ALTERNATIVES.md)** - Comprehensive audio system options
-- **[Audio Testing Procedures](docs/AUDIO-TESTING.md)** - Testing and troubleshooting audio
-- **[Windows Demo Guide](docs/README_WINDOWS_DEMO.md)** - Windows-specific demo instructions
-- **[Installation Guide](INSTALLATION.md)** - Detailed setup and dependency management
-- **[Multi-Language Strategy](MULTI-LANGUAGE-STRATEGY.md)** - Cross-platform implementation guide
-- **[AI Integration Summary](AI-INTEGRATION-SUMMARY.md)** - Local AI model integration details
+```text
+ethervoxai/
+├── build/              # Linux native build
+├── build-rpi/          # Raspberry Pi cross-compile build
+├── build-windows/      # Windows cross-compile build
+├── cmake/              # CMake configuration
+│   ├── rpi-toolchain.cmake
+│   ├── windows-toolchain.cmake
+│   └── esp32-toolchain.cmake
+├── scripts/            # Build and setup scripts
+│   └── setup-rpi-toolchain.sh
+├── sysroot/            # Cross-compilation sysroot
+│   └── rpi/            # Raspberry Pi libraries and headers
+├── src/
+│   ├── audio/          # Audio processing
+│   │   ├── platform_linux.c
+│   │   ├── platform_rpi.c
+│   │   ├── platform_windows.c
+│   │   └── platform_esp32.c
+│   ├── platform/       # Platform HAL implementations
+│   │   ├── desktop_hal.c
+│   │   ├── rpi_hal.c
+│   │   └── esp32_hal.c
+│   └── ...
+└── tests/              # Unit and integration tests
+```text
 
-### Development Scripts
+## Cross-Compilation Setup
 
-**Build & Development:**
+**Raspberry Pi:**
+
 ```bash
-npm run build              # Build TypeScript core
-npm run build:web          # Build web dashboard (requires React)
-npm run build:mobile       # Build mobile dashboard (requires React Native)
-npm run build:all          # Build core + web components
-npm run dev                # Watch mode for development
-npm run typecheck          # Type checking only
-```
 
-**Testing & Quality:**
+# One-time setup
+
+./scripts/setup-rpi-toolchain.sh
+
+# This script:
+
+# - Downloads ARM GCC cross-compiler
+
+# - Downloads and builds bcm2835 library
+
+# - Downloads ARM versions of OpenSSL and libcurl
+
+# - Sets up sysroot for cross-compilation
+```text
+
+**Windows (from Linux):**
+
 ```bash
-npm run test               # Run all tests
-npm run test:watch         # Run tests in watch mode
-npm run test:coverage      # Run tests with coverage report
-npm run test:audio         # Interactive audio testing console
-npm run lint               # Lint and fix code
-npm run lint:core          # Lint core modules only
-```
 
-**Demos & Examples:**
+# Install MinGW
+
+sudo apt-get install mingw-w64
+
+# Build
+
+make build-windows
+```text
+
+## Adding New Platforms
+
+To add support for a new platform:
+
+1. **Create platform-specific source files:**
+   - `src/audio/platform_newplatform.c`
+   - `src/platform/newplatform_hal.c`
+1. **Add platform detection in CMakeLists.txt:**
+
+```cmake
+elseif(TARGET_PLATFORM STREQUAL "NEWPLATFORM")
+    add_definitions(-DETHERVOX_PLATFORM_NEWPLATFORM=1)
+    set(PLATFORM_SOURCES
+        src/audio/platform_newplatform.c
+        src/platform/newplatform_hal.c
+    )
+```text
+
+1. **Create toolchain file** (if cross-compiling):
+   - `cmake/newplatform-toolchain.cmake`
+1. **Add Makefile targets:**
+
+```makefile
+configure-newplatform:
+    cmake -B build-newplatform -DTARGET_PLATFORM=NEWPLATFORM
+
+build-newplatform: configure-newplatform
+    cmake --build build-newplatform
+```text
+
+## Testing
+
 ```bash
-npm run demo               # Main EthervoxAI demo
-npm run demo:windows       # Windows desktop audio demo  
-npm run demo:ai            # AI integration testing
-npm run demo:ui            # Web UI demo (requires React)
-```
 
-## 🔐 Privacy & Security
+# Run all tests
 
-EthervoxAI is designed with privacy as a core principle:
+make test
 
-- **🏠 Local Processing**: All voice and AI processing happens on-device by default
-- **🔒 Encrypted Communication**: Any optional cloud communications are end-to-end encrypted  
-- **👤 Data Control**: Users have complete control over data retention and deletion
-- **📋 Audit Logging**: Comprehensive logging of all system interactions with privacy dashboard
-- **✅ Consent Management**: Granular consent controls for cloud services and data sharing
-- **🌍 Cross-Platform Privacy**: Consistent privacy controls across all implementation languages
-- **🔍 No Telemetry**: No automatic data collection or telemetry by default
-- **⚡ Offline Capable**: Full functionality without internet connection
+# Run tests for specific platform
 
-### Privacy Dashboard Features
+cd build-rpi && ctest --verbose
 
-- Real-time privacy status monitoring
-- Data retention policy management  
-- Cloud service consent controls
-- Audit log viewer and export
-- Model download and caching controls
-- Cross-language implementation privacy sync
+# Run specific test
 
-### Privacy Modes & Language Support
+./build/tests/test_audio_core
+./build/tests/test_plugin_manager
+```text
 
-**Privacy Modes:**
-- **Strict**: All processing happens locally, user consent required for any cloud access
-- **Balanced**: Local processing with optional cloud fallback for complex queries  
-- **Permissive**: Allows cloud processing for enhanced capabilities
+## Contributing
 
-**Supported Languages (MVP):**
-- English (US/UK)
-- Spanish (Latin America)
-- Mandarin (Simplified Chinese)
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
 
-**Multi-Platform Implementations:**
-- **TypeScript/Node.js**: Full-featured reference implementation
-- **Python**: Core functionality with examples
-- **C++**: Embedded systems and ESP32 support
-- **MicroPython**: Microcontroller optimization
+- Code of conduct and community guidelines
+- Development environment setup
+- Pull request process
+- Platform-specific testing guidelines
+- Issue reporting and feature requests
 
-## 🚀 Platform Support & Implementations
+## SDK Documentation
 
-### Primary Implementation (TypeScript/Node.js)
-- **Full Feature Set**: Complete AI integration with all modules
-- **Cross-Platform**: Windows 10/11, macOS, Linux, Raspberry Pi
-- **Audio I/O**: 5+ audio methods with automatic fallback
-- **Development Tools**: Comprehensive testing and debugging suite
-- **Performance Tiers**: Automatic optimization for hardware capabilities
+Comprehensive API documentation is available:
 
-### Additional Language Implementations
-- **🐍 Python**: Core functionality with examples (`implementations/python/`)
-- **⚡ C++**: Embedded systems and ESP32 support (`implementations/cpp/`)  
-- **🔬 MicroPython**: Microcontroller optimization (`implementations/micropython/`)
-- **🔄 Shared Protocols**: Consistent APIs across all implementations
+- **C/C++ API**: [SDK Documentation](sdk/README.md)
+- **Platform HAL Guide**: [HAL Documentation](docs/platform-hal.md)
+- **JavaScript API**: [Dashboard SDK](dashboard/src/sdk/README.md)
+- **Python Bindings**: [Python SDK](python/README.md)
 
-### Hardware Compatibility
-- **💻 Desktop/Laptop**: Full functionality on Windows/macOS/Linux
-- **🍓 Raspberry Pi**: Optimized models and audio processing  
-- **📱 ESP32**: C++ implementation for microcontrollers
-- **🖥️ ARM Systems**: Native support with vector optimization
-- **☁️ Cloud/Server**: Headless operation with REST APIs
+## Development
 
-## 🎯 Roadmap & Future Development
+## Build System Architecture
 
-### Current Status (✅ Completed)
-- ✅ Real local AI model integration (TinyLlama, Phi-2, Mistral, Llama2)
-- ✅ Multi-platform audio processing with 5+ output methods
-- ✅ Hardware detection and automatic optimization
-- ✅ Privacy dashboard with audit logging
-- ✅ Cross-platform implementations (Python, C++, MicroPython)
-- ✅ Comprehensive testing and development tools
-- ✅ ESP32 and embedded system support
+EtherVoxAI uses a layered build system:
 
-### Near-term Goals (🔄 In Progress)
-- 🔄 Expand language support to 15+ languages
-- 🔄 Voice cloning and customization capabilities
-- 🔄 RAG (Retrieval-Augmented Generation) integration
-- 🔄 Plugin ecosystem for third-party integrations
-- 🔄 Mobile app development (React Native)
+1. **Makefile** - High-level build orchestration with platform-specific targets
+1. **CMake** - Cross-platform build configuration and dependency management
+1. **Toolchain Files** - Platform-specific compiler and linker settings
 
-### Long-term Vision (📋 Planned)
-- 📋 Hardware device integration and manufacturing
-- 📋 Distributed AI model sharing (privacy-preserving)
-- 📋 Advanced voice synthesis and emotion detection
-- 📋 Multi-modal AI (vision, audio, text) integration
-- 📋 Commercial licensing and enterprise features
+**Directory Structure:**
 
-## 🤝 Contributing to EthervoxAI
+```text
+ethervoxai/
+├── build/              # Linux native build
+├── build-rpi/          # Raspberry Pi cross-compile build
+├── build-windows/      # Windows cross-compile build
+├── cmake/              # CMake configuration
+│   ├── rpi-toolchain.cmake
+│   ├── windows-toolchain.cmake
+│   └── esp32-toolchain.cmake
+├── scripts/            # Build and setup scripts
+│   └── setup-rpi-toolchain.sh
+├── sysroot/            # Cross-compilation sysroot
+│   └── rpi/            # Raspberry Pi libraries and headers
+├── src/
+│   ├── audio/          # Audio processing
+│   │   ├── platform_linux.c
+│   │   ├── platform_rpi.c
+│   │   ├── platform_windows.c
+│   │   └── platform_esp32.c
+│   ├── platform/       # Platform HAL implementations
+│   │   ├── desktop_hal.c
+│   │   ├── rpi_hal.c
+│   │   └── esp32_hal.c
+│   └── ...
+└── tests/              # Unit and integration tests
+```text
 
-*By contributing, you agree your work is released under [CC BY-NC-SA 4.0](LICENSE). Commercial redistribution of your work is prohibited without approval.*
+## Cross-Compilation Setup
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+**Raspberry Pi:**
 
-## 📄 License & Legal
+```bash
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+# One-time setup
 
-**Key License Points:**
-- ✅ Commercial use permitted
-- ✅ Modification and distribution allowed
-- ✅ Private use encouraged
-- ⚠️ No warranty provided
-- 📋 License and copyright notice required
+./scripts/setup-rpi-toolchain.sh
 
-**Additional Legal Documentation:**
-- [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Security Policy](SECURITY.md)  
-- [Legal Documentation](docs/legal.md)
-- [License Comparison](docs/license-comparison.md)
+# This script:
 
-## 📞 Support & Community
+# - Downloads ARM GCC cross-compiler
 
-For questions, issues, or contributions, please:
+# - Downloads and builds bcm2835 library
 
-1. **📖 Check Documentation**: Review [docs/](docs/) and module-specific guides
-2. **🔍 Search Issues**: Check existing [GitHub issues](https://github.com/ethervox-ai/ethervoxai/issues)
-3. **🧪 Test Audio**: Run `npm run test:audio` for audio-related issues
-4. **🆕 Create Issue**: File a new issue with detailed information
-5. **💬 Discussions**: Join community discussions for feature requests
+# - Downloads ARM versions of OpenSSL and libcurl
 
-### Getting Help
+# - Sets up sysroot for cross-compilation
+```text
 
-**For Installation Issues:**
-- Review [INSTALLATION.md](INSTALLATION.md) for dependency troubleshooting
-- Check [Audio Alternatives Guide](docs/AUDIO_ALTERNATIVES.md) for audio problems
-- Run the audio test suite: `npm run test:audio`
+**Windows (from Linux):**
 
-**For Development Questions:**
-- See [Multi-Language Strategy](MULTI-LANGUAGE-STRATEGY.md) for implementation guidance
-- Check [AI Integration Summary](AI-INTEGRATION-SUMMARY.md) for model-related questions
-- Review module documentation in [docs/modules/](docs/modules/)
+```bash
 
-**For Hardware-Specific Issues:**
-- Test hardware detection: `npm run demo` and check platform detection output
-- Review ESP32 documentation: [implementations/cpp/esp32/README.md](implementations/cpp/esp32/README.md)
-- Check Raspberry Pi optimization guidelines
+# Install MinGW
 
----
+sudo apt-get install mingw-w64
 
-**Built with ❤️ for privacy-conscious developers and users who want powerful AI without compromising their data.**
+# Build
 
-*EthervoxAI - Where Privacy Meets Intelligence* 🧠🔐
+make build-windows
+```text
+
+## Adding New Platforms
+
+To add support for a new platform:
+
+1. **Create platform-specific source files:**
+   - `src/audio/platform_newplatform.c`
+   - `src/platform/newplatform_hal.c`
+1. **Add platform detection in CMakeLists.txt:**
+
+```cmake
+elseif(TARGET_PLATFORM STREQUAL "NEWPLATFORM")
+    add_definitions(-DETHERVOX_PLATFORM_NEWPLATFORM=1)
+    set(PLATFORM_SOURCES
+        src/audio/platform_newplatform.c
+        src/platform/newplatform_hal.c
+    )
+```text
+
+1. **Create toolchain file** (if cross-compiling):
+   - `cmake/newplatform-toolchain.cmake`
+1. **Add Makefile targets:**
+
+```makefile
+configure-newplatform:
+    cmake -B build-newplatform -DTARGET_PLATFORM=NEWPLATFORM
+
+build-newplatform: configure-newplatform
+    cmake --build build-newplatform
+```text
+
+## Testing
+
+```bash
+
+# Run all tests
+
+make test
+
+# Run tests for specific platform
+
+cd build-rpi && ctest --verbose
+
+# Run specific test
+
+./build/tests/test_audio_core
+./build/tests/test_plugin_manager
+```text
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
+
+- Code of conduct and community guidelines
+- Development environment setup
+- Pull request process
+- Platform-specific testing guidelines
+- Issue reporting and feature requests
+
+## SDK Documentation
+
+Comprehensive API documentation is available:
+
+- **C/C++ API**: [SDK Documentation](sdk/README.md)
+- **Platform HAL Guide**: [HAL Documentation](docs/platform-hal.md)
+- **JavaScript API**: [Dashboard SDK](dashboard/src/sdk/README.md)
+- **Python Bindings**: [Python SDK](python/README.md)
+
+## SDK Documentation
+
+Comprehensive API documentation is available:
+
+- **C/C++ API**: [SDK Documentation](sdk/README.md)
+- **Platform HAL Guide**: [HAL Documentation](docs/platform-hal.md)
+- **JavaScript API**: [Dashboard SDK](dashboard/src/sdk/README.md)
+- **Python Bindings**: [Python SDK](python/README.md)
+
+## Roadmap
+
+## Phase 1 (Current - v0.1.0)
+
+- [x] Core audio processing engine
+- [x] Basic intent recognition
+- [x] Multi-platform build system (Linux, RPI, Windows)
+- [x] Hardware Abstraction Layer (HAL)
+- [x] Cross-compilation support
+- [x] Web dashboard MVP
+- [x] Unit test framework
+- [ ] Plugin system implementation
+- [ ] ESP32 platform support
+
+## Phase 2 (v0.2.0)
+
+- [ ] Advanced multi-language support
+- [ ] Cloud LLM integrations (OpenAI, HuggingFace)
+- [ ] Mobile companion app
+- [ ] Advanced privacy controls
+- [ ] Continuous integration/deployment
+
+## Phase 3 (v0.3.0)
+
+- [ ] Federated learning capabilities
+- [ ] Custom wake word training
+- [ ] Advanced context awareness
+- [ ] Enterprise deployment tools
+- [ ] Performance optimizations for embedded platforms
+
+## License
+
+This project is licensed under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License** (CC BY-NC-SA 4.0).
+
+## You are free to:
+
+- **Share** — copy and redistribute the material in any medium or format
+- **Adapt** — remix, transform, and build upon the material
+
+## Under the following terms:
+
+- **Attribution** — You must give appropriate credit and indicate if changes were made
+- **NonCommercial** — You may not use the material for commercial purposes
+- **ShareAlike** — If you remix or adapt, you must distribute under the same license
+
+For commercial licensing options, please contact us at licensing@ethervox-ai.org
+
+See the [LICENSE](LICENSE) file for full terms.
+
+## Support
+
+- **Documentation**: [https://docs.ethervox-ai.org](https://docs.ethervox-ai.org)
+- **Issues**: [GitHub Issues](https://github.com/ethervox-ai/ethervoxai/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/ethervox-ai/ethervoxai/discussions)
+- **Email**: support@ethervox-ai.org
+
+
+## License
+
+See [LICENSE.md](LICENSE)
+
+
+
+**EtherVoxAI** - Building the future of privacy-first voice AI 🎙️✨

@@ -1,0 +1,50 @@
+{
+  "name": "ethervoxai",
+  "version": "0.1.0",
+  "description": "Privacy-first, multilingual voice intelligence platform for edge hardware",
+  "main": "src/main.js",
+  "scripts": {
+    "build": "npm run build:core && npm run build:dashboard",
+    "build:core": "cmake --build build --config Release",
+    "build:dashboard": "cd dashboard && npm run build",
+    "dev": "npm run dev:dashboard", 
+    "dev:dashboard": "cd dashboard && npm run dev",
+    "configure": "cmake --preset default",
+    "configure:debug": "cmake --preset debug",
+    "configure:esp32-s3": "cmake --preset esp32-s3",
+    "configure:esp32-c3": "cmake --preset esp32-c3", 
+    "configure:esp32": "cmake --preset esp32-original",
+    "configure:rpi": "cmake --preset rpi-4",
+    "configure:rpi-zero": "cmake --preset rpi-zero",
+    "build:esp32-s3": "cmake --build --preset esp32-s3",
+    "build:esp32-c3": "cmake --build --preset esp32-c3",
+    "build:esp32": "cmake --build --preset esp32-original",
+    "build:rpi": "cmake --build --preset rpi-4", 
+    "build:rpi-zero": "cmake --build --preset rpi-zero",
+    "test": "npm run test:core && npm run test:dashboard",
+    "test:core": "ctest --preset default",
+    "test:debug": "ctest --preset debug",
+    "test:dashboard": "cd dashboard && npm run test",
+    "clean": "rm -rf build* && cd dashboard && rm -rf dist node_modules"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ethervox-ai/ethervoxai.git"
+  },
+  "keywords": [
+    "voice-ai",
+    "privacy",
+    "edge-computing",
+    "multilingual",
+    "iot",
+    "speech-recognition"
+  ],
+  "author": "EthervoxAI Team",
+  "license": "CC-BY-NC-SA-4.0",
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

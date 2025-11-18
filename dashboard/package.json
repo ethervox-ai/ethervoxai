@@ -1,0 +1,38 @@
+{
+  "name": "ethervoxai-dashboard",
+  "version": "0.1.0",
+  "description": "Privacy-first dashboard for EthervoxAI configuration and monitoring",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
+    "format": "prettier --write src/"
+  },
+  "dependencies": {
+    "@headlessui/vue": "^1.7.16",
+    "@heroicons/vue": "^2.0.18",
+    "axios": "^1.5.0",
+    "chart.js": "^4.4.0",
+    "license-checker": "^25.0.1",
+    "pinia": "^2.1.6",
+    "safety": "^0.2.1",
+    "vue": "^3.3.4",
+    "vue-chartjs": "^5.2.0",
+    "vue-router": "^4.2.4",
+    "yui-lint": "^0.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.3.4",
+    "autoprefixer": "^10.4.15",
+    "eslint": "^8.49.0",
+    "eslint-plugin-vue": "^9.17.0",
+    "postcss": "^8.4.29",
+    "prettier": "^3.0.3",
+    "tailwindcss": "^3.3.3",
+    "vite": "^4.4.9"
+  },
+  "author": "EthervoxAI Team",
+  "license": "CC-BY-NC-SA-4.0",
+  "type": "module"
+}

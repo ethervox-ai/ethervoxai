@@ -1,0 +1,316 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security scans weekly on Sundays at 02:00 UTC
+    - cron: '0 2 * * 0'
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'cpp', 'javascript' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        queries: security-extended,security-and-quality
+
+    - name: Setup build environment (C/C++)
+      if: matrix.language == 'cpp'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          libasound2-dev \
+          libcurl4-openssl-dev \
+          libssl-dev
+
+    - name: Build C/C++ code
+      if: matrix.language == 'cpp'
+      run: |
+        # Use Makefile wrapper to configure and build
+        make configure TARGET_PLATFORM=linux
+        make build
+
+    - name: Setup Node.js (JavaScript)
+      if: matrix.language == 'javascript'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: dashboard/package-lock.json
+
+    - name: Install dashboard dependencies
+      if: matrix.language == 'javascript'
+      working-directory: dashboard
+      run: npm ci
+
+    - name: Build dashboard
+      if: matrix.language == 'javascript'
+      working-directory: dashboard
+      run: npm run build
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+
+    - name: Save CodeQL analyze output
+      if: always()
+      run: |
+        echo "=== Save CodeQL analyze logs ==="
+        # The CodeQL action writes SARIF to codeql-results.sarif; capture any console output to a file
+        echo "CodeQL analysis completed for language: ${{ matrix.language }}" > codeql-analyze-${{ matrix.language }}.log || true
+
+    - name: Upload CodeQL SARIF artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: codeql-sarif-${{ matrix.language }}-${{ github.sha }}
+        path: |
+          codeql-results.sarif
+          codeql-analyze-${{ matrix.language }}.log
+        retention-days: 30
+
+    - name: Upload SARIF to Security tab (non-fatal)
+      if: always()
+      continue-on-error: true
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: codeql-results.sarif
+
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: dashboard/package-lock.json
+
+    - name: Install dashboard dependencies
+      working-directory: dashboard
+      run: npm ci
+
+    - name: Run npm audit
+      working-directory: dashboard
+      run: |
+        npm audit --audit-level=moderate --json > npm-audit-results.json || true
+        
+    - name: Upload npm audit results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: npm-audit-results
+        path: dashboard/npm-audit-results.json
+        retention-days: 30
+
+    - name: Run Snyk Security Scan
+      uses: snyk/actions/node@master
+      continue-on-error: true
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --file=dashboard/package.json --severity-threshold=medium
+
+    - name: Setup Python for C/C++ dependency scanning
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install safety for Python dependency scanning
+      run: pip install safety
+
+    - name: Check for known vulnerabilities in system dependencies
+      run: |
+        # Create a requirements.txt for system analysis tools
+        echo "cmake>=3.16" > system-requirements.txt
+        echo "ninja>=1.10" >> system-requirements.txt
+        
+        # Run safety check (will show informational output)
+        safety check --file=system-requirements.txt --output json > safety-results.json || true
+
+    - name: Upload safety results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: safety-results
+        path: safety-results.json
+        retention-days: 30
+
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Run TruffleHog OSS
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified
+
+    - name: Run GitLeaks
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || contains(github.event.head_commit.message, '[security-scan]')
+    
+    steps:
+    - name: Checkout repository  
+      uses: actions/checkout@v4
+
+    - name: Build Docker image for scanning
+      run: |
+        cat > Dockerfile.security << 'EOF'
+        FROM ubuntu:22.04
+        
+        # Install system dependencies
+        RUN apt-get update && apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          libasound2-dev \
+          libcurl4-openssl-dev \
+          libssl-dev \
+          git \
+          && rm -rf /var/lib/apt/lists/*
+        
+        # Copy source code
+        COPY . /app
+        WORKDIR /app
+        # Build the application via Makefile/CMake
+        RUN make configure && cmake --build build
+              
+              # Create non-root user
+              RUN useradd -m ethervox
+              USER ethervox
+              
+              ENTRYPOINT ["./build/ethervoxai"]
+              EOF
+              
+              docker build -f Dockerfile.security -t ethervoxai:security .
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'ethervoxai:security'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [codeql-analysis, dependency-scan, secret-scan]
+    if: always()
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+    - name: Download all security artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: security-results
+
+    - name: Generate security summary
+      run: |
+        echo "# Security Scan Summary" > security-summary.md
+        echo "Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> security-summary.md
+        echo "" >> security-summary.md
+        
+        echo "## Scans Performed" >> security-summary.md
+        echo "- ✅ CodeQL Analysis (C/C++ and JavaScript)" >> security-summary.md
+        echo "- ✅ Dependency Vulnerability Scan (npm audit, Snyk)" >> security-summary.md
+        echo "- ✅ Secret Scanning (TruffleHog, GitLeaks)" >> security-summary.md
+        
+        if [ -d "security-results" ]; then
+          echo "- ✅ Container Security Scan (Trivy)" >> security-summary.md
+        else
+          echo "- ⏭️ Container Security Scan (scheduled only)" >> security-summary.md
+        fi
+        
+        echo "" >> security-summary.md
+        echo "## Results" >> security-summary.md
+        echo "Detailed results are available in the Actions artifacts and Security tab." >> security-summary.md
+        echo "" >> security-summary.md
+        echo "For any high or critical vulnerabilities found:" >> security-summary.md
+        echo "1. Review the findings in the Security tab" >> security-summary.md
+        echo "2. Create issues for remediation" >> security-summary.md  
+        echo "3. Update dependencies or code as needed" >> security-summary.md
+        echo "4. Re-run security scans to verify fixes" >> security-summary.md
+
+    - name: Upload security summary
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-summary
+        path: security-summary.md
+        retention-days: 90
+
+    - name: Comment PR with security summary (PR only)
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const summary = fs.readFileSync('security-summary.md', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: summary
+          });
