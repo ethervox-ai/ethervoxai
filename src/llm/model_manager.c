@@ -517,8 +517,10 @@ uint64_t ethervox_model_manager_get_available_space(const char* path) {
 
 bool ethervox_model_manager_has_enough_space(const char* path, uint64_t required_bytes) {
     uint64_t available = ethervox_model_manager_get_available_space(path);
-    // Add 10% buffer for safety
-    uint64_t required_with_buffer = required_bytes + (required_bytes / 10);
+    // Add 10% buffer for safety, avoiding overflow
+    uint64_t required_with_buffer = (required_bytes > UINT64_MAX / 11)
+        ? UINT64_MAX
+        : (required_bytes * 11) / 10;
     return available >= required_with_buffer;
 }
 
