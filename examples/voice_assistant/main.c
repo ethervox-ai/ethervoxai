@@ -675,17 +675,23 @@ int main(int argc, char** argv) {
   const char* model_path = NULL;
   bool text_mode = false;
   
-  for (int i = 1; i < argc; ++i) {
+  int i = 1;
+  while (i < argc) {
     if (strncmp(argv[i], "--lang=", 7) == 0) {
       cli_language = argv[i] + 7;
+      i++;
     } else if ((strcmp(argv[i], "--lang") == 0 || strcmp(argv[i], "-l") == 0) && i + 1 < argc) {
-      cli_language = argv[++i];
+      cli_language = argv[i + 1];
+      i += 2;
     } else if (strncmp(argv[i], "--model=", 8) == 0) {
       model_path = argv[i] + 8;
+      i++;
     } else if ((strcmp(argv[i], "--model") == 0 || strcmp(argv[i], "-m") == 0) && i + 1 < argc) {
-      model_path = argv[++i];
+      model_path = argv[i + 1];
+      i += 2;
     } else if (strcmp(argv[i], "--text") == 0 || strcmp(argv[i], "--cli") == 0) {
       text_mode = true;
+      i++;
     } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
       printf("Usage: %s [options]\n\n", argv[0]);
       printf("Options:\n");
@@ -694,6 +700,8 @@ int main(int argc, char** argv) {
       printf("                          Presets: tinyllama, phi2, mistral, llama2\n");
       printf("                          Or provide path to local GGUF file\n");
       printf("  --text, --cli           Use text mode instead of voice\n");
+    } else {
+      i++;
       printf("  --help, -h              Show this help message\n\n");
       printf("Examples:\n");
       printf("  %s --text\n", argv[0]);
