@@ -22,7 +22,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <errno.h>
-
+#include <fcntl.h>
 #ifdef _WIN32
 #include <windows.h>
 #include <direct.h>
@@ -310,9 +310,16 @@ static int download_with_curl(ethervox_model_manager_t* manager,
     }
     
     // Open file for writing
-    FILE* fp = fopen(dest_path, "wb");
+    int out_fd = open(dest_path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (out_fd < 0) {
+        ETHERVOX_LOG_ERROR("Failed to create file with restrictive permissions: %s", dest_path);
+        curl_easy_cleanup(curl);
+        return ETHERVOX_ERROR_FAILED;
+    }
+    FILE* fp = fdopen(out_fd, "wb");
     if (!fp) {
-        ETHERVOX_LOG_ERROR("Failed to open file for writing: %s", dest_path);
+        ETHERVOX_LOG_ERROR("Failed to open FILE stream: %s", dest_path);
+        close(out_fd);
         curl_easy_cleanup(curl);
         return ETHERVOX_ERROR_FAILED;
     }
