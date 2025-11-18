@@ -311,6 +311,8 @@ static int llama_backend_generate(ethervox_llm_backend_t* backend,
   clock_t start_time = clock();
   
   // Tokenize prompt
+  // llama_tokenize returns a negative value when called with NULL output buffer and zero size.
+  // Negate the result to get the required token count (see llama.cpp API documentation).
   const int n_prompt_tokens = -llama_tokenize(ctx->model, prompt, (int)strlen(prompt),
                                               NULL, 0, true, true);
   
