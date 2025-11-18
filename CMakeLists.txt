@@ -198,7 +198,7 @@ target_include_directories(ethervoxai
 set(ETHERVOXAI_PLATFORM_LIBS "")
 
 if(WIN32)
-    set(ETHERVOXAI_PLATFORM_LIBS winmm ws2_32 crypt32)
+    set(ETHERVOXAI_PLATFORM_LIBS winmm ws2_32 crypt32 wininet)
 elseif(TARGET_PLATFORM STREQUAL "RPI")
     set(ETHERVOXAI_PLATFORM_LIBS pthread m)
 
