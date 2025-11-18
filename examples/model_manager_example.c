@@ -126,7 +126,12 @@ int main(int argc, char* argv[]) {
     }
     
     // Step 5: Get model path
-    const char* model_path = ethervox_model_manager_get_path(manager, selected_model);
+    char model_path[1024];
+    if (ethervox_model_manager_get_path(manager, selected_model, model_path, sizeof(model_path)) != ETHERVOX_SUCCESS) {
+        fprintf(stderr, "Failed to get model path\n");
+        ethervox_model_manager_destroy(manager);
+        return 1;
+    }
     printf("5. Model location: %s\n\n", model_path);
     
     // Step 6: Initialize LLM backend with the model

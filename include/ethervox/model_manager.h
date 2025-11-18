@@ -94,9 +94,11 @@ int ethervox_model_manager_download(
     ethervox_model_manager_t* manager,
     const ethervox_model_info_t* model_info);
 
-const char* ethervox_model_manager_get_path(
+int ethervox_model_manager_get_path(
     ethervox_model_manager_t* manager,
-    const ethervox_model_info_t* model_info);
+    const ethervox_model_info_t* model_info,
+    char* path_buffer,
+    size_t buffer_size);
 
 bool ethervox_model_manager_is_available(
     ethervox_model_manager_t* manager,

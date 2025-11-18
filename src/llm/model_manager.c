@@ -287,17 +287,25 @@ ethervox_model_status_t ethervox_model_manager_get_status(
     return ETHERVOX_MODEL_STATUS_AVAILABLE;
 }
 
-const char* ethervox_model_manager_get_path(
+int ethervox_model_manager_get_path(
     ethervox_model_manager_t* manager,
-    const ethervox_model_info_t* model_info) {
+    const ethervox_model_info_t* model_info,
+    char* path_buffer,
+    size_t buffer_size) {
     
-    if (!manager || !model_info) {
-        return NULL;
+    if (!manager || !model_info || !path_buffer || buffer_size == 0) {
+        return ETHERVOX_ERROR_INVALID_ARGUMENT;
     }
     
-    static char path[1024];
-    snprintf(path, sizeof(path), "%s/%s", manager->models_dir, model_info->filename);
-    return path;
+    int written = snprintf(path_buffer, buffer_size, "%s/%s", 
+                          manager->models_dir, model_info->filename);
+    
+    if (written < 0 || (size_t)written >= buffer_size) {
+        ETHERVOX_LOG_ERROR("Path buffer too small (need %d bytes, have %zu)", written + 1, buffer_size);
+        return ETHERVOX_ERROR_FAILED;
+    }
+    
+    return ETHERVOX_SUCCESS;
 }
 
 bool ethervox_model_manager_is_available(
@@ -539,9 +547,10 @@ bool ethervox_model_manager_has_enough_space(const char* path, uint64_t required
         return ETHERVOX_ERROR_INVALID_ARGUMENT;
     }
     
-    const char* path = ethervox_model_manager_get_path(manager, model_info);
-    if (!path) {
-        return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    char path[1024];
+    int result = ethervox_model_manager_get_path(manager, model_info, path, sizeof(path));
+    if (result != ETHERVOX_SUCCESS) {
+        return result;
     }
     
     if (unlink(path) != 0) {

@@ -43,6 +43,7 @@ static void voice_assistant_sleep_us(unsigned int microseconds) {
 
 #include "ethervox/audio.h"
 #include "ethervox/dialogue.h"
+#include "ethervox/error.h"
 #include "ethervox/llm.h"
 #include "ethervox/model_manager.h"
 #include "ethervox/platform.h"
@@ -340,28 +341,37 @@ int pipeline_init(voice_pipeline_t* pipeline, const char* language_override, boo
             }
             
             // Get model path from manager
-            actual_model_path = ethervox_model_manager_get_path(pipeline->model_manager, selected_model);
+            static char model_path_buffer[1024];
+            if (ethervox_model_manager_get_path(pipeline->model_manager, selected_model, 
+                                               model_path_buffer, sizeof(model_path_buffer)) == ETHERVOX_SUCCESS) {
+              actual_model_path = model_path_buffer;
+            } else {
+              fprintf(stderr, "Failed to get model path\n");
+              actual_model_path = NULL;
+            }
           }
         }
         
         // Load model
-        printf("Loading model: %s\n", actual_model_path);
-        if (ethervox_llm_backend_load_model(pipeline->llm_backend, actual_model_path) != 0) {
-          fprintf(stderr, "⚠️  Failed to load model (continuing without local LLM)\n");
-          ethervox_llm_backend_cleanup(pipeline->llm_backend);
-          ethervox_llm_backend_free(pipeline->llm_backend);
-          pipeline->llm_backend = NULL;
-        } else {
-          pipeline->llm_enabled = true;
-          pipeline->model_path = strdup(actual_model_path);
-          printf("✓ LLM backend initialized with model: %s\n", actual_model_path);
-          
-          // Display capabilities
-          ethervox_llm_capabilities_t caps;
-          if (pipeline->llm_backend->get_capabilities(pipeline->llm_backend, &caps) == 0) {
-            printf("  • Model format: %s\n", caps.model_format);
-            printf("  • Max context: %u tokens\n", caps.max_context_length);
-            printf("  • GPU support: %s\n", caps.supports_gpu ? "yes" : "no");
+        if (actual_model_path) {
+          printf("Loading model: %s\n", actual_model_path);
+          if (ethervox_llm_backend_load_model(pipeline->llm_backend, actual_model_path) != 0) {
+            fprintf(stderr, "⚠️  Failed to load model (continuing without local LLM)\n");
+            ethervox_llm_backend_cleanup(pipeline->llm_backend);
+            ethervox_llm_backend_free(pipeline->llm_backend);
+            pipeline->llm_backend = NULL;
+          } else {
+            pipeline->llm_enabled = true;
+            pipeline->model_path = strdup(actual_model_path);
+            printf("✓ LLM backend initialized with model: %s\n", actual_model_path);
+            
+            // Display capabilities
+            ethervox_llm_capabilities_t caps;
+            if (pipeline->llm_backend->get_capabilities(pipeline->llm_backend, &caps) == 0) {
+              printf("  • Model format: %s\n", caps.model_format);
+              printf("  • Max context: %u tokens\n", caps.max_context_length);
+              printf("  • GPU support: %s\n", caps.supports_gpu ? "yes" : "no");
+            }
           }
         }
 skip_llm_load:
