@@ -123,9 +123,7 @@ static void sanitize_language(const char* source, char* target, size_t target_le
     return;
   }
 
-  if (out_idx >= 2) {
-    target[2] = '\0';
-  }
+  target[2] = '\0';
 }
 
 static void map_stt_language(const char* base_language, char* target, size_t target_len) {
