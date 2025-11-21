@@ -175,29 +175,49 @@ jobs:
           # Windows build using CMake directly
           cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release
         elif [ -n "${{ matrix.cross_compile }}" ]; then
-          # Cross-compilation for ARM
-          if [ "${{ matrix.target }}" = "rpi-zero" ] || [ "${{ matrix.target }}" = "rpi-4" ]; then
-            # Use Makefile for RPI targets if available
-            if grep -q "configure-rpi" Makefile 2>/dev/null; then
-              make configure-rpi
-            else
-              # Fallback to direct CMake configuration
-              cmake -B build -G "Ninja" \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_SYSTEM_NAME=Linux \
-                -DCMAKE_SYSTEM_PROCESSOR=${{ matrix.arch }} \
-                -DCMAKE_C_COMPILER=${{ matrix.cross_compile }}-gcc \
-                -DCMAKE_CXX_COMPILER=${{ matrix.cross_compile }}-g++ \
-                -DTARGET_PLATFORM=RPI
-            fi
-          else
-            # Generic ARM cross-compilation
+          # Cross-compilation for ARM - use CMake directly to avoid Makefile toolchain issues
+          if [ "${{ matrix.target }}" = "rpi-zero" ]; then
+            # Raspberry Pi Zero (ARMv6/ARMv7 32-bit)
             cmake -B build -G "Ninja" \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_SYSTEM_NAME=Linux \
-              -DCMAKE_SYSTEM_PROCESSOR=${{ matrix.arch }} \
-              -DCMAKE_C_COMPILER=${{ matrix.cross_compile }}-gcc \
-              -DCMAKE_CXX_COMPILER=${{ matrix.cross_compile }}-g++
+              -DCMAKE_SYSTEM_PROCESSOR=arm \
+              -DCMAKE_C_COMPILER=/usr/bin/${{ matrix.cross_compile }}-gcc \
+              -DCMAKE_CXX_COMPILER=/usr/bin/${{ matrix.cross_compile }}-g++ \
+              -DCMAKE_FIND_ROOT_PATH=/usr/${{ matrix.cross_compile }} \
+              -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+              -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+              -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+              -DTARGET_PLATFORM=RPI \
+              -DCMAKE_C_FLAGS="-march=armv6 -mfpu=vfp -mfloat-abi=hard" \
+              -DCMAKE_CXX_FLAGS="-march=armv6 -mfpu=vfp -mfloat-abi=hard"
+          elif [ "${{ matrix.target }}" = "rpi-4" ]; then
+            # Raspberry Pi 4/5 (ARM64)
+            cmake -B build -G "Ninja" \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_SYSTEM_NAME=Linux \
+              -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+              -DCMAKE_C_COMPILER=/usr/bin/${{ matrix.cross_compile }}-gcc \
+              -DCMAKE_CXX_COMPILER=/usr/bin/${{ matrix.cross_compile }}-g++ \
+              -DCMAKE_FIND_ROOT_PATH=/usr/${{ matrix.cross_compile }} \
+              -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+              -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+              -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+              -DTARGET_PLATFORM=RPI \
+              -DCMAKE_C_FLAGS="-march=armv8-a+crc -mtune=cortex-a72" \
+              -DCMAKE_CXX_FLAGS="-march=armv8-a+crc -mtune=cortex-a72"
+          else
+            # Generic ARM64
+            cmake -B build -G "Ninja" \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_SYSTEM_NAME=Linux \
+              -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+              -DCMAKE_C_COMPILER=/usr/bin/${{ matrix.cross_compile }}-gcc \
+              -DCMAKE_CXX_COMPILER=/usr/bin/${{ matrix.cross_compile }}-g++ \
+              -DCMAKE_FIND_ROOT_PATH=/usr/${{ matrix.cross_compile }} \
+              -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+              -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+              -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
           fi
         else
           # Native build
