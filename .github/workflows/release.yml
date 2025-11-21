@@ -569,6 +569,14 @@ jobs:
         echo "Release assets:"
         ls -la final-release/
 
+    - name: Delete existing release if it exists
+      continue-on-error: true
+      run: |
+        gh release delete ${{ needs.validate-release.outputs.version }} --yes || true
+        git push --delete origin ${{ needs.validate-release.outputs.version }} || true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
@@ -579,6 +587,8 @@ jobs:
         files: final-release/*
         generate_release_notes: true
         make_latest: ${{ needs.validate-release.outputs.is_prerelease == 'false' }}
+        fail_on_unmatched_files: false
+        append_body: false
 
   update-documentation:
     name: Update Release Documentation
