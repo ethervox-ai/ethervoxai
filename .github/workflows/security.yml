@@ -68,7 +68,7 @@ jobs:
     - name: Install dashboard dependencies
       if: matrix.language == 'javascript'
       working-directory: dashboard
-      run: npm ci
+      run: npm install
 
     - name: Build dashboard
       if: matrix.language == 'javascript'
@@ -124,7 +124,7 @@ jobs:
 
     - name: Install dashboard dependencies
       working-directory: dashboard
-      run: npm ci
+      run: npm install
 
     - name: Run npm audit
       working-directory: dashboard
