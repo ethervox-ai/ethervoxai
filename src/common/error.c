@@ -4,17 +4,17 @@
 #include <time.h>
 
 // Thread-local storage for error context (if available)
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_THREADS__)
-#include <threads.h>
-static thread_local ethervox_error_context_t g_error_context = {0};
+#if defined(_MSC_VER)
+// MSVC extension - use this first for Windows
+static __declspec(thread) ethervox_error_context_t g_error_context = {0};
 #define HAS_THREAD_LOCAL 1
 #elif defined(__GNUC__) || defined(__clang__)
-// GCC/Clang extension
+// GCC/Clang extension (including MinGW)
 static __thread ethervox_error_context_t g_error_context = {0};
 #define HAS_THREAD_LOCAL 1
-#elif defined(_MSC_VER)
-// MSVC extension
-static __declspec(thread) ethervox_error_context_t g_error_context = {0};
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_THREADS__)
+#include <threads.h>
+static thread_local ethervox_error_context_t g_error_context = {0};
 #define HAS_THREAD_LOCAL 1
 #else
 // Fallback to global for platforms without thread_local

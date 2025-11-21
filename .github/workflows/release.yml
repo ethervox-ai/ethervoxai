@@ -158,9 +158,19 @@ jobs:
             if [ "${{ matrix.cross_compile }}" = "arm-linux-gnueabihf" ]; then
               sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
                 binutils-arm-linux-gnueabihf crossbuild-essential-armhf
+              # Add armhf architecture for cross-compiled libraries
+              sudo dpkg --add-architecture armhf
+              sudo apt-get update
+              sudo apt-get install -y libasound2-dev:armhf libcurl4-openssl-dev:armhf \
+                libssl-dev:armhf
             elif [ "${{ matrix.cross_compile }}" = "aarch64-linux-gnu" ]; then
               sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
                 binutils-aarch64-linux-gnu crossbuild-essential-arm64
+              # Add arm64 architecture for cross-compiled libraries
+              sudo dpkg --add-architecture arm64
+              sudo apt-get update
+              sudo apt-get install -y libasound2-dev:arm64 libcurl4-openssl-dev:arm64 \
+                libssl-dev:arm64
             fi
           fi
         elif [ "${{ matrix.platform }}" = "windows" ]; then
@@ -222,8 +232,9 @@ jobs:
               -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
           fi
         else
-          # Native build
-          make configure TARGET_PLATFORM=${{ matrix.platform }}
+          # Native build - uppercase the platform name for CMake
+          PLATFORM_UPPER=$(echo "${{ matrix.platform }}" | tr '[:lower:]' '[:upper:]')
+          make configure TARGET_PLATFORM=${PLATFORM_UPPER}
         fi
 
     - name: Build (Makefile)
@@ -338,9 +349,10 @@ jobs:
         cp bootloader/bootloader.bin ../../esp32-release-${{ matrix.target }}/
         cp partition_table/partition-table.bin ../../esp32-release-${{ matrix.target }}/
         
-        # Copy configuration
-        cp ../partitions.csv ../../esp32-release-${{ matrix.target }}/
-        cp ../sdkconfig ../../esp32-release-${{ matrix.target }}/
+        # Copy configuration files if they exist
+        [ -f ../partitions.csv ] && cp ../partitions.csv ../../esp32-release-${{ matrix.target }}/ || echo "partitions.csv not found, skipping"
+        [ -f ../sdkconfig ] && cp ../sdkconfig ../../esp32-release-${{ matrix.target }}/ || echo "sdkconfig not found, skipping"
+        [ -f sdkconfig ] && cp sdkconfig ../../esp32-release-${{ matrix.target }}/ || echo "build/sdkconfig not found, skipping"
         
         # Create flash script
         cd ../../esp32-release-${{ matrix.target }}
