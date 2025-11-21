@@ -350,15 +350,24 @@ jobs:
         echo "" >> metrics-report.txt
         
         echo "## Lines of Code (cloc)" >> metrics-report.txt
-        cloc src/ include/ dashboard/src/ --exclude-dir=node_modules >> metrics-report.txt
+        cloc src/ include/ dashboard/src/ --exclude-dir=node_modules >> metrics-report.txt 2>&1 || echo "cloc failed" >> metrics-report.txt
         echo "" >> metrics-report.txt
         
         echo "## Cyclomatic Complexity (radon)" >> metrics-report.txt
-        find . -name "*.py" | head -5 | xargs radon cc -s || echo "No Python files found" >> metrics-report.txt
+        PYFILES=$(find . -name "*.py" -type f 2>/dev/null | head -5)
+        if [ -n "$PYFILES" ]; then
+          echo "$PYFILES" | xargs radon cc -s >> metrics-report.txt 2>&1 || echo "radon analysis failed" >> metrics-report.txt
+        else
+          echo "No Python files found" >> metrics-report.txt
+        fi
         echo "" >> metrics-report.txt
         
         echo "## Code Complexity (lizard)" >> metrics-report.txt
-        lizard src/ -l cpp --sort cyclomatic_complexity | head -20 >> metrics-report.txt
+        if [ -d "src/" ]; then
+          lizard src/ -l cpp --sort cyclomatic_complexity 2>&1 | head -30 >> metrics-report.txt || echo "lizard analysis failed" >> metrics-report.txt
+        else
+          echo "No src/ directory found" >> metrics-report.txt
+        fi
         echo "" >> metrics-report.txt
         
         echo "## File Statistics" >> metrics-report.txt
