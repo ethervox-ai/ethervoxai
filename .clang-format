@@ -2,7 +2,6 @@
 # Based on Google style with some modifications for embedded systems
 
 BasedOnStyle: Google
-Language: C
 IndentWidth: 2
 TabWidth: 2
 UseTab: Never
