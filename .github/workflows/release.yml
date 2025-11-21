@@ -457,6 +457,51 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+        
+    - name: Determine next version
+      id: next_version
+      run: |
+          # Get the latest tag (sorted by version semantics)
+          LATEST_TAG=$(git tag --sort=-v:refname | head -n1)
+
+          if [[ -z "$LATEST_TAG" ]]; then
+            # Default starting point if no tags exist
+            NEXT_VERSION="v0.0.1"
+          else
+            # Strip leading 'v'
+            VERSION=${LATEST_TAG#v}
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+            # Increment patch
+            PATCH=$((PATCH + 1))
+
+            # Roll over if patch reaches 100
+            if [[ $PATCH -ge 100 ]]; then
+              PATCH=0
+              MINOR=$((MINOR + 1))
+            fi
+
+            NEXT_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+
+          echo "Next version: $NEXT_VERSION"
+          echo "version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+
+    - name: Ensure fresh tag
+      run: |
+        VERSION="${{ steps.next_version.outputs.version }}"
+        echo "Preparing tag $VERSION"
+
+        # Delete if exists
+        git tag -d "$VERSION" 2>/dev/null || true
+        git push origin ":refs/tags/$VERSION" || true
+
+        # Create and push new tag
+        git tag "$VERSION"
+        git push origin "$VERSION"
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Download all artifacts
       uses: actions/download-artifact@v4
@@ -466,6 +511,9 @@ jobs:
     - name: Generate release notes
       id: release_notes
       run: |
+        VERSION="${{ needs.validate-release.outputs.version }}"
+        echo "Generating release notes for $VERSION"
+        run: |
         VERSION="${{ needs.validate-release.outputs.version }}"
         echo "Generating release notes for $VERSION"
         
@@ -565,23 +613,12 @@ jobs:
         find release-assets/ -name "*.zip" -o -name "*.tar.gz" | while read file; do
           cp "$file" final-release/
         done
-        
-        echo "Release assets:"
-        ls -la final-release/
-
-    - name: Delete existing release if it exists
-      continue-on-error: true
-      run: |
-        gh release delete ${{ needs.validate-release.outputs.version }} --yes || true
-        git push --delete origin ${{ needs.validate-release.outputs.version }} || true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ needs.validate-release.outputs.version }}
-        name: EtherVoxAI ${{ needs.validate-release.outputs.version }}
+        tag_name: ${{ steps.next_version.outputs.version }}
+        name: EtherVoxAI ${{ steps.next_version.outputs.version }}
         body_path: release-notes.md
         prerelease: ${{ needs.validate-release.outputs.is_prerelease }}
         files: final-release/*
