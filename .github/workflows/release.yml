@@ -160,20 +160,15 @@ jobs:
                 binutils-arm-linux-gnueabihf crossbuild-essential-armhf
               # Add armhf architecture for cross-compiled libraries
               sudo dpkg --add-architecture armhf
-              # Restrict existing repos to amd64 only
-              echo "checking current sources.list content"
-              sudo cat /etc/apt/sources.list
-              sudo sed -i 's/^deb \(.*\)/deb [arch=amd64] \1/' /etc/apt/sources.list
-              echo "checking updated sources.list content"
-              sudo cat /etc/apt/sources.list
-              echo "checking existing sources.list.d content"
-              sudo ls -l /etc/apt/sources.list.d/
+              # Restrict existing repos to amd64 only (Ubuntu 24.04 uses deb822 format)
+              if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+                sudo sed -i 's/^Architectures: .*$/Architectures: amd64/' /etc/apt/sources.list.d/ubuntu.sources
+              fi
               # Configure apt to use ports.ubuntu.com for armhf packages
               echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs) main universe" | sudo tee /etc/apt/sources.list.d/armhf-cross.list
               echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs)-updates main universe" | sudo tee -a /etc/apt/sources.list.d/armhf-cross.list
               echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs)-security main universe" | sudo tee -a /etc/apt/sources.list.d/armhf-cross.list
               sudo apt-get update
-              echo "apt-get update completed"
               sudo apt-get install -y libasound2-dev:armhf libcurl4-openssl-dev:armhf \
                 libssl-dev:armhf
             elif [ "${{ matrix.cross_compile }}" = "aarch64-linux-gnu" ]; then
@@ -181,20 +176,15 @@ jobs:
                 binutils-aarch64-linux-gnu crossbuild-essential-arm64
               # Add arm64 architecture for cross-compiled libraries
               sudo dpkg --add-architecture arm64
-              # Restrict existing repos to amd64 only
-              echo "checking current sources.list content"
-              sudo cat /etc/apt/sources.list
-              sudo sed -i 's/^deb \(.*\)/deb [arch=amd64] \1/' /etc/apt/sources.list
-              echo "checking updated sources.list content"
-              sudo cat /etc/apt/sources.list
-              echo "checking existing sources.list.d content"
-              sudo ls -l /etc/apt/sources.list.d/
+              # Restrict existing repos to amd64 only (Ubuntu 24.04 uses deb822 format)
+              if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+                sudo sed -i 's/^Architectures: .*$/Architectures: amd64/' /etc/apt/sources.list.d/ubuntu.sources
+              fi
               # Configure apt to use ports.ubuntu.com for arm64 packages
               echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs) main universe" | sudo tee /etc/apt/sources.list.d/arm64-cross.list
               echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs)-updates main universe" | sudo tee -a /etc/apt/sources.list.d/arm64-cross.list
               echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs)-security main universe" | sudo tee -a /etc/apt/sources.list.d/arm64-cross.list
               sudo apt-get update
-              echo "apt-get update completed"
               sudo apt-get install -y libasound2-dev:arm64 libcurl4-openssl-dev:arm64 \
                 libssl-dev:arm64
             fi
