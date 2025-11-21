@@ -138,13 +138,13 @@ export const useSystemStore = defineStore('system', () => {
       await axios.post('/api/audio/settings', settings)
       
       // Update local state
-      if (settings.hasOwnProperty('microphoneActive')) {
+      if (Object.prototype.hasOwnProperty.call(settings, 'microphoneActive')) {
         microphoneActive.value = settings.microphoneActive
       }
-      if (settings.hasOwnProperty('speakerActive')) {
+      if (Object.prototype.hasOwnProperty.call(settings, 'speakerActive')) {
         speakerActive.value = settings.speakerActive
       }
-      if (settings.hasOwnProperty('currentLanguage')) {
+      if (Object.prototype.hasOwnProperty.call(settings, 'currentLanguage')) {
         currentLanguage.value = settings.currentLanguage
       }
       

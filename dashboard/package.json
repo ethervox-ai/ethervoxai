@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path ../.gitignore",
+    "lint": "cross-env ESLINT_USE_FLAT_CONFIG=false eslint src --fix",
     "format": "prettier --write src/"
   },
   "dependencies": {
@@ -26,6 +26,7 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.3.4",
     "autoprefixer": "^10.4.15",
+    "cross-env": "^7.0.3",
     "eslint": "^8.49.0",
     "eslint-plugin-vue": "^9.17.0",
     "postcss": "^8.4.29",
