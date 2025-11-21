@@ -240,17 +240,16 @@ jobs:
         else
           # Native build - uppercase the platform name for CMake
           PLATFORM_UPPER=$(echo "${{ matrix.platform }}" | tr '[:lower:]' '[:upper:]')
-          make configure TARGET_PLATFORM=${PLATFORM_UPPER}
+          cmake -B build -G "Ninja" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DTARGET_PLATFORM=${PLATFORM_UPPER}
         fi
 
     - name: Build (Makefile)
       shell: bash
       run: |
-        if [ "${{ matrix.platform }}" = "windows" ] || [ -n "${{ matrix.cross_compile }}" ]; then
-          cmake --build build --config Release
-        else
-          make build
-        fi
+        # All platforms now use cmake --build
+        cmake --build build --config Release
 
     - name: Create distribution package
       shell: bash
