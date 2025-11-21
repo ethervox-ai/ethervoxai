@@ -380,6 +380,7 @@ int pipeline_init(voice_pipeline_t* pipeline, const char* language_override, boo
     printf("(No LLM model specified - using simple response mode)\n");
   }
 
+skip_llm_load:
   // Initialize dialogue engine
   pipeline->llm_config = ethervox_dialogue_get_default_llm_config();
   pipeline->llm_config.language_code = pipeline->language_code;
