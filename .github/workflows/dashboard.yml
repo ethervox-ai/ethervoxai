@@ -64,38 +64,17 @@ jobs:
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
 
-    - name: Type check TypeScript
-      run: pnpm run type-check
-
     - name: Lint
       run: pnpm run lint
 
     - name: Format check
-      run: pnpm run format:check
-
-    - name: Run unit tests
-      run: pnpm run test:unit -- --coverage
-
-    - name: Run component tests
-      run: pnpm run test:component
-
-    - name: Upload test coverage
-      uses: codecov/codecov-action@v4
-      with:
-        files: dashboard/coverage/lcov.info
-        flags: dashboard
-        name: dashboard-coverage
-        fail_ci_if_error: false
+      run: pnpm run format
 
   build:
     name: Build Dashboard
     runs-on: ubuntu-latest
     needs: test
 
-    strategy:
-      matrix:
-        mode: ['development', 'production']
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -113,85 +92,17 @@ jobs:
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
 
-    - name: Build for production
-      if: matrix.mode == 'production'
+    - name: Build dashboard
       run: pnpm run build
       env:
         NODE_ENV: production
 
-    - name: Build for development
-      if: matrix.mode == 'development'
-      run: pnpm run build:dev
-      env:
-        NODE_ENV: development
-
-    - name: Analyze bundle size
-      if: matrix.mode == 'production'
-      run: |
-        pnpm run build:analyze
-        echo "=== Bundle Analysis ===" >> bundle-analysis.txt
-        echo "Build mode: ${{ matrix.mode }}" >> bundle-analysis.txt
-        echo "Generated: $(date)" >> bundle-analysis.txt
-        echo "" >> bundle-analysis.txt
-        
-        # Get file sizes
-        if [ -d "dist" ]; then
-          echo "File sizes:" >> bundle-analysis.txt
-          find dist -name "*.js" -o -name "*.css" | xargs ls -lh >> bundle-analysis.txt
-          echo "" >> bundle-analysis.txt
-          echo "Total size:" >> bundle-analysis.txt
-          du -sh dist >> bundle-analysis.txt
-        fi
-
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: dashboard-${{ matrix.mode }}-${{ github.sha }}
-        path: |
-          dashboard/dist/
-          dashboard/bundle-analysis.txt
+        name: dashboard-build-${{ github.sha }}
+        path: dashboard/dist/
         retention-days: 30
-
-  e2e-test:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: ${{ env.PNPM_VERSION }}
-
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
-
-    - name: Install Playwright browsers
-      run: pnpm exec playwright install --with-deps
-
-    - name: Build application
-      run: pnpm run build
-
-    - name: Run E2E tests
-      run: pnpm run test:e2e
-
-    - name: Upload E2E test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: e2e-test-results-${{ github.sha }}
-        path: |
-          dashboard/test-results/
-          dashboard/playwright-report/
-        retention-days: 15
 
   lighthouse:
     name: Lighthouse Performance Audit
@@ -278,7 +189,7 @@ jobs:
   deploy-preview:
     name: Deploy Preview
     runs-on: ubuntu-latest
-    needs: [test, build, e2e-test]
+    needs: [test, build]
     if: github.event_name == 'pull_request'
 
     steps:

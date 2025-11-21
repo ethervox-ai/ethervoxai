@@ -102,3 +102,6 @@ esp32-project/dependencies.lock
 run-artifacts/
 *.md.bak
 bin/act
+dashboard/package-lock.json
+dashboard/package-lock.json
+dashboard/package-lock.json
