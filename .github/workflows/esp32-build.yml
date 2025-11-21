@@ -42,6 +42,7 @@ jobs:
       with:
         esp_idf_version: ${{ env.IDF_VERSION }}
         target: ${{ matrix.target }}
+        path: 'esp32-project'
 
     - name: Cache ESP-IDF tools
       uses: actions/cache@v4
@@ -56,18 +57,18 @@ jobs:
 
     - name: Configure ESP32 project
       run: |
-        cd src/platform/esp32
+        cd esp32-project
         idf.py set-target ${{ matrix.target }}
         idf.py reconfigure
 
     - name: Build ESP32 firmware
       run: |
-        cd src/platform/esp32
+        cd esp32-project
         idf.py build
 
     - name: Generate build info
       run: |
-        cd src/platform/esp32
+        cd esp32-project
         echo "ESP32_TARGET=${{ matrix.target }}" >> build_info.txt
         echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> build_info.txt
         echo "COMMIT_SHA=${{ github.sha }}" >> build_info.txt
@@ -76,7 +77,7 @@ jobs:
     - name: Package ESP32 artifacts
       run: |
         mkdir -p esp32-artifacts-${{ matrix.target }}
-        cd src/platform/esp32/build
+        cd esp32-project/build
         
         # Copy firmware binaries
         cp ethervoxai.bin ../../../esp32-artifacts-${{ matrix.target }}/
@@ -113,7 +114,7 @@ jobs:
 
     - name: Check firmware size
       run: |
-        cd src/platform/esp32/build
+        cd esp32-project/build
         echo "=== Firmware Size Analysis ==="
         echo "Target: ${{ matrix.target }}"
         echo "Firmware size: $(stat -c%s ethervoxai.bin) bytes"
@@ -143,7 +144,7 @@ jobs:
 
     - name: Validate sdkconfig
       run: |
-        cd src/platform/esp32
+        cd esp32-project
         echo "=== Validating ESP32 Configuration ==="
         
         # Check for required configs
@@ -182,7 +183,7 @@ jobs:
 
     - name: Security configuration check
       run: |
-        cd src/platform/esp32
+        cd esp32-project
         echo "=== ESP32 Security Check ==="
         
         # Check for secure boot configuration
