@@ -153,11 +153,18 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Setup ESP-IDF
-      uses: espressif/esp-idf-ci-action@v1
-      with:
-        esp_idf_version: ${{ env.IDF_VERSION }}
-        target: esp32
+    - name: Install ESP-IDF
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git wget flex bison gperf python3 python3-pip python3-venv cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
+        mkdir -p ~/esp
+        cd ~/esp
+        if [ ! -d "esp-idf" ]; then
+          git clone -b ${{ env.IDF_VERSION }} --recursive https://github.com/espressif/esp-idf.git
+          cd esp-idf
+          ./install.sh esp32
+        fi
 
     - name: Validate sdkconfig
       shell: bash
@@ -194,15 +201,23 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Setup ESP-IDF
-      uses: espressif/esp-idf-ci-action@v1
-      with:
-        esp_idf_version: ${{ env.IDF_VERSION }}
-        target: esp32
+    - name: Install ESP-IDF
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git wget flex bison gperf python3 python3-pip python3-venv cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
+        mkdir -p ~/esp
+        cd ~/esp
+        if [ ! -d "esp-idf" ]; then
+          git clone -b ${{ env.IDF_VERSION }} --recursive https://github.com/espressif/esp-idf.git
+          cd esp-idf
+          ./install.sh esp32
+        fi
 
     - name: Security configuration check
       shell: bash
       run: |
+        . ~/esp/esp-idf/export.sh
         cd esp32-project
         echo "=== ESP32 Security Check ==="
         
