@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'cpp', 'javascript' ]
+        language: [ 'c', 'javascript' ]
 
     steps:
     - name: Checkout repository
@@ -38,8 +38,8 @@ jobs:
         languages: ${{ matrix.language }}
         queries: security-extended,security-and-quality
 
-    - name: Setup build environment (C/C++)
-      if: matrix.language == 'cpp'
+    - name: Setup build environment (C)
+      if: matrix.language == 'c'
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -50,8 +50,8 @@ jobs:
           libcurl4-openssl-dev \
           libssl-dev
 
-    - name: Build C/C++ code
-      if: matrix.language == 'cpp'
+    - name: Build C code
+      if: matrix.language == 'c'
       run: |
         # Use Makefile wrapper to configure and build
         make configure TARGET_PLATFORM=linux
@@ -273,7 +273,7 @@ jobs:
         echo "" >> security-summary.md
         
         echo "## Scans Performed" >> security-summary.md
-        echo "- ✅ CodeQL Analysis (C/C++ and JavaScript)" >> security-summary.md
+        echo "- ✅ CodeQL Analysis (C and JavaScript/TypeScript)" >> security-summary.md
         echo "- ✅ Dependency Vulnerability Scan (npm audit, Snyk)" >> security-summary.md
         echo "- ✅ Secret Scanning (TruffleHog, GitLeaks)" >> security-summary.md
         

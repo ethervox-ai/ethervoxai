@@ -590,7 +590,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 Comprehensive API documentation is available:
 
-- **C/C++ API**: [SDK Documentation](sdk/README.md)
+- **C API**: [SDK Documentation](sdk/README.md)
 - **Platform HAL Guide**: [HAL Documentation](docs/platform-hal.md)
 - **JavaScript API**: [Dashboard SDK](dashboard/src/sdk/README.md)
 - **Python Bindings**: [Python SDK](python/README.md)
@@ -729,7 +729,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 Comprehensive API documentation is available:
 
-- **C/C++ API**: [SDK Documentation](sdk/README.md)
+- **C API**: [SDK Documentation](sdk/README.md)
 - **Platform HAL Guide**: [HAL Documentation](docs/platform-hal.md)
 - **JavaScript API**: [Dashboard SDK](dashboard/src/sdk/README.md)
 - **Python Bindings**: [Python SDK](python/README.md)

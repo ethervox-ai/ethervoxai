@@ -85,7 +85,7 @@ jobs:
     - name: Configure CMake
       run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DTARGET_PLATFORM=${{ matrix.cmake_platform }}
 
-    - name: Build
+    - name: Build C project
       run: cmake --build build --config ${{ env.BUILD_TYPE }}
 
     - name: Run unit tests

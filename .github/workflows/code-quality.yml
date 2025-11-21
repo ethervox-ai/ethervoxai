@@ -29,16 +29,16 @@ jobs:
           ninja-build \
           libasound2-dev
 
-    - name: Check C++ formatting
+    - name: Check C formatting
       continue-on-error: true
       run: |
-        echo "=== C++ Format Check ==="
-        find src include -name "*.cpp" -o -name "*.hpp" -o -name "*.h" -o -name "*.c" | \
+        echo "=== C Format Check ==="
+        find src include sdk tests -name "*.c" -o -name "*.h" | \
         xargs clang-format --dry-run --Werror --style=file
 
     - name: Run clang-tidy
       run: |
-        echo "=== C++ Static Analysis ==="
+        echo "=== C Static Analysis ==="
         # Configure via Makefile/CMake to generate compile commands
         cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
         
@@ -56,14 +56,14 @@ jobs:
 
     - name: Run cppcheck
       run: |
-        echo "=== C++ Security and Bug Analysis ==="
-        cppcheck --enable=all --std=c++17 --platform=unix64 \
+        echo "=== Cppcheck Static Analysis ==="
+        cppcheck --enable=all --std=c11 --platform=unix64 \
           --suppress=missingIncludeSystem \
           --suppress=unusedFunction \
           --suppress=unmatchedSuppression \
           --error-exitcode=1 \
           --xml --xml-version=2 \
-          src/ include/ 2> cppcheck-report.xml || true
+          src/ include/ sdk/ tests/ 2> cppcheck-report.xml || true
         
         # Convert XML to readable format
         if [ -f cppcheck-report.xml ]; then
@@ -75,16 +75,16 @@ jobs:
       run: |
         echo "=== Include Analysis ==="
         # Run IWYU on a subset of files to check include hygiene
-        find src -name "*.cpp" | head -10 | while read file; do
+        find src -name "*.c" | head -10 | while read file; do
           echo "Checking includes in $file"
           iwyu_tool.py -p build "$file" || true
         done
 
-    - name: Upload C++ analysis results
+    - name: Upload C analysis results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: cpp-analysis-${{ github.sha }}
+        name: c-analysis-${{ github.sha }}
         path: |
           cppcheck-report.xml
           build/compile_commands.json

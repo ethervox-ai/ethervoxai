@@ -1,7 +1,8 @@
-# C++ format style configuration for EtherVoxAI
+# C format style configuration for EtherVoxAI
 # Based on Google style with some modifications for embedded systems
 
 BasedOnStyle: Google
+Language: C
 IndentWidth: 2
 TabWidth: 2
 UseTab: Never
