@@ -167,6 +167,7 @@ jobs:
               if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
                 echo "Updating ubuntu.sources to restrict to amd64"
                 sudo sed -i 's/^Architectures: .*$/Architectures: amd64/' /etc/apt/sources.list.d/ubuntu.sources
+                sudo cat /etc/apt/sources.list.d/ubuntu.sources
               fi
               # Configure apt to use ports.ubuntu.com for armhf packages
               echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs) main universe" | sudo tee /etc/apt/sources.list.d/armhf-cross.list
