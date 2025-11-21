@@ -166,7 +166,7 @@ jobs:
               # Restrict existing repos to amd64 only (Ubuntu 24.04 uses deb822 format)
               if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
                 echo "Updating ubuntu.sources to restrict to amd64"
-                sudo sed -i 's/^Architectures: .*$/Architectures: amd64/' /etc/apt/sources.list.d/ubuntu.sources
+                sudo sed -i '/^Types:/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources
                 sudo cat /etc/apt/sources.list.d/ubuntu.sources
               fi
               # Configure apt to use ports.ubuntu.com for armhf packages
@@ -187,7 +187,7 @@ jobs:
               # Restrict existing repos to amd64 only (Ubuntu 24.04 uses deb822 format)
               if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
                 echo "Updating ubuntu.sources to restrict to amd64"
-                sudo sed -i 's/^Architectures: .*$/Architectures: amd64/' /etc/apt/sources.list.d/ubuntu.sources
+                sudo sed -i '/^Types:/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources
                 sudo cat /etc/apt/sources.list.d/ubuntu.sources
               fi
               # Configure apt to use ports.ubuntu.com for arm64 packages
