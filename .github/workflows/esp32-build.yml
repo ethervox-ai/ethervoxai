@@ -38,20 +38,29 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
-    - name: Setup ESP-IDF
-      uses: espressif/esp-idf-ci-action@v1
-      with:
-        esp_idf_version: ${{ env.IDF_VERSION }}
-        target: ${{ matrix.target }}
-        path: 'esp32-project'
+    - name: Install ESP-IDF dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git wget flex bison gperf python3 python3-pip python3-venv \
+          cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
 
+    - name: Setup ESP-IDF
+      run: |
+        mkdir -p ~/esp
+        cd ~/esp
+        if [ ! -d "esp-idf" ]; then
+          git clone --recursive --branch ${{ env.IDF_VERSION }} --depth 1 https://github.com/espressif/esp-idf.git
+        fi
+        cd esp-idf
+        ./install.sh ${{ matrix.target }}
+        
     - name: Cache ESP-IDF tools
       uses: actions/cache@v4
       with:
         path: |
           ~/.espressif
-          ~/.cache/pip
-        key: ${{ runner.os }}-esp-idf-${{ env.IDF_VERSION }}-${{ matrix.target }}
+          ~/esp/esp-idf
+        key: ${{ runner.os }}-esp-idf-${{ env.IDF_VERSION }}-${{ matrix.target }}-v2
         restore-keys: |
           ${{ runner.os }}-esp-idf-${{ env.IDF_VERSION }}-
           ${{ runner.os }}-esp-idf-
@@ -60,7 +69,7 @@ jobs:
       shell: bash
       run: |
         # Source ESP-IDF environment
-        . $IDF_PATH/export.sh
+        . ~/esp/esp-idf/export.sh
         
         # Navigate to project and configure
         cd esp32-project
@@ -149,7 +158,7 @@ jobs:
     - name: Validate sdkconfig
       shell: bash
       run: |
-        . $IDF_PATH/export.sh
+        . ~/esp/esp-idf/export.sh
         cd esp32-project
         echo "=== Validating ESP32 Configuration ==="
         
