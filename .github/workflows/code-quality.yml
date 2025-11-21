@@ -121,7 +121,7 @@ jobs:
 
     - name: Secret scanning with TruffleHog (PR)
       uses: trufflesecurity/trufflehog@main
-      if: github.event_name == 'pull_request'
+      if: github.event_name == 'pull_request' && github.event.pull_request.base.sha != github.event.pull_request.head.sha
       with:
         path: ./
         base: ${{ github.event.pull_request.base.sha }}
@@ -130,7 +130,7 @@ jobs:
 
     - name: Secret scanning with TruffleHog (Push)
       uses: trufflesecurity/trufflehog@main
-      if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+      if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before != github.event.after
       with:
         path: ./
         base: ${{ github.event.before }}
