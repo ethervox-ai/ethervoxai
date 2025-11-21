@@ -198,32 +198,31 @@ set(ETHERVOXAI_PLATFORM_LIBS "")
 if(WIN32)
     set(ETHERVOXAI_PLATFORM_LIBS winmm ws2_32 crypt32 wininet)
 elseif(TARGET_PLATFORM STREQUAL "RPI")
-    set(ETHERVOXAI_PLATFORM_LIBS pthread m)
+    # For cross-compilation, link libraries directly (they're installed via apt for the target arch)
+    set(ETHERVOXAI_PLATFORM_LIBS asound pthread curl ssl crypto m)
+    
+    # Only search for bcm2835 in sysroot if CMAKE_SYSROOT is defined
+    if(CMAKE_SYSROOT)
+        set(_ethervox_rpi_lib_paths
+            ${CMAKE_SYSROOT}/lib
+            ${CMAKE_SYSROOT}/lib/arm-linux-gnueabihf
+            ${CMAKE_SYSROOT}/../lib
+            ${CMAKE_SYSROOT}/../lib/arm-linux-gnueabihf
+        )
 
-    set(_ethervox_rpi_lib_paths
-        ${CMAKE_SYSROOT}/lib
-        ${CMAKE_SYSROOT}/lib/arm-linux-gnueabihf
-        ${CMAKE_SYSROOT}/../lib
-        ${CMAKE_SYSROOT}/../lib/arm-linux-gnueabihf
-    )
-
-    find_library(BCM2835_LIB bcm2835 PATHS ${_ethervox_rpi_lib_paths} NO_DEFAULT_PATH)
-    if(BCM2835_LIB)
-        list(APPEND ETHERVOXAI_PLATFORM_LIBS ${BCM2835_LIB})
-        target_compile_definitions(ethervoxai PUBLIC ETHERVOX_HAVE_BCM2835=1)
-    else()
-        target_compile_definitions(ethervoxai PUBLIC ETHERVOX_HAVE_BCM2835=0)
-        message(WARNING "bcm2835 library not found in Raspberry Pi sysroot; GPIO features disabled")
-    endif()
-
-    foreach(_lib_name curl ssl crypto)
-        find_library(_found_lib_${_lib_name} ${_lib_name} PATHS ${_ethervox_rpi_lib_paths} NO_DEFAULT_PATH)
-        if(_found_lib_${_lib_name})
-            list(APPEND ETHERVOXAI_PLATFORM_LIBS ${_found_lib_${_lib_name}})
+        find_library(BCM2835_LIB bcm2835 PATHS ${_ethervox_rpi_lib_paths} NO_DEFAULT_PATH)
+        if(BCM2835_LIB)
+            list(APPEND ETHERVOXAI_PLATFORM_LIBS ${BCM2835_LIB})
+            target_compile_definitions(ethervoxai PUBLIC ETHERVOX_HAVE_BCM2835=1)
         else()
-            message(WARNING "${_lib_name} library not found in Raspberry Pi sysroot; skipping link")
+            target_compile_definitions(ethervoxai PUBLIC ETHERVOX_HAVE_BCM2835=0)
+            message(WARNING "bcm2835 library not found in Raspberry Pi sysroot; GPIO features disabled")
         endif()
-    endforeach()
+    else()
+        # No sysroot - skip bcm2835 (typical for GitHub Actions cross-compilation)
+        target_compile_definitions(ethervoxai PUBLIC ETHERVOX_HAVE_BCM2835=0)
+        message(STATUS "No CMAKE_SYSROOT defined; skipping bcm2835 library search")
+    endif()
 
 elseif(UNIX AND NOT APPLE)
     set(ETHERVOXAI_PLATFORM_LIBS asound pthread curl ssl crypto m)
