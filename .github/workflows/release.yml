@@ -93,6 +93,7 @@ jobs:
     name: Build Release Assets
     needs: validate-release
     strategy:
+      fail-fast: false
       matrix:
         include:
           # Desktop platforms
@@ -177,7 +178,8 @@ jobs:
         elif [ -n "${{ matrix.cross_compile }}" ]; then
           # Cross-compilation for ARM - use CMake directly to avoid Makefile toolchain issues
           if [ "${{ matrix.target }}" = "rpi-zero" ]; then
-            # Raspberry Pi Zero (ARMv6/ARMv7 32-bit)
+            # Raspberry Pi Zero (ARMv6 32-bit)
+            # ARMv6 with hard-float requires ARM mode (not Thumb), so add -marm
             cmake -B build -G "Ninja" \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_SYSTEM_NAME=Linux \
@@ -189,8 +191,8 @@ jobs:
               -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
               -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
               -DTARGET_PLATFORM=RPI \
-              -DCMAKE_C_FLAGS="-march=armv6 -mfpu=vfp -mfloat-abi=hard" \
-              -DCMAKE_CXX_FLAGS="-march=armv6 -mfpu=vfp -mfloat-abi=hard"
+              -DCMAKE_C_FLAGS="-marm -march=armv6 -mfpu=vfp -mfloat-abi=hard" \
+              -DCMAKE_CXX_FLAGS="-marm -march=armv6 -mfpu=vfp -mfloat-abi=hard"
           elif [ "${{ matrix.target }}" = "rpi-4" ]; then
             # Raspberry Pi 4/5 (ARM64)
             cmake -B build -G "Ninja" \
