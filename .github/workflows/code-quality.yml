@@ -116,19 +116,8 @@ jobs:
           p/secrets
           p/owasp-top-ten
 
-    - name: Upload Semgrep results to GitHub Advanced Security
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
-      with:
-        sarif_file: semgrep.sarif
-
-    - name: Upload Semgrep SARIF artifact
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: semgrep-sarif-${{ github.sha }}
-        path: semgrep.sarif
-        retention-days: 30
+    # Note: SARIF upload removed as it requires additional configuration
+    # To enable, add generateSarif parameter to Semgrep action above
 
     - name: Secret scanning with TruffleHog (PR)
       uses: trufflesecurity/trufflehog@main
