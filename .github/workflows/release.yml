@@ -160,8 +160,12 @@ jobs:
                 binutils-arm-linux-gnueabihf crossbuild-essential-armhf
               # Add armhf architecture for cross-compiled libraries
               sudo dpkg --add-architecture armhf
+              echo "Listing existing sources"
+              sudo ls -l /etc/apt/sources.list.d/
+              sudo cat /etc/apt/sources.list.d/ubuntu.sources || true
               # Restrict existing repos to amd64 only (Ubuntu 24.04 uses deb822 format)
               if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+                echo "Updating ubuntu.sources to restrict to amd64"
                 sudo sed -i 's/^Architectures: .*$/Architectures: amd64/' /etc/apt/sources.list.d/ubuntu.sources
               fi
               # Configure apt to use ports.ubuntu.com for armhf packages
@@ -176,9 +180,14 @@ jobs:
                 binutils-aarch64-linux-gnu crossbuild-essential-arm64
               # Add arm64 architecture for cross-compiled libraries
               sudo dpkg --add-architecture arm64
+              echo "Listing existing sources"
+              sudo ls -l /etc/apt/sources.list.d/
+              sudo cat /etc/apt/sources.list.d/ubuntu.sources || true
               # Restrict existing repos to amd64 only (Ubuntu 24.04 uses deb822 format)
               if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+                echo "Updating ubuntu.sources to restrict to amd64"
                 sudo sed -i 's/^Architectures: .*$/Architectures: amd64/' /etc/apt/sources.list.d/ubuntu.sources
+                sudo cat /etc/apt/sources.list.d/ubuntu.sources
               fi
               # Configure apt to use ports.ubuntu.com for arm64 packages
               echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs) main universe" | sudo tee /etc/apt/sources.list.d/arm64-cross.list
