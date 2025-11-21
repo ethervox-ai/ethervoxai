@@ -181,9 +181,18 @@ jobs:
         
     - name: Scan for secrets
       uses: trufflesecurity/trufflehog@main
+      if: github.event_name == 'pull_request'
       with:
         path: dashboard/
-        base: ${{ github.event.repository.default_branch }}
+        base: ${{ github.event.pull_request.base.sha }}
+        head: ${{ github.event.pull_request.head.sha }}
+    
+    - name: Scan for secrets (full scan on push)
+      uses: trufflesecurity/trufflehog@main
+      if: github.event_name == 'push'
+      with:
+        path: dashboard/
+        base: HEAD~1
         head: HEAD
 
   deploy-preview:
