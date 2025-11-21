@@ -96,8 +96,17 @@ static int esp32_i2c_write(uint32_t bus_id, uint8_t device_addr, const uint8_t* 
   if (!data || len == 0)
     return -1;
 
-  // Use bus_id to select I2C port (default to I2C_NUM_0)
-  i2c_port_t i2c_num = (bus_id == 0) ? I2C_NUM_0 : I2C_NUM_1;
+  // Use bus_id to select I2C port
+  // Note: ESP32-C6 only supports I2C_NUM_0, so we default to it
+  i2c_port_t i2c_num = I2C_NUM_0;
+#if SOC_I2C_NUM > 1
+  // For chips with multiple I2C controllers, allow bus selection
+  if (bus_id == 1) {
+    i2c_num = I2C_NUM_1;
+  }
+#else
+  (void)bus_id; // Suppress unused parameter warning
+#endif
 
   i2c_cmd_handle_t cmd = i2c_cmd_link_create();
   i2c_master_start(cmd);
@@ -115,8 +124,17 @@ static int esp32_i2c_read(uint32_t bus_id, uint8_t device_addr, uint8_t* data, u
   if (!data || len == 0)
     return -1;
 
-  // Use bus_id to select I2C port (default to I2C_NUM_0)
-  i2c_port_t i2c_num = (bus_id == 0) ? I2C_NUM_0 : I2C_NUM_1;
+  // Use bus_id to select I2C port
+  // Note: ESP32-C6 only supports I2C_NUM_0, so we default to it
+  i2c_port_t i2c_num = I2C_NUM_0;
+#if SOC_I2C_NUM > 1
+  // For chips with multiple I2C controllers, allow bus selection
+  if (bus_id == 1) {
+    i2c_num = I2C_NUM_1;
+  }
+#else
+  (void)bus_id; // Suppress unused parameter warning
+#endif
 
   i2c_cmd_handle_t cmd = i2c_cmd_link_create();
   i2c_master_start(cmd);
