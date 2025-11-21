@@ -56,18 +56,19 @@ jobs:
           ${{ runner.os }}-esp-idf-${{ env.IDF_VERSION }}-
           ${{ runner.os }}-esp-idf-
 
-    - name: Configure ESP32 project
+    - name: Build ESP32 firmware
+      shell: bash
       run: |
+        # Source ESP-IDF environment
+        . $IDF_PATH/export.sh
+        
+        # Navigate to project and configure
         cd esp32-project
         idf.py set-target ${{ matrix.target }}
-        idf.py reconfigure
-
-    - name: Build ESP32 firmware
-      run: |
-        cd esp32-project
         idf.py build
 
     - name: Generate build info
+      shell: bash
       run: |
         cd esp32-project
         echo "ESP32_TARGET=${{ matrix.target }}" >> build_info.txt
@@ -76,6 +77,7 @@ jobs:
         echo "IDF_VERSION=${{ env.IDF_VERSION }}" >> build_info.txt
 
     - name: Package ESP32 artifacts
+      shell: bash
       run: |
         mkdir -p esp32-artifacts-${{ matrix.target }}
         cd esp32-project/build
@@ -114,6 +116,7 @@ jobs:
         retention-days: 30
 
     - name: Check firmware size
+      shell: bash
       run: |
         cd esp32-project/build
         echo "=== Firmware Size Analysis ==="
@@ -144,7 +147,9 @@ jobs:
         target: esp32
 
     - name: Validate sdkconfig
+      shell: bash
       run: |
+        . $IDF_PATH/export.sh
         cd esp32-project
         echo "=== Validating ESP32 Configuration ==="
         
@@ -183,6 +188,7 @@ jobs:
         target: esp32
 
     - name: Security configuration check
+      shell: bash
       run: |
         cd esp32-project
         echo "=== ESP32 Security Check ==="
