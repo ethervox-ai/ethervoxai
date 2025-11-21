@@ -88,34 +88,38 @@ jobs:
     - name: Package ESP32 artifacts
       shell: bash
       run: |
-        mkdir -p esp32-artifacts-${{ matrix.target }}
-        cd esp32-project/build
+        # Create artifacts directory in workspace root
+        ARTIFACTS_DIR="${GITHUB_WORKSPACE}/esp32-artifacts-${{ matrix.target }}"
+        mkdir -p "${ARTIFACTS_DIR}"
         
         # Copy firmware binaries
-        cp ethervoxai.bin ../../../esp32-artifacts-${{ matrix.target }}/
-        cp ethervoxai.elf ../../../esp32-artifacts-${{ matrix.target }}/
-        cp bootloader/bootloader.bin ../../../esp32-artifacts-${{ matrix.target }}/
-        cp partition_table/partition-table.bin ../../../esp32-artifacts-${{ matrix.target }}/
+        cp esp32-project/build/ethervoxai.bin "${ARTIFACTS_DIR}/"
+        cp esp32-project/build/ethervoxai.elf "${ARTIFACTS_DIR}/"
+        cp esp32-project/build/bootloader/bootloader.bin "${ARTIFACTS_DIR}/"
+        cp esp32-project/build/partition_table/partition-table.bin "${ARTIFACTS_DIR}/"
         
         # Copy partition table and other config files
-        cp ../partitions.csv ../../../esp32-artifacts-${{ matrix.target }}/
-        cp ../sdkconfig ../../../esp32-artifacts-${{ matrix.target }}/
-        cp ../build_info.txt ../../../esp32-artifacts-${{ matrix.target }}/
+        cp esp32-project/partitions.csv "${ARTIFACTS_DIR}/" || echo "partitions.csv not found, skipping"
+        cp esp32-project/sdkconfig "${ARTIFACTS_DIR}/"
+        cp esp32-project/build_info.txt "${ARTIFACTS_DIR}/"
         
         # Generate flash instructions
-        echo "# ESP32 Flash Instructions" > ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
-        echo "" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
-        echo "Target: ${{ matrix.target }}" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
-        echo "Built: $(date)" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
-        echo "" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
-        echo "## Flash Command:" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
-        echo '```bash' >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
-        echo "esptool.py --chip ${{ matrix.target }} --port /dev/ttyUSB0 --baud 460800 write_flash -z \\" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
-        echo "  --flash_mode dio --flash_freq 40m --flash_size detect \\" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
-        echo "  0x1000 bootloader.bin \\" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
-        echo "  0x8000 partition-table.bin \\" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
-        echo "  0x10000 ethervoxai.bin" >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
-        echo '```' >> ../../../esp32-artifacts-${{ matrix.target }}/FLASH.md
+        {
+          echo "# ESP32 Flash Instructions"
+          echo ""
+          echo "Target: ${{ matrix.target }}"
+          echo "Built: $(date)"
+          echo ""
+          echo "## Flash Command:"
+          echo '```bash'
+          echo "esptool.py --chip ${{ matrix.target }} --port /dev/ttyUSB0 --baud 460800 write_flash -z \\"
+          echo "  --flash_mode dio --flash_freq 40m --flash_size detect \\"
+          echo "  0x1000 bootloader.bin \\"
+          echo "  0x8000 partition-table.bin \\"
+          echo "  0x10000 ethervoxai.bin"
+          echo '```'
+        } > "${ARTIFACTS_DIR}/FLASH.md"
+
 
     - name: Upload ESP32 artifacts
       uses: actions/upload-artifact@v4
