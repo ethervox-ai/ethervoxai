@@ -174,8 +174,10 @@ jobs:
               echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs)-updates main universe" | sudo tee -a /etc/apt/sources.list.d/armhf-cross.list
               echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs)-security main universe" | sudo tee -a /etc/apt/sources.list.d/armhf-cross.list
               sudo apt-get update
-              sudo apt-get install -y libasound2-dev:armhf libcurl4-openssl-dev:armhf \
-                libssl-dev:armhf
+              # Use dpkg --force-overwrite to handle file conflicts (e.g., /usr/bin/curl-config)
+              sudo apt-get download libasound2-dev:armhf libcurl4-openssl-dev:armhf libssl-dev:armhf
+              sudo dpkg --force-overwrite -i libasound2-dev_*_armhf.deb libcurl4-openssl-dev_*_armhf.deb libssl-dev_*_armhf.deb || true
+              sudo apt-get install -f -y
             elif [ "${{ matrix.cross_compile }}" = "aarch64-linux-gnu" ]; then
               sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
                 binutils-aarch64-linux-gnu crossbuild-essential-arm64
@@ -195,8 +197,10 @@ jobs:
               echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs)-updates main universe" | sudo tee -a /etc/apt/sources.list.d/arm64-cross.list
               echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs)-security main universe" | sudo tee -a /etc/apt/sources.list.d/arm64-cross.list
               sudo apt-get update
-              sudo apt-get install -y libasound2-dev:arm64 libcurl4-openssl-dev:arm64 \
-                libssl-dev:arm64
+              # Use dpkg --force-overwrite to handle file conflicts (e.g., /usr/bin/curl-config)
+              sudo apt-get download libasound2-dev:arm64 libcurl4-openssl-dev:arm64 libssl-dev:arm64
+              sudo dpkg --force-overwrite -i libasound2-dev_*_arm64.deb libcurl4-openssl-dev_*_arm64.deb libssl-dev_*_arm64.deb || true
+              sudo apt-get install -f -y
             fi
           fi
         elif [ "${{ matrix.platform }}" = "windows" ]; then
