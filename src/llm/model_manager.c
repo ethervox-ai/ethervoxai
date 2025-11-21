@@ -538,6 +538,8 @@ bool ethervox_model_manager_has_enough_space(const char* path, uint64_t required
         : (required_bytes * 11) / 10;
     return available >= required_with_buffer;
 }
+
+int ethervox_model_manager_delete_model(
     ethervox_model_manager_t* g_manager,
     const ethervox_model_info_t* model_info) {
     

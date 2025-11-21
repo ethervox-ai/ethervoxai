@@ -309,7 +309,7 @@ cmake --build build --target llm_example
 - [llama.cpp](https://github.com/ggerganov/llama.cpp) - Core inference engine
 - [GGUF Format](https://github.com/ggerganov/ggml/blob/master/docs/gguf.md) - Model format spec
 - [HuggingFace GGUF Models](https://huggingface.co/models?library=gguf) - Pre-quantized models
-- [EthervoxAI SDK](../sdk/README.md) - Full SDK documentation
+- [EthervoxAI SDK](../../sdk/README.md) - Full SDK documentation
 
 ## License
 
