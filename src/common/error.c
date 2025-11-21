@@ -1,4 +1,13 @@
 // SPDX-License-Identifier: CC-BY-NC-SA-4.0
+
+// Windows-specific defines must come before any Windows headers
+#if defined(_WIN32)
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600  // Windows Vista or later for GetTickCount64
+#endif
+#include <windows.h>
+#endif
+
 #include "ethervox/error.h"
 #include <string.h>
 #include <time.h>

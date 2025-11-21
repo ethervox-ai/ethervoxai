@@ -160,6 +160,9 @@ jobs:
                 binutils-arm-linux-gnueabihf crossbuild-essential-armhf
               # Add armhf architecture for cross-compiled libraries
               sudo dpkg --add-architecture armhf
+              # Configure apt to use ports.ubuntu.com for armhf packages
+              echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs) main universe" | sudo tee /etc/apt/sources.list.d/armhf-cross.list
+              echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs)-updates main universe" | sudo tee -a /etc/apt/sources.list.d/armhf-cross.list
               sudo apt-get update
               sudo apt-get install -y libasound2-dev:armhf libcurl4-openssl-dev:armhf \
                 libssl-dev:armhf
@@ -168,6 +171,9 @@ jobs:
                 binutils-aarch64-linux-gnu crossbuild-essential-arm64
               # Add arm64 architecture for cross-compiled libraries
               sudo dpkg --add-architecture arm64
+              # Configure apt to use ports.ubuntu.com for arm64 packages
+              echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs) main universe" | sudo tee /etc/apt/sources.list.d/arm64-cross.list
+              echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs)-updates main universe" | sudo tee -a /etc/apt/sources.list.d/arm64-cross.list
               sudo apt-get update
               sudo apt-get install -y libasound2-dev:arm64 libcurl4-openssl-dev:arm64 \
                 libssl-dev:arm64
