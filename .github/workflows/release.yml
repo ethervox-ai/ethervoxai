@@ -108,19 +108,22 @@ jobs:
             platform: macos
             arch: x64
             target: macos-x64
-          # ARM platforms
+          # ARM platforms with cross-compilation
           - os: ubuntu-latest
             platform: linux
             arch: arm64
             target: linux-arm64
+            cross_compile: aarch64-linux-gnu
           - os: ubuntu-latest
             platform: linux
             arch: armhf
             target: rpi-zero
+            cross_compile: arm-linux-gnueabihf
           - os: ubuntu-latest
             platform: linux
             arch: arm64
             target: rpi-4
+            cross_compile: aarch64-linux-gnu
 
     runs-on: ${{ matrix.os }}
 
@@ -149,10 +152,15 @@ jobs:
           sudo apt-get install -y build-essential cmake ninja-build \
             libasound2-dev libcurl4-openssl-dev libssl-dev pkg-config
           
-          if [ "${{ matrix.target }}" = "rpi-zero" ]; then
-            sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
-          elif [ "${{ matrix.target }}" = "rpi-4" ] || [ "${{ matrix.target }}" = "linux-arm64" ]; then
-            sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          # Install cross-compilation toolchains for ARM
+          if [ -n "${{ matrix.cross_compile }}" ]; then
+            if [ "${{ matrix.cross_compile }}" = "arm-linux-gnueabihf" ]; then
+              sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
+                binutils-arm-linux-gnueabihf crossbuild-essential-armhf
+            elif [ "${{ matrix.cross_compile }}" = "aarch64-linux-gnu" ]; then
+              sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+                binutils-aarch64-linux-gnu crossbuild-essential-arm64
+            fi
           fi
         elif [ "${{ matrix.platform }}" = "windows" ]; then
           choco install ninja
@@ -163,19 +171,43 @@ jobs:
     - name: Configure (Makefile)
       shell: bash
       run: |
-        if [[ "${{ matrix.target }}" == rpi-* ]]; then
-          make configure-rpi
-        elif [ "${{ matrix.platform }}" = "windows" ]; then
+        if [ "${{ matrix.platform }}" = "windows" ]; then
           # Windows build using CMake directly
           cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release
+        elif [ -n "${{ matrix.cross_compile }}" ]; then
+          # Cross-compilation for ARM
+          if [ "${{ matrix.target }}" = "rpi-zero" ] || [ "${{ matrix.target }}" = "rpi-4" ]; then
+            # Use Makefile for RPI targets if available
+            if grep -q "configure-rpi" Makefile 2>/dev/null; then
+              make configure-rpi
+            else
+              # Fallback to direct CMake configuration
+              cmake -B build -G "Ninja" \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_SYSTEM_NAME=Linux \
+                -DCMAKE_SYSTEM_PROCESSOR=${{ matrix.arch }} \
+                -DCMAKE_C_COMPILER=${{ matrix.cross_compile }}-gcc \
+                -DCMAKE_CXX_COMPILER=${{ matrix.cross_compile }}-g++ \
+                -DTARGET_PLATFORM=RPI
+            fi
+          else
+            # Generic ARM cross-compilation
+            cmake -B build -G "Ninja" \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_SYSTEM_NAME=Linux \
+              -DCMAKE_SYSTEM_PROCESSOR=${{ matrix.arch }} \
+              -DCMAKE_C_COMPILER=${{ matrix.cross_compile }}-gcc \
+              -DCMAKE_CXX_COMPILER=${{ matrix.cross_compile }}-g++
+          fi
         else
+          # Native build
           make configure TARGET_PLATFORM=${{ matrix.platform }}
         fi
 
     - name: Build (Makefile)
       shell: bash
       run: |
-        if [ "${{ matrix.platform }}" = "windows" ]; then
+        if [ "${{ matrix.platform }}" = "windows" ] || [ -n "${{ matrix.cross_compile }}" ]; then
           cmake --build build --config Release
         else
           make build
@@ -419,14 +451,18 @@ jobs:
         - **Windows x64**: Full-featured build with dashboard
         - **Linux x64**: Full-featured build with dashboard
         - **macOS x64**: Full-featured build with dashboard
+        
+        ### ARM Platforms (Cross-compiled)
         - **Linux ARM64**: Optimized for 64-bit ARM systems
+        - **Raspberry Pi Zero**: Lightweight build for Pi Zero/Zero 2 W (ARMv6/ARMv7)
+        - **Raspberry Pi 4/5**: Full-featured build for Pi 4/5 series (ARM64)
         
         ### Embedded Platforms
-        - **Raspberry Pi Zero**: Lightweight build for Pi Zero/Zero 2 W
-        - **Raspberry Pi 4/5**: Full-featured build for Pi 4/5 series
         - **ESP32**: Firmware for ESP32 DevKits
+        - **ESP32-S2**: Firmware for ESP32-S2 modules
         - **ESP32-S3**: Firmware for ESP32-S3 with advanced features
         - **ESP32-C3**: Compact firmware for ESP32-C3 RISC-V
+        - **ESP32-C6**: Firmware for ESP32-C6 with Wi-Fi 6
         
         ## Installation
         
