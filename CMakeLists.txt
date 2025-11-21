@@ -39,6 +39,7 @@ elseif(TARGET_PLATFORM STREQUAL "RPI")
     # Raspberry Pi specific settings
     set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/rpi-toolchain.cmake")
     add_definitions(-DTARGET_RPI=1)
+    add_definitions(-DETHERVOX_PLATFORM_RPI=1)  # Define as preprocessor macro
     add_definitions(-DPLATFORM_EMBEDDED=1)
     set(ETHERVOX_PLATFORM_RPI 1)  # Set as CMake variable too
     
