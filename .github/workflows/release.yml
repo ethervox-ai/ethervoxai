@@ -131,7 +131,18 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
+    - name: Setup Node.js for Dashboard
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: '9'
+
     - name: Setup build environment
+      shell: bash
       run: |
         if [ "${{ matrix.platform }}" = "linux" ]; then
           sudo apt-get update
@@ -150,17 +161,28 @@ jobs:
         fi
 
     - name: Configure (Makefile)
+      shell: bash
       run: |
         if [[ "${{ matrix.target }}" == rpi-* ]]; then
           make configure-rpi
+        elif [ "${{ matrix.platform }}" = "windows" ]; then
+          # Windows build using CMake directly
+          cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release
         else
           make configure TARGET_PLATFORM=${{ matrix.platform }}
         fi
 
     - name: Build (Makefile)
-      run: make build
+      shell: bash
+      run: |
+        if [ "${{ matrix.platform }}" = "windows" ]; then
+          cmake --build build --config Release
+        else
+          make build
+        fi
 
     - name: Create distribution package
+      shell: bash
       run: |
         cmake --build build --target package
         
@@ -213,8 +235,9 @@ jobs:
     needs: validate-release
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        target: ['esp32', 'esp32s3', 'esp32c3']
+        target: ['esp32', 'esp32s2', 'esp32s3', 'esp32c3', 'esp32c6']
 
     steps:
     - name: Checkout repository
@@ -223,35 +246,45 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
-    - name: Setup ESP-IDF
-      uses: espressif/esp-idf-ci-action@v1
-      with:
-        esp_idf_version: 'v5.1.2'
-        target: ${{ matrix.target }}
+    - name: Install ESP-IDF
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git wget flex bison gperf python3 python3-pip python3-venv cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
+        mkdir -p ~/esp
+        cd ~/esp
+        if [ ! -d "esp-idf" ]; then
+          git clone -b v5.1.2 --recursive https://github.com/espressif/esp-idf.git
+          cd esp-idf
+          ./install.sh ${{ matrix.target }}
+        fi
 
     - name: Build ESP32 firmware
+      shell: bash
       run: |
-        cd src/platform/esp32
+        . ~/esp/esp-idf/export.sh
+        cd esp32-project
         idf.py set-target ${{ matrix.target }}
         idf.py build
 
     - name: Package ESP32 release
+      shell: bash
       run: |
         mkdir -p esp32-release-${{ matrix.target }}
-        cd src/platform/esp32/build
+        cd esp32-project/build
         
         # Copy firmware files
-        cp ethervoxai.bin ../../../esp32-release-${{ matrix.target }}/
-        cp ethervoxai.elf ../../../esp32-release-${{ matrix.target }}/
-        cp bootloader/bootloader.bin ../../../esp32-release-${{ matrix.target }}/
-        cp partition_table/partition-table.bin ../../../esp32-release-${{ matrix.target }}/
+        cp ethervoxai.bin ../../esp32-release-${{ matrix.target }}/
+        cp ethervoxai.elf ../../esp32-release-${{ matrix.target }}/
+        cp bootloader/bootloader.bin ../../esp32-release-${{ matrix.target }}/
+        cp partition_table/partition-table.bin ../../esp32-release-${{ matrix.target }}/
         
         # Copy configuration
-        cp ../partitions.csv ../../../esp32-release-${{ matrix.target }}/
-        cp ../sdkconfig ../../../esp32-release-${{ matrix.target }}/
+        cp ../partitions.csv ../../esp32-release-${{ matrix.target }}/
+        cp ../sdkconfig ../../esp32-release-${{ matrix.target }}/
         
         # Create flash script
-        cd ../../../esp32-release-${{ matrix.target }}
+        cd ../../esp32-release-${{ matrix.target }}
         cat > flash.sh << 'EOF'
         #!/bin/bash
         # ESP32 Flash Script
