@@ -243,22 +243,27 @@ jobs:
         # Create release directory
         mkdir -p release-${{ matrix.target }}
         
-        # Copy binaries
+        # Extract the CPack-generated tarball instead of copying individual files
         if [ "${{ matrix.platform }}" = "windows" ]; then
-          cp build/src/ethervoxai.exe release-${{ matrix.target }}/
-          cp build/*.dll release-${{ matrix.target }}/ 2>/dev/null || true
+          # For Windows, look for the generated package
+          if [ -f build/EthervoxAI-*-win64.zip ]; then
+            unzip -q build/EthervoxAI-*-win64.zip -d release-${{ matrix.target }}/
+          elif [ -f build/*.zip ]; then
+            unzip -q build/*.zip -d release-${{ matrix.target }}/
+          fi
         else
-          cp build/src/ethervoxai release-${{ matrix.target }}/
-          cp build/*.so release-${{ matrix.target }}/ 2>/dev/null || true
+          # For Linux/macOS, extract the tarball
+          if [ -f build/EthervoxAI-*-Linux.tar.gz ]; then
+            tar -xzf build/EthervoxAI-*-Linux.tar.gz -C release-${{ matrix.target }}/
+          elif [ -f build/EthervoxAI-*-Darwin.tar.gz ]; then
+            tar -xzf build/EthervoxAI-*-Darwin.tar.gz -C release-${{ matrix.target }}/
+          elif [ -f build/*.tar.gz ]; then
+            tar -xzf build/*.tar.gz -C release-${{ matrix.target }}/
+          fi
         fi
         
-        # Copy dashboard
-        if [ -d "build/dashboard/dist" ]; then
-          cp -r build/dashboard/dist release-${{ matrix.target }}/dashboard
-        fi
-        
-        # Copy documentation
-        cp README.md CONTRIBUTING.md LICENSE release-${{ matrix.target }}/
+        # Add documentation if not already included
+        cp README.md CONTRIBUTING.md LICENSE release-${{ matrix.target }}/ 2>/dev/null || true
         
         # Copy platform-specific files
         if [[ "${{ matrix.target }}" == rpi-* ]]; then
@@ -268,7 +273,7 @@ jobs:
           echo "See README.md for detailed installation instructions." >> release-${{ matrix.target }}/INSTALL.md
         fi
         
-        # Create archive
+        # Create final archive
         if [ "${{ matrix.platform }}" = "windows" ]; then
           7z a ethervoxai-${{ needs.validate-release.outputs.version }}-${{ matrix.target }}.zip release-${{ matrix.target }}/*
         else
