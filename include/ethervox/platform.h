@@ -22,6 +22,7 @@
 #include <time.h>
 
 #include "ethervox/config.h"
+#include "ethervox/error.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -81,25 +82,25 @@ typedef struct {
 // Hardware abstraction layer interface
 typedef struct {
   // Platform initialization
-  int (*init)(ethervox_platform_info_t* platform);
+  ethervox_result_t (*init)(ethervox_platform_info_t* platform);
   void (*cleanup)(ethervox_platform_info_t* platform);
 
   // GPIO operations
-  int (*gpio_configure)(uint32_t pin, ethervox_gpio_mode_t mode);
-  int (*gpio_write)(uint32_t pin, bool state);
+  ethervox_result_t (*gpio_configure)(uint32_t pin, ethervox_gpio_mode_t mode);
+  ethervox_result_t (*gpio_write)(uint32_t pin, bool state);
   bool (*gpio_read)(uint32_t pin);
-  int (*gpio_set_pwm)(uint32_t pin, uint32_t duty_cycle);
+  ethervox_result_t (*gpio_set_pwm)(uint32_t pin, uint32_t duty_cycle);
 
   // I2C operations
-  int (*i2c_init)(uint32_t bus, uint32_t sda_pin, uint32_t scl_pin);
-  int (*i2c_write)(uint32_t bus, uint8_t device_addr, const uint8_t* data, uint32_t len);
-  int (*i2c_read)(uint32_t bus, uint8_t device_addr, uint8_t* data, uint32_t len);
+  ethervox_result_t (*i2c_init)(uint32_t bus, uint32_t sda_pin, uint32_t scl_pin);
+  ethervox_result_t (*i2c_write)(uint32_t bus, uint8_t device_addr, const uint8_t* data, uint32_t len);
+  ethervox_result_t (*i2c_read)(uint32_t bus, uint8_t device_addr, uint8_t* data, uint32_t len);
   void (*i2c_cleanup)(uint32_t bus);
 
   // SPI operations
-  int (*spi_init)(uint32_t bus, uint32_t mosi_pin, uint32_t miso_pin, uint32_t clk_pin,
+  ethervox_result_t (*spi_init)(uint32_t bus, uint32_t mosi_pin, uint32_t miso_pin, uint32_t clk_pin,
                   uint32_t cs_pin);
-  int (*spi_transfer)(uint32_t bus, const uint8_t* tx_data, uint8_t* rx_data, uint32_t len);
+  ethervox_result_t (*spi_transfer)(uint32_t bus, const uint8_t* tx_data, uint8_t* rx_data, uint32_t len);
   void (*spi_cleanup)(uint32_t bus);
 
   // System operations
@@ -111,8 +112,8 @@ typedef struct {
   uint32_t (*get_free_heap_size)(void);
 
   // Power management
-  int (*set_cpu_frequency)(uint32_t frequency_mhz);
-  int (*enable_power_saving)(bool enable);
+  ethervox_result_t (*set_cpu_frequency)(uint32_t frequency_mhz);
+  ethervox_result_t (*enable_power_saving)(bool enable);
   float (*get_battery_voltage)(void);
   uint32_t (*delay_us)(uint32_t us);
   uint32_t (*delay_ms)(uint32_t ms);
@@ -130,7 +131,7 @@ typedef struct {
 } ethervox_platform_t;
 
 // Public API functions
-int ethervox_platform_init(ethervox_platform_t* platform);
+ethervox_result_t ethervox_platform_init(ethervox_platform_t* platform);
 void ethervox_platform_cleanup(ethervox_platform_t* platform);
 
 // Platform detection
@@ -139,9 +140,9 @@ ethervox_platform_capabilities_t ethervox_platform_get_capabilities(void);
 bool ethervox_platform_has_capability(const char* capability);
 
 // GPIO utilities
-int ethervox_gpio_configure_pin(ethervox_platform_t* platform,
+ethervox_result_t ethervox_gpio_configure_pin(ethervox_platform_t* platform,
                                 const ethervox_gpio_config_t* config);
-int ethervox_gpio_write_pin(ethervox_platform_t* platform, uint32_t pin, bool state);
+ethervox_result_t ethervox_gpio_write_pin(ethervox_platform_t* platform, uint32_t pin, bool state);
 bool ethervox_gpio_read_pin(ethervox_platform_t* platform, uint32_t pin);
 
 // System utilities
@@ -150,10 +151,20 @@ uint32_t ethervox_platform_get_memory_usage(ethervox_platform_t* platform);
 float ethervox_platform_get_cpu_usage(ethervox_platform_t* platform);
 
 // Device-specific profiles
-int ethervox_platform_load_device_profile(ethervox_platform_t* platform, const char* profile_name);
+ethervox_result_t ethervox_platform_load_device_profile(ethervox_platform_t* platform, const char* profile_name);
 
 // // Platform-specific HAL registration
-int ethervox_platform_register_hal(ethervox_platform_t* platform);
+ethervox_result_t ethervox_platform_register_hal(ethervox_platform_t* platform);
+
+// Android-specific utilities
+#ifdef __ANDROID__
+/**
+ * Get Android application files directory
+ * Returns the path set via setAndroidFilesDir() from JNI
+ * @return Path to Android app files directory, or NULL if not set
+ */
+const char* ethervox_get_android_files_dir(void);
+#endif
 
 #ifdef __cplusplus
 }

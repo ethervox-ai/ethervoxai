@@ -22,6 +22,7 @@
 #ifdef ETHERVOX_PLATFORM_RPI
 
 #include "ethervox/audio.h"
+#include "ethervox/error.h"
 
 // TODO: Include I2S and ALSA headers as needed
 // TODO: Bring in bcm2835.h for GPIO control if available
@@ -89,11 +90,14 @@ static int rpi_gpio_init(rpi_audio_data_t* audio_data) {
 }
 #endif
 
-static int rpi_audio_init(ethervox_audio_runtime_t* runtime,
+static ethervox_result_t rpi_audio_init(ethervox_audio_runtime_t* runtime,
                           const ethervox_audio_config_t* config) {
+  ETHERVOX_CHECK_PTR(runtime);
+  ETHERVOX_CHECK_PTR(config);
+  
   rpi_audio_data_t* audio_data = (rpi_audio_data_t*)malloc(sizeof(rpi_audio_data_t));
   if (!audio_data) {
-    return -1;
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_OUT_OF_MEMORY, "Failed to allocate RPi audio state");
   }
 
   memset(audio_data, 0, sizeof(rpi_audio_data_t));
@@ -103,6 +107,11 @@ static int rpi_audio_init(ethervox_audio_runtime_t* runtime,
   const size_t buffer_bytes =
     (size_t)audio_data->buffer_frames * config->channels * sizeof(int16_t);
   audio_data->audio_buffer = (char*)malloc(buffer_bytes);
+  if (!audio_data->audio_buffer) {
+    free(audio_data);
+    runtime->platform_data = NULL;
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_OUT_OF_MEMORY, "Failed to allocate audio buffer");
+  }
 
   // Initialize GPIO for mic array control
   if (rpi_gpio_init(audio_data) != 0) {
@@ -110,7 +119,7 @@ static int rpi_audio_init(ethervox_audio_runtime_t* runtime,
   }
 
   printf("Raspberry Pi audio driver initialized\n");
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 #if ETHERVOX_HAVE_BCM2835
@@ -137,10 +146,9 @@ static int rpi_select_microphone(rpi_audio_data_t* audio_data, int mic_index) {
 }
 #endif
 
-static int rpi_audio_start_capture(ethervox_audio_runtime_t* runtime) {
-  if (!runtime || !runtime->platform_data) {
-    return -1;
-  }
+static ethervox_result_t rpi_audio_start_capture(ethervox_audio_runtime_t* runtime) {
+  ETHERVOX_CHECK_PTR(runtime);
+  ETHERVOX_CHECK_PTR(runtime->platform_data);
 
   rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
 
@@ -161,13 +169,12 @@ static int rpi_audio_start_capture(ethervox_audio_runtime_t* runtime) {
 #endif
 
   audio_data->is_capturing = true;
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
-static int rpi_audio_stop_capture(ethervox_audio_runtime_t* runtime) {
-  if (!runtime || !runtime->platform_data) {
-    return -1;
-  }
+static ethervox_result_t rpi_audio_stop_capture(ethervox_audio_runtime_t* runtime) {
+  ETHERVOX_CHECK_PTR(runtime);
+  ETHERVOX_CHECK_PTR(runtime->platform_data);
 
   rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
 
@@ -179,13 +186,12 @@ static int rpi_audio_stop_capture(ethervox_audio_runtime_t* runtime) {
 #endif
 
   audio_data->is_capturing = false;
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
-static int rpi_audio_start_playback(ethervox_audio_runtime_t* runtime) {
-  if (!runtime || !runtime->platform_data) {
-    return -1;
-  }
+static ethervox_result_t rpi_audio_start_playback(ethervox_audio_runtime_t* runtime) {
+  ETHERVOX_CHECK_PTR(runtime);
+  ETHERVOX_CHECK_PTR(runtime->platform_data);
 
   rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
 
@@ -197,13 +203,12 @@ static int rpi_audio_start_playback(ethervox_audio_runtime_t* runtime) {
 #endif
 
   audio_data->is_playing = true;
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
-static int rpi_audio_stop_playback(ethervox_audio_runtime_t* runtime) {
-  if (!runtime || !runtime->platform_data) {
-    return -1;
-  }
+static ethervox_result_t rpi_audio_stop_playback(ethervox_audio_runtime_t* runtime) {
+  ETHERVOX_CHECK_PTR(runtime);
+  ETHERVOX_CHECK_PTR(runtime->platform_data);
 
   rpi_audio_data_t* audio_data = (rpi_audio_data_t*)runtime->platform_data;
 
@@ -217,7 +222,7 @@ static int rpi_audio_stop_playback(ethervox_audio_runtime_t* runtime) {
 
   audio_data->is_playing = false;
   printf("Raspberry Pi audio playback stopped\n");
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 static void rpi_audio_cleanup(ethervox_audio_runtime_t* runtime) {
@@ -237,7 +242,9 @@ static void rpi_audio_cleanup(ethervox_audio_runtime_t* runtime) {
   printf("Raspberry Pi audio driver cleaned up\n");
 }
 
-int ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime) {
+ethervox_result_t ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime) {
+  ETHERVOX_CHECK_PTR(runtime);
+  
   runtime->driver.init = rpi_audio_init;
   runtime->driver.start_capture = rpi_audio_start_capture;
   runtime->driver.stop_capture = rpi_audio_stop_capture;
@@ -245,18 +252,17 @@ int ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime) {
   runtime->driver.stop_playback = rpi_audio_stop_playback;
   runtime->driver.cleanup = rpi_audio_cleanup;
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 #else  // !ETHERVOX_PLATFORM_RPI
 
-#include <errno.h>
-
 #include "ethervox/audio.h"
+#include "ethervox/error.h"
 
-int ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime) {
+ethervox_result_t ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime) {
   (void)runtime;
-  return -ENOSYS;
+  return ETHERVOX_ERROR_NOT_SUPPORTED;
 }
 
 #endif  // ETHERVOX_PLATFORM_RPI

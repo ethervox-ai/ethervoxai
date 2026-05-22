@@ -230,6 +230,9 @@ jobs:
 
     - name: Run tests with coverage
       working-directory: build-coverage
+      env:
+        ETHERVOX_GITHUB_TOKEN_DESKTOP: ${{ secrets.ETHERVOX_GITHUB_TOKEN_DESKTOP }}
+        ETHERVOX_GITHUB_TOKEN: ${{ secrets.ETHERVOX_GITHUB_TOKEN }}
       run: |
         # Initialize coverage data (creates baseline)
         lcov --directory . --zerocounters

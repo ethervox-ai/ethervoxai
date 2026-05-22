@@ -61,7 +61,7 @@ bool ethervox_llm_backend_is_available(ethervox_llm_backend_type_t type) {
   }
 }
 
-int ethervox_llm_backend_init(ethervox_llm_backend_t* backend, const ethervox_llm_config_t* config) {
+ethervox_result_t ethervox_llm_backend_init(ethervox_llm_backend_t* backend, const ethervox_llm_config_t* config) {
   if (!backend) {
     ETHERVOX_LOG_ERROR("Backend is NULL");
     return ETHERVOX_ERROR_INVALID_ARGUMENT;
@@ -97,7 +97,7 @@ void ethervox_llm_backend_free(ethervox_llm_backend_t* backend) {
   free(backend);
 }
 
-int ethervox_llm_backend_load_model(ethervox_llm_backend_t* backend, const char* model_path) {
+ethervox_result_t ethervox_llm_backend_load_model(ethervox_llm_backend_t* backend, const char* model_path) {
   if (!backend) {
     ETHERVOX_LOG_ERROR("Backend is NULL");
     return ETHERVOX_ERROR_INVALID_ARGUMENT;
@@ -129,7 +129,7 @@ void ethervox_llm_backend_unload_model(ethervox_llm_backend_t* backend) {
   backend->is_loaded = false;
 }
 
-int ethervox_llm_backend_generate(ethervox_llm_backend_t* backend,
+ethervox_result_t ethervox_llm_backend_generate(ethervox_llm_backend_t* backend,
                                  const char* prompt,
                                  const char* language_code,
                                  ethervox_llm_response_t* response) {

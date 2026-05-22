@@ -22,6 +22,7 @@
 #include <time.h>
 
 #include "ethervox/platform.h"
+#include "ethervox/error.h"
 
 #ifdef ETHERVOX_PLATFORM_WINDOWS
 #include <windows.h>
@@ -30,36 +31,32 @@
 // Forward declarations ONLY (no function bodies)
 #ifdef ETHERVOX_PLATFORM_RPI
 #pragma message("-----Compiling with ETHERVOX_PLATFORM_RPI")
-extern int rpi_hal_register(ethervox_platform_t* platform);
+extern ethervox_result_t rpi_hal_register(ethervox_platform_t* platform);
 #endif
 #ifdef ETHERVOX_PLATFORM_ESP32
-#pragma message("----Compiling with ETHERVOX_PLATFORM_ESP32")
-extern int esp32_hal_register(ethervox_platform_t* platform);
+extern ethervox_result_t esp32_hal_register(ethervox_platform_t* platform);
 #endif
 #if defined(ETHERVOX_PLATFORM_DESKTOP)
-#pragma message("----Compiling with ETHERVOX_PLATFORM_DESKTOP")
-extern int desktop_hal_register(ethervox_platform_t* platform);
+extern ethervox_result_t desktop_hal_register(ethervox_platform_t* platform);
+#endif
+#if defined(ETHERVOX_PLATFORM_ANDROID) || defined(__ANDROID__)
+extern ethervox_result_t ethervox_platform_hal_register_android(ethervox_platform_t* platform);
 #endif
 
 // Register platform-specific HAL
-int ethervox_platform_register_hal(ethervox_platform_t* platform) {
-  if (!platform) {
-    return -1;
-  }
+ethervox_result_t ethervox_platform_register_hal(ethervox_platform_t* platform) {
+  ETHERVOX_CHECK_PTR(platform);
 
 #ifdef ETHERVOX_PLATFORM_ESP32
-#pragma message("Returning ESP32_HAL")
   return esp32_hal_register(platform);
 #elif defined(ETHERVOX_PLATFORM_RPI)
-#pragma message("Returning RPI_HAL")
   return rpi_hal_register(platform);
+#elif defined(ETHERVOX_PLATFORM_ANDROID) || defined(__ANDROID__)
+  return ethervox_platform_hal_register_android(platform);
 #elif defined(ETHERVOX_PLATFORM_DESKTOP)
-#pragma message("Returning DESKTOP_HAL")
   return desktop_hal_register(platform);
 #else
-#pragma message("No HAL available for this platform")
-  fprintf(stderr, "No HAL available for this platform\n");
-  return -1;
+  ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_PLATFORM_INIT, "No HAL available for this platform");
 #endif
 }
 
@@ -69,6 +66,8 @@ const char* ethervox_platform_get_name(void) {
   return "ESP32";
 #elif defined(ETHERVOX_PLATFORM_RPI)
   return "Raspberry Pi";
+#elif defined(ETHERVOX_PLATFORM_ANDROID) || defined(__ANDROID__)
+  return "Android";
 #elif defined(ETHERVOX_PLATFORM_WINDOWS)
   return "Windows";
 #elif defined(ETHERVOX_PLATFORM_LINUX)
@@ -217,10 +216,8 @@ static uint64_t get_system_timestamp_us(void) {
 }
 
 // Initialize platform
-int ethervox_platform_init(ethervox_platform_t* platform) {
-  if (!platform) {
-    return -1;
-  }
+ethervox_result_t ethervox_platform_init(ethervox_platform_t* platform) {
+  ETHERVOX_CHECK_PTR(platform);
 
   memset(platform, 0, sizeof(ethervox_platform_t));
 
@@ -251,8 +248,8 @@ int ethervox_platform_init(ethervox_platform_t* platform) {
 #endif
 
   // Register platform-specific HAL functions
-  int result = ethervox_platform_register_hal(platform);
-  if (result != 0) {
+  ethervox_result_t result = ethervox_platform_register_hal(platform);
+  if (ethervox_is_error(result)) {
     snprintf(platform->last_error, sizeof(platform->last_error), "Failed to register platform HAL");
     return result;
   }
@@ -260,7 +257,7 @@ int ethervox_platform_init(ethervox_platform_t* platform) {
   // Initialize platform-specific subsystems
   if (platform->hal.init) {
     result = platform->hal.init(&platform->info);
-    if (result != 0) {
+    if (ethervox_is_error(result)) {
       snprintf(platform->last_error, sizeof(platform->last_error),
                "Platform initialization failed");
       return result;
@@ -272,7 +269,7 @@ int ethervox_platform_init(ethervox_platform_t* platform) {
   printf("Platform initialized: %s (%s)\n", platform->info.platform_name,
          platform->info.hardware_revision);
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 // Cleanup platform
@@ -299,14 +296,17 @@ uint64_t ethervox_platform_get_uptime_ms(ethervox_platform_t* platform) {
 }
 
 // GPIO configuration helper
-int ethervox_gpio_configure_pin(ethervox_platform_t* platform,
+ethervox_result_t ethervox_gpio_configure_pin(ethervox_platform_t* platform,
                                 const ethervox_gpio_config_t* config) {
-  if (!platform || !config || !platform->hal.gpio_configure) {
-    return -1;
+  ETHERVOX_CHECK_PTR(platform);
+  ETHERVOX_CHECK_PTR(config);
+  
+  if (!platform->hal.gpio_configure) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_IMPLEMENTED, "GPIO configure not implemented");
   }
 
-  int result = platform->hal.gpio_configure(config->pin, config->mode);
-  if (result == 0 && config->mode == ETHERVOX_GPIO_OUTPUT) {
+  ethervox_result_t result = platform->hal.gpio_configure(config->pin, config->mode);
+  if (ethervox_is_success(result) && config->mode == ETHERVOX_GPIO_OUTPUT) {
     // Set initial state for output pins
     platform->hal.gpio_write(config->pin, config->initial_state);
   }
@@ -315,9 +315,11 @@ int ethervox_gpio_configure_pin(ethervox_platform_t* platform,
 }
 
 // GPIO write helper
-int ethervox_gpio_write_pin(ethervox_platform_t* platform, uint32_t pin, bool state) {
-  if (!platform || !platform->hal.gpio_write) {
-    return -1;
+ethervox_result_t ethervox_gpio_write_pin(ethervox_platform_t* platform, uint32_t pin, bool state) {
+  ETHERVOX_CHECK_PTR(platform);
+  
+  if (!platform->hal.gpio_write) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_IMPLEMENTED, "GPIO write not implemented");
   }
 
   return platform->hal.gpio_write(pin, state);
@@ -333,17 +335,17 @@ bool ethervox_gpio_read_pin(ethervox_platform_t* platform, uint32_t pin) {
 }
 
 // Load device profile (placeholder implementation)
-int ethervox_platform_load_device_profile(ethervox_platform_t* platform, const char* profile_name) {
-  if (!platform || !profile_name) {
-    return -1;
-}
+ethervox_result_t ethervox_platform_load_device_profile(ethervox_platform_t* platform, const char* profile_name) {
+  ETHERVOX_CHECK_PTR(platform);
+  ETHERVOX_CHECK_PTR(profile_name);
+  
   printf("Loading device profile: %s\n", profile_name);
 
   // In a real implementation, this would load configuration from a file
   // and configure hardware-specific settings like mic array geometry,
   // GPIO pin assignmentim_spec, audio routing, etc.
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 // Register platform-specific HAL implementation

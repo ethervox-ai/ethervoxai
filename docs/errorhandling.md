@@ -1,12 +1,14 @@
 # Error Handling Specification
 
-**Version:** 1.0  
-**Status:** Draft  
-**Last Updated:** October 31, 2025
+**Version:** 1.2  
+**Status:** Implemented & Tested  
+**Last Updated:** March 30, 2026
 
 ## Overview
 
 This document specifies a consistent error handling approach across the EtherVoxAI codebase, covering both the C runtime and Node.js/TypeScript implementations.
+
+**March 2026 Philosophy Update:** Error handling verbosity should match operation criticality. Critical subsystems get full context logging, optional features get simple error codes, and independent batch operations use array-based patterns to avoid boilerplate while maintaining error visibility.
 
 ## Goals
 
@@ -36,6 +38,9 @@ ETHERVOX_ERROR_ALREADY_INITIALIZED = -6
 ETHERVOX_ERROR_TIMEOUT = -7
 ETHERVOX_ERROR_NOT_SUPPORTED = -8
 ETHERVOX_ERROR_BUFFER_TOO_SMALL = -9
+ETHERVOX_ERROR_NOT_IMPLEMENTED = -10
+ETHERVOX_ERROR_FAILED = -11
+ETHERVOX_ERROR_NOT_FOUND = -12
 
 // Platform/HAL errors (-100 to -199)
 ETHERVOX_ERROR_PLATFORM_INIT = -100
@@ -129,28 +134,80 @@ ETHERVOX_CHECK_PTR(ptr)
 
 ### Usage Examples
 
-#### Basic Error Handling
+#### Error Handling Philosophy (March 2026 Update)
+
+**Critical initialization operations** require verbose error handling with full context extraction.
+**Non-critical operations** use simple error code logging without context extraction.
+**Batch operations** use array-based pattern for independent optional features.
+
+#### Critical Initialization (Verbose)
+
+For subsystems that must succeed (audio, memory, STT, TTS, config):
 
 ```c
-ethervox_result_t ethervox_audio_init(ethervox_audio_t* audio) {
-    ETHERVOX_CHECK_PTR(audio);
-    
-    ethervox_result_t result = platform_audio_init();
-    if (ethervox_is_error(result)) {
-        ETHERVOX_LOG_ERROR("Platform audio init failed: %s", 
-                          ethervox_error_string(result));
-        return result;
+ethervox_result_t result = ethervox_audio_init(&audio);
+if (ethervox_is_error(result)) {
+    const ethervox_error_context_t* ctx = ethervox_error_get_context();
+    fprintf(stderr, "Failed to initialize audio: %s\n", 
+            ctx && ctx->message ? ctx->message : ethervox_error_string(result));
+    if (ctx) {
+        fprintf(stderr, "  at %s:%d in %s()\n", ctx->file, ctx->line, ctx->function);
     }
-    
-    return ETHERVOX_SUCCESS;
+    return result;  // Cannot continue
 }
 ```
 
-#### Error Propagation
+#### Non-Critical Operations (Simple)
+
+For optional features (tools, plugins, non-essential checks):
+
+```c
+ethervox_result_t result = ethervox_tool_register(&registry);
+if (ethervox_is_error(result)) {
+    fprintf(stderr, "[WARNING] Tool registration failed: Error %d occurred\n", result);
+    // Continue - tool is optional
+}
+```
+
+#### Batch Registration Pattern
+
+For multiple independent optional operations:
+
+```c
+typedef struct {
+    const char* name;
+    ethervox_result_t result;
+} tool_reg_result_t;
+
+tool_reg_result_t tools[] = {
+    {"Path Config", ethervox_path_config_register(&registry, &path_config)},
+    {"Unit Conversion", ethervox_unit_conversion_register(&registry)},
+    {"Conversation", ethervox_conversation_tools_register(&registry)},
+    {NULL, ETHERVOX_SUCCESS}
+};
+
+int succeeded = 0, failed = 0;
+for (int i = 0; tools[i].name != NULL; i++) {
+    if (ethervox_is_success(tools[i].result)) {
+        succeeded++;
+    } else {
+        failed++;
+        fprintf(stderr, "[WARNING] Tool %s registration failed: Error %d occurred\n", 
+               tools[i].name, tools[i].result);
+    }
+}
+
+if (g_debug_enabled) {
+    printf("Tools: %d registered successfully, %d failed\n", succeeded, failed);
+}
+```
+
+#### Error Propagation with ETHERVOX_CHECK
+
+For simple initialization sequences with no cleanup needed:
 
 ```c
 ethervox_result_t initialize_system(void) {
-    // Automatically propagates error if init fails
     ETHERVOX_CHECK(ethervox_platform_init());
     ETHERVOX_CHECK(ethervox_audio_init(&g_audio));
     ETHERVOX_CHECK(ethervox_stt_init(&g_stt));
@@ -159,18 +216,7 @@ ethervox_result_t initialize_system(void) {
 }
 ```
 
-#### Caller Error Handling
-
-```c
-ethervox_result_t result = ethervox_audio_init(&audio);
-if (ethervox_is_error(result)) {
-    const ethervox_error_context_t* ctx = ethervox_error_get_context();
-    fprintf(stderr, "Error: %s at %s:%d in %s()\n", 
-            ethervox_error_string(result), 
-            ctx->file, ctx->line, ctx->function);
-    // Handle error appropriately
-}
-```
+**Note:** Only use `ETHERVOX_CHECK()` when you have no allocated resources to clean up and failure is truly fatal.
 
 ## Logging Integration
 
@@ -354,21 +400,67 @@ try {
 
 ## Migration Strategy
 
-### Phase 1: Core Infrastructure (Week 1)
+### Migration Status Summary
 
-- [ ] Create `include/ethervox/error.h` with error codes and API
-- [ ] Implement `src/common/error.c` with thread-local context
-- [ ] Create `include/ethervox/logging.h` with logging API
-- [ ] Implement `src/common/logging.c`
-- [ ] Create TypeScript error classes in `src/common/errors.ts`
-- [ ] Update `CMakeLists.txt` to include new files
-- [ ] Write unit tests for error handling (`tests/unit/test_error.c`)
+**Phase 1: Infrastructure** ✅ **COMPLETED** - All error handling infrastructure is implemented and tested (16/16 tests passing).
 
-### Phase 2: Critical Path (Weeks 2-3)
+**Phase 2: Call Site Migration** ⚠️ **IN PROGRESS** - Critical audio bugs fixed, but systematic audit needed for remaining ~40+ locations.
 
+**Critical Bug Pattern Discovered (January 28, 2026):**
+During transcription feature debugging, we discovered that many call sites were incorrectly treating `ethervox_result_t` return values as data instead of error codes. This occurred because functions were migrated from returning `int` (data/count) to `ethervox_result_t` (error code) with data moved to out-parameters, but not all call sites were updated.
+
+**Bug Pattern:**
+```c
+// ❌ WRONG: Treats ETHERVOX_SUCCESS (0) as "0 samples"
+int samples_read = ethervox_audio_read(&runtime, &buffer);
+if (samples_read > 0) { /* never executes */ }
+
+// ✅ CORRECT: Check result code, use out-parameter for data
+ethervox_result_t result = ethervox_audio_read(&runtime, &buffer);
+if (ethervox_is_success(result) && buffer.size > 0) {
+    int samples_read = (int)buffer.size;  // Get actual sample count
+}
+```
+
+**Fixed Locations:**
+- `src/plugins/voice_tools/voice_tools.c` (lines 130-240) - audio capture thread
+- `src/audio/audio_recording.c` (line 214) - recording utility
+- `src/dialogue/voice_conversation.c` (lines 310, 330, 565, 599) - voice conversation
+
+**Remaining Work:**
+Grep search (`int\s+\w+\s*=\s*ethervox_\w+\(`) found ~40 additional locations in:
+- `src/platform/ethervox_android_core.c` (~15 instances) - Type consistency, logic correct
+- `src/main.c` (~20 instances) - Type consistency, logic correct  
+- Various test files - Need case-by-case review
+
+Most remaining instances correctly check `result == 0` for success, but use `int` instead of `ethervox_result_t` for type consistency. Priority is fixing any that treat return values as data.
+
+### Phase 1: Core Infrastructure ✅ COMPLETED
+
+- [x] Create `include/ethervox/error.h` with error codes and API
+- [x] Implement `src/common/error.c` with thread-local context
+- [x] Create `include/ethervox/logging.h` with logging API
+- [x] Implement `src/common/logging.c`
+- [x] Update `CMakeLists.txt` to include new files
+- [x] Write comprehensive unit tests for error handling (`tests/unit/test_error.c`)
+- [x] Integrate tests into CTest with 100% pass rate
+- [ ] Create TypeScript error classes in `src/common/errors.ts` (if needed)
+
+### Phase 2: Critical Path (Weeks 2-3) ⚠️ IN PROGRESS
+
+- [x] Fix critical call site bugs treating `ethervox_result_t` as data
+  - [x] `src/audio/audio_recording.c` (line 214)
+  - [x] `src/dialogue/voice_conversation.c` (lines 310, 330, 565, 599)
+  - [x] `src/plugins/voice_tools/voice_tools.c` (lines 130-240)
+- [x] Implement batch registration pattern for optional tools (March 30, 2026)
+  - [x] `src/main.c` tool registration block (~54 lines → ~28 lines)
+  - [x] Array-based pattern shows per-tool failures with error codes
+  - [x] Summary reporting: "Tools: X registered successfully, Y failed"
 - [ ] Migrate `src/audio/audio_core.c` to use new error codes
 - [ ] Migrate platform HAL files (`src/platform/*.c`)
 - [ ] Update plugin manager (`src/plugins/plugin_manager.c`)
+- [ ] Systematic audit: Convert remaining `int result = ethervox_*()` to `ethervox_result_t`
+- [ ] Apply batch pattern to other independent optional operations
 - [ ] Ensure all tests pass with graceful degradation
 - [ ] Update SDK wrappers to use new error types
 
@@ -392,22 +484,22 @@ try {
 
 ```
 include/ethervox/
-├── error.h           # Error codes, context, and macros
-└── logging.h         # Logging API and macros
+├── error.h           # Error codes, context, and macros ✅ IMPLEMENTED
+└── logging.h         # Logging API and macros ✅ IMPLEMENTED
 
 src/common/
-├── error.c           # Error implementation
-└── logging.c         # Logging implementation
+├── error.c           # Error implementation ✅ IMPLEMENTED
+└── logging.c         # Logging implementation ✅ IMPLEMENTED
 
 src/common/
-└── errors.ts         # TypeScript error classes
+└── errors.ts         # TypeScript error classes (optional)
 
 tests/unit/
-├── test_error.c      # C error handling tests
-└── test_errors.ts    # TypeScript error tests
+├── test_error.c      # C error handling tests ✅ COMPREHENSIVE (16 tests)
+└── test_errors.ts    # TypeScript error tests (if needed)
 
 docs/
-└── error-handling-spec.md  # This document
+└── errorhandling.md  # This document
 ```
 
 ## Implementation Files
@@ -429,8 +521,27 @@ docs/
 
 ### C Runtime
 
+**When to use verbose error handling (with context extraction):**
+- Critical subsystem initialization (audio, STT, TTS, memory, config, platform)
+- User-facing command execution (/load, /optimize, /train, etc.)
+- Operations where failure requires cleanup or specific recovery actions
+- Situations where detailed diagnostics help users fix the problem
+
+**When to use simple error handling (error code only):**
+- Optional tool/plugin registrations
+- Non-critical features that gracefully degrade
+- Operations inside debug-only blocks
+- Batch operations where summary reporting is sufficient
+
+**When to use batch registration pattern:**
+- Multiple independent optional operations (tool registrations, plugin loads)
+- When you want aggregate reporting (X succeeded, Y failed)
+- Operations where individual failures don't affect others
+
+**Core patterns:**
+
 1. **Always check pointers**: Use `ETHERVOX_CHECK_PTR(ptr)` for all pointer arguments
-2. **Propagate errors**: Use `ETHERVOX_CHECK(expr)` to automatically propagate errors
+2. **Propagate errors**: Use `ETHERVOX_CHECK(expr)` to automatically propagate errors (only when no cleanup needed)
 3. **Log before returning**: Use `ETHERVOX_LOG_RETURN_ERROR` for errors that need logging
 4. **Set context**: Use `ETHERVOX_ERROR_SET` or `ETHERVOX_RETURN_ERROR` to preserve context
 5. **Clear errors**: Call `ethervox_error_clear()` after handling errors
@@ -446,13 +557,18 @@ docs/
 
 ## Testing Requirements
 
-### C Runtime
+### C Runtime ✅ ALL IMPLEMENTED
 
-1. Test error code to string conversion
-2. Test error context preservation across function calls
-3. Test thread-local storage (if available)
-4. Test macro expansion and usage
-5. Test graceful degradation with missing hardware
+1. ✅ Test error code to string conversion (all 45+ error codes)
+2. ✅ Test error context preservation across function calls
+3. ✅ Test thread-local storage (Windows, GCC/Clang, C11)
+4. ✅ Test macro expansion and usage (`ETHERVOX_CHECK`, `ETHERVOX_CHECK_PTR`, `ETHERVOX_RETURN_ERROR`)
+5. ✅ Test error propagation chains (3-level deep call stacks)
+6. ✅ Test edge cases (NULL messages, long messages, multiple errors)
+7. ✅ Test realistic initialization scenarios
+8. ✅ Test logging integration
+
+**Test Results:** 16/16 tests passing, 100% success rate, integrated into CTest
 
 ### TypeScript
 

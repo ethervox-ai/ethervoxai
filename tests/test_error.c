@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: CC-BY-NC-SA-4.0
-#include "ethervox/error.h"
 #include "ethervox/logging.h"
+#include "ethervox/error.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -134,5 +134,5 @@ int main(void) {
     test_logging();
     
     printf("\n=== All Tests Passed ===\n\n");
-    return 0;
+    return ETHERVOX_SUCCESS;
 }

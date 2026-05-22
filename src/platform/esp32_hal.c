@@ -26,10 +26,11 @@
 #include <freertos/task.h>
 
 #include "ethervox/platform.h"
+#include "ethervox/error.h"
 
 // ESP32-specific HAL implementation
 
-static int esp32_init(ethervox_platform_info_t* info) {
+static ethervox_result_t esp32_init(ethervox_platform_info_t* info) {
   // Initialize ESP32 subsystems
   printf("Initializing ESP32 platform\n");
 
@@ -48,7 +49,7 @@ static int esp32_init(ethervox_platform_info_t* info) {
   i2c_param_config(I2C_NUM_0, &i2c_config);
   i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 static void esp32_cleanup(ethervox_platform_info_t* info) {
@@ -57,7 +58,7 @@ static void esp32_cleanup(ethervox_platform_info_t* info) {
   gpio_uninstall_isr_service();
 }
 
-static int esp32_gpio_configure(uint32_t pin, ethervox_gpio_mode_t mode) {
+static ethervox_result_t esp32_gpio_configure(uint32_t pin, ethervox_gpio_mode_t mode) {
   gpio_config_t config = {0};
   config.pin_bit_mask = (1ULL << pin);
 
@@ -77,24 +78,35 @@ static int esp32_gpio_configure(uint32_t pin, ethervox_gpio_mode_t mode) {
       config.pull_down_en = GPIO_PULLDOWN_ENABLE;
       break;
     default:
-      return -1;
+      ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_INVALID_ARGUMENT, "Invalid GPIO mode");
   }
 
-  return gpio_config(&config);
+  esp_err_t ret = gpio_config(&config);
+  if (ret != ESP_OK) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_GPIO_FAILURE, "GPIO config failed");
+  }
+  return ETHERVOX_SUCCESS;
 }
 
-static int esp32_gpio_write(uint32_t pin, bool state) {
-  return gpio_set_level(pin, state ? 1 : 0);
+static ethervox_result_t esp32_gpio_write(uint32_t pin, bool state) {
+  esp_err_t ret = gpio_set_level(pin, state ? 1 : 0);
+  if (ret != ESP_OK) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_GPIO_FAILURE, "GPIO write failed");
+  }
+  return ETHERVOX_SUCCESS;
 }
 
 static bool esp32_gpio_read(uint32_t pin) {
   return gpio_get_level(pin) != 0;
 }
 
-static int esp32_i2c_write(uint32_t bus_id, uint8_t device_addr, const uint8_t* data,
+static ethervox_result_t esp32_i2c_write(uint32_t bus_id, uint8_t device_addr, const uint8_t* data,
                            uint32_t len) {
-  if (!data || len == 0)
-    return -1;
+  ETHERVOX_CHECK_PTR(data);
+  
+  if (len == 0) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_INVALID_ARGUMENT, "I2C write length is zero");
+  }
 
   // Use bus_id to select I2C port
   // Note: ESP32-C6 only supports I2C_NUM_0, so we default to it
@@ -117,12 +129,18 @@ static int esp32_i2c_write(uint32_t bus_id, uint8_t device_addr, const uint8_t* 
   esp_err_t ret = i2c_master_cmd_begin(i2c_num, cmd, 1000 / portTICK_PERIOD_MS);
   i2c_cmd_link_delete(cmd);
 
-  return (ret == ESP_OK) ? 0 : -1;
+  if (ret != ESP_OK) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_I2C_FAILURE, "I2C write failed");
+  }
+  return ETHERVOX_SUCCESS;
 }
 
-static int esp32_i2c_read(uint32_t bus_id, uint8_t device_addr, uint8_t* data, uint32_t len) {
-  if (!data || len == 0)
-    return -1;
+static ethervox_result_t esp32_i2c_read(uint32_t bus_id, uint8_t device_addr, uint8_t* data, uint32_t len) {
+  ETHERVOX_CHECK_PTR(data);
+  
+  if (len == 0) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_INVALID_ARGUMENT, "I2C read length is zero");
+  }
 
   // Use bus_id to select I2C port
   // Note: ESP32-C6 only supports I2C_NUM_0, so we default to it
@@ -150,10 +168,13 @@ static int esp32_i2c_read(uint32_t bus_id, uint8_t device_addr, uint8_t* data, u
   esp_err_t ret = i2c_master_cmd_begin(i2c_num, cmd, 1000 / portTICK_PERIOD_MS);
   i2c_cmd_link_delete(cmd);
 
-  return (ret == ESP_OK) ? 0 : -1;
+  if (ret != ESP_OK) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_I2C_FAILURE, "I2C read failed");
+  }
+  return ETHERVOX_SUCCESS;
 }
 
-static int esp32_spi_transfer(uint32_t bus_id, const uint8_t* tx_data, uint8_t* rx_data,
+static ethervox_result_t esp32_spi_transfer(uint32_t bus_id, const uint8_t* tx_data, uint8_t* rx_data,
                               uint32_t len) {
   // Basic SPI transfer - would need proper configuration in real implementation
   // bus_id could be used to select SPI host (SPI2_HOST, SPI3_HOST)
@@ -164,7 +185,11 @@ static int esp32_spi_transfer(uint32_t bus_id, const uint8_t* tx_data, uint8_t* 
   };
 
   // Note: In real implementation, you'd need to store spi_device_handle_t per bus_id
-  return spi_device_transmit(NULL, &transaction);  // NULL device handle - placeholder
+  esp_err_t ret = spi_device_transmit(NULL, &transaction);  // NULL device handle - placeholder
+  if (ret != ESP_OK) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_SPI_FAILURE, "SPI transfer failed");
+  }
+  return ETHERVOX_SUCCESS;
 }
 
 static uint32_t esp32_delay_ms(uint32_t ms) {
@@ -209,9 +234,8 @@ static float esp32_get_cpu_temperature(void) {
 }
 
 // Register ESP32-specific HAL functions
-int esp32_hal_register(ethervox_platform_t* platform) {
-  if (!platform)
-    return -1;
+ethervox_result_t esp32_hal_register(ethervox_platform_t* platform) {
+  ETHERVOX_CHECK_PTR(platform);
 
   platform->hal.init = esp32_init;
   platform->hal.cleanup = esp32_cleanup;
@@ -234,7 +258,7 @@ int esp32_hal_register(ethervox_platform_t* platform) {
   platform->hal.get_free_heap_size = esp32_get_free_heap_size;
   platform->hal.get_cpu_temperature = esp32_get_cpu_temperature;
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 #endif  // ETHERVOX_PLATFORM_ESP32

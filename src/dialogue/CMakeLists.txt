@@ -1,5 +1,6 @@
 add_library(ethervox_dialogue STATIC
     dialogue_core.c
+    integration_tests.c
 )
 
 target_include_directories(ethervox_dialogue PRIVATE

@@ -18,6 +18,7 @@ Be concise. Prefer minimal, testable changes and cite the files below when refer
 
 - Project conventions and patterns
   - The repo has one authoritative README that lists canonical module names and locations; prefer referencing it when adding or changing modules.
+  - **ESP32 source mirroring**: `esp32-project/src/` and `esp32-project/include/` are symlinks to `../src` and `../include`. Edit files in the root `src/` or `include/` directories only - changes automatically apply to both desktop and ESP32 builds. Do not duplicate .gitignore patterns for `esp32-project/`.
   - Audio systems use a fallback chain; when modifying audio code, update `config/audio.json` and ensure `CrossPlatformAudioManager` fallback logic remains intact.
   - Model management is centralized in `modelManager` (downloads, caching, compatibility). Changes that affect model files must preserve cache paths and compatibility checks.
   - Hardware detection and optimization logic live in `platformDetector`. Avoid hard-coding performance tiers; use `platformDetector.getCapabilities()`.
@@ -32,6 +33,19 @@ Be concise. Prefer minimal, testable changes and cite the files below when refer
   - Prefer to add unit tests for new behavior in `tests/` when feasible. Use `npm run test` and `npm run lint` locally.
   - When touching multi-language implementations, only change the language-specific folders if the change is language-specific; otherwise, update shared `specs/` first.
   - Do not add heavyweight dependencies (e.g., React) without documenting why and updating `README.md` installation steps.
+  - **Error handling (C/C++ code)**: All functions must use `ethervox_result_t` return type. See `.github/error-handling-reference.md` for:
+    - Quick reference of all 80+ error codes
+    - Usage of `ETHERVOX_CHECK_PTR()`, `ETHERVOX_RETURN_ERROR()`, `ETHERVOX_CHECK()` macros
+    - Migration patterns from `int` to `ethervox_result_t`
+    - Common error handling patterns
+    - **Always include**: `#include "ethervox/error.h"`
+    - **Migration status**: Track in `MIGRATION_CHECKLIST.md` (~7/150 files complete)
+  - **License compliance**: EthervoxAI is a commercial product licensed under CC BY-NC-SA 4.0. When adding new dependencies:
+    - Check license compatibility (MIT, Apache 2.0, BSD are typically fine)
+    - Avoid GPL/AGPL licenses that require derivative works to be open-source
+    - Document third-party licenses in `THIRD_PARTY_LICENSES.md`
+    - Flag any licensing concerns before adding dependencies
+    - Never commit API keys, tokens, or secrets to the repository
 
 - Examples from the codebase (where to look)
   - Hardware detection: see `platformDetector` usage in `README.md` examples and mirror its API when writing new optimizations.
@@ -43,3 +57,5 @@ Be concise. Prefer minimal, testable changes and cite the files below when refer
   - Run CI (`.github/workflows/`) locally by running `npm run build` and `npm run test` to catch lint/type errors.
 
 If anything here is unclear or you want more detail (e.g., list of actual `src/` files), tell me which area to expand and I'll iterate.
+
+Furthermore, you do not make "quick fixes" if there are correct solution that can be implemented with moderate effort. Always prefer correctness and maintainability over speed.

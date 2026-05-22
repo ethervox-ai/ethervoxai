@@ -73,16 +73,35 @@ EtherVoxAI is an open-source voice AI platform designed for privacy-conscious us
 ### Clone and Setup
 
 ```bash
-
 # Clone the repository
-
 git clone https://github.com/ethervox-ai/ethervoxai.git
 cd ethervoxai
 
-# Install dependencies (optional - auto-installs on first build)
+# Option A: Automatic dependency download (recommended for first-time users)
+# llama.cpp and whisper.cpp will be downloaded automatically during cmake configure
+mkdir build && cd build
+cmake ..  # Downloads dependencies on first run (~2-5 minutes one-time)
+make -j$(nproc)
 
+# Option B: Manual submodule initialization (advanced users/offline development)
+git submodule update --init --recursive  # Downloads ~80MB
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
+
+# Download phonemizer dictionaries (required for TTS)
+./scripts/download_phonemizer_data.sh
+
+# Install system dependencies (optional - auto-installs on first build)
 make install-deps
-```text
+```
+
+**Note**: After the first build, dependencies are cached in `external/` and never re-downloaded, even for clean rebuilds.
+
+**Advanced Options:**
+- Disable auto-download: `cmake -B build -DETHERVOX_AUTO_FETCH_DEPS=OFF`
+- Use custom dependency paths: `cmake -B build -DLLAMA_CPP_CUSTOM_DIR=/path/to/llama.cpp`
+- See [Dependency Management Guide](docs/DEPENDENCY_MANAGEMENT.md) for details
 
 ## Platform-Specific Builds
 
@@ -238,7 +257,233 @@ Navigate to `http://localhost:3000` to access the EtherVoxAI control panel.
 # Windows
 
 ethervoxai.exe
-```text
+```
+
+## Desktop CLI Usage (macOS/Linux/Windows)
+
+EtherVoxAI includes a powerful command-line interface with an LLM-powered Governor for intelligent tool orchestration and conversation memory.
+
+### Build the Desktop CLI
+
+```bash
+# Install dependencies
+npm install
+
+# Build core and examples
+npm run build
+
+# Or build just the core
+npm run build:core
+
+# Skip GitHub token validation during development
+SKIP_GITHUB_TOKEN_VALIDATION=1 make
+```
+
+**Note:** GitHub token validation can be skipped by setting `SKIP_GITHUB_TOKEN_VALIDATION=1` environment variable. This disables the bug reporter but allows development without configuring GitHub access.
+
+### Running the Governor CLI
+
+```bash
+# Navigate to build directory
+cd build
+
+# Run with default settings
+./ethervoxai
+
+# Auto-load a model on startup
+./ethervoxai --model path/to/model.gguf --auto-load
+
+# Quiet mode (suppress model loading logs)
+./ethervoxai --model path/to/model.gguf --auto-load --quiet
+```
+
+### CLI Commands
+
+Once running, the Governor CLI supports the following commands:
+
+**Conversation & Memory:**
+- Just type naturally to chat with the AI
+- `/paste` - Enter multi-line paste mode (end with `/end` or Ctrl+D)
+- `/stats` - Show memory statistics (total entries, disk usage)
+- `/search <query>` - Search conversation memory
+- `/summary [window_size]` - Generate summary of recent conversation
+- `/export <filepath>` - Export memory to file (markdown/json)
+
+**Memory Management:**
+- `/reminders` - List active reminders
+- `/forget <memory_id>` - Delete a specific memory entry
+
+**Model Control:**
+- `/load <model_path>` - Load or switch LLM model
+- `/help` - Show available commands
+- `/quit` or `/exit` - Exit the application
+
+**Model Management:**
+- `/models` - List all available models with status and disk usage
+- `/modelstatus <type>` - Check status of models (governor/whisper/vosk/piper)
+- `/modeldownload <type> <name>` - Download a specific model
+- `/modeldelete <type> <name>` - Delete a model to free disk space
+
+### Model Management
+
+EthervoxAI includes a comprehensive model management system for all AI components:
+
+**Check Available Models:**
+```bash
+> /models
+Total disk usage: 1847.23 MB
+
+━━━ Governor LLM ━━━
+✅ granite-3.0-2b-instruct-Q4_K_M.gguf [DEFAULT]
+   Status: Found, Size: 1464.84 MB
+
+━━━ Whisper STT ━━━
+❌ ggml-base.en.bin [DEFAULT]
+   Status: Not Found, Expected: 70.57 MB
+```
+
+**Download Models:**
+```bash
+# Download recommended Whisper model
+> /modeldownload whisper ggml-base.en.bin
+
+# Download Vosk for real-time conversation
+> /modeldownload vosk vosk-model-small-en-us-0.15
+
+# Download Piper TTS voice
+> /modeldownload piper en_US-lessac-medium.onnx
+```
+
+**Supported Model Types:**
+- **Governor LLM**: Language models for conversation and tool orchestration
+  - granite-3.0-2b-instruct (1.5GB, recommended)
+  - granite-3.0-8b-instruct (5GB, higher quality)
+- **Whisper STT**: Speech-to-text for transcription
+  - ggml-base.en.bin (74MB, fast and accurate)
+  - ggml-small.en.bin (244MB, better accuracy)
+- **Vosk STT**: Real-time speech recognition for conversations
+  - vosk-model-small-en-us-0.15 (40MB, 10x faster than Whisper)
+  - vosk-model-en-us-0.22 (1.8GB, best accuracy)
+- **Piper TTS**: Text-to-speech for natural voice output
+  - en_US-lessac-medium.onnx (17MB, natural voice)
+
+**Phonemizer Note:**
+EthervoxAI uses a custom GPL-free phonemizer for Piper TTS. The phonemizer dictionaries (CMU Dict for English, CC-CEDICT for Chinese) are downloaded via `scripts/download_phonemizer_data.sh` and are not included in the repository.
+
+**Storage Location:**
+All models are stored in `~/.ethervox/models/` with subdirectories by type.
+
+**API Integration:**
+```c
+#include "ethervox/model_downloader.h"
+
+// Check if model exists
+ethervox_model_status_t status = ethervox_model_whisper_status("ggml-base.en.bin");
+if (status == ETHERVOX_MODEL_STATUS_NOT_FOUND) {
+    // Download the model
+    ethervox_model_download(ETHERVOX_MODEL_TYPE_WHISPER, "ggml-base.en.bin", NULL, NULL);
+}
+
+// List all available models
+ethervox_model_info_t* models = NULL;
+uint32_t count = 0;
+ethervox_model_list(ETHERVOX_MODEL_TYPE_GOVERNOR, &models, &count);
+for (uint32_t i = 0; i < count; i++) {
+    printf("%s - %s\n", models[i].name, models[i].description);
+}
+free(models);
+```
+
+See [docs/MODEL_MANAGEMENT.md](docs/MODEL_MANAGEMENT.md) for complete documentation.
+
+### Available Tools
+
+The Governor has access to the following tools for enhanced functionality:
+
+**Memory Tools:**
+- `memory_store` - Save facts, events, and reminders to conversation memory
+- `memory_search` - Search through stored memories by query
+- `memory_reminder_list` - List all active reminders
+- `memory_complete_reminder` - Mark a reminder as done
+- `memory_export` - Export conversation history to file
+- `memory_forget` - Delete specific memories
+
+**File Tools (Read-Write Enabled):**
+- `file_list` - List files in a directory
+- `file_read` - Read text file contents (.txt, .md, .org, .c, .cpp, .h, .sh)
+- `file_search` - Search for text patterns in files
+- `file_write` - Create or overwrite files with content (max 10MB)
+
+**Compute Tools:**
+- `calculator_compute` - Evaluate mathematical expressions
+- `percentage_calculate` - Calculate percentages
+- `time_get_current` - Get current time and date
+- `timer_set` - Set countdown timers
+
+### Example Usage
+
+```bash
+# Start the CLI
+./build/ethervoxai --model qwen2.5-3b-instruct-q4_k_m.gguf --auto-load
+
+# Chat naturally
+> Hello, my name is Alice
+Assistant: Nice to meet you, Alice! How can I help you today?
+
+# Ask it to remember things
+> Remember that I prefer dark mode for my IDE
+Assistant: Got it, I'll remember that you prefer dark mode for your IDE.
+
+# Search memories
+> What do you remember about my preferences?
+Assistant: You prefer dark mode for your IDE.
+
+# File operations
+> Write a markdown note about chickens to ./chickens.md
+Assistant: Done! I've created chickens.md with information about chickens.
+
+# Read files
+> What's in ./chickens.md?
+Assistant: The file contains information about chickens including...
+
+# Calculations
+> What's 17 divided by 12?
+Assistant: 17 divided by 12 is approximately 1.42.
+
+# Multi-line input
+> /paste
+(paste mode - type or paste multiple lines, then type /end or press Ctrl+D)
+This is line 1
+This is line 2
+This is line 3
+/end
+Assistant: I received your multi-line message...
+```
+
+### Features
+
+**Intelligent Tool Orchestration:**
+- The Governor automatically selects and chains appropriate tools
+- Supports parallel tool execution when possible
+- Handles tool errors gracefully with helpful suggestions
+
+**Conversation Memory:**
+- Persistent memory across sessions (stored in `~/.ethervox/memory/`)
+- Automatic importance scoring for memories
+- Tag-based organization (personal, preferences, reminders, etc.)
+- Search by relevance and recency
+
+**File Access:**
+- Sandboxed to specific directories (current directory, home, Documents)
+- Extension filtering for security (.txt, .md, .org, .c, .cpp, .h, .sh)
+- Path validation and permissions checking
+
+**Performance:**
+- Token-efficient tool calls
+- Streaming responses for real-time feedback
+- Configurable response length (default: 2048 tokens)
+- Context window management
+
 
 ## 6. Flashing ESP32 build to device
 
@@ -791,6 +1036,18 @@ This project is licensed under the **Creative Commons Attribution-NonCommercial-
 For commercial licensing options, please contact us at licensing@ethervox-ai.org
 
 See the [LICENSE](LICENSE) file for full terms.
+
+### Third-Party Licenses
+
+EthervoxAI uses several open-source libraries and data sources:
+- **ONNX Runtime** (MIT) - Neural network inference
+- **Speex DSP** (BSD-3-Clause) - Audio resampling
+- **CMU Pronouncing Dictionary** (Public Domain) - English phonemization
+- **CC-CEDICT** (CC BY-SA 4.0) - Chinese phonemization
+- **llama.cpp** (MIT) - LLM inference
+- **whisper.cpp** (MIT) - Speech recognition
+
+For complete licensing information and attribution requirements, see [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
 ## Support
 

@@ -19,6 +19,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "ethervox/error.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -90,11 +91,11 @@ ethervox_model_status_t ethervox_model_manager_get_status(
     ethervox_model_manager_t* manager,
     const ethervox_model_info_t* model_info);
 
-int ethervox_model_manager_download(
+ethervox_result_t ethervox_model_manager_download(
     ethervox_model_manager_t* manager,
     const ethervox_model_info_t* model_info);
 
-int ethervox_model_manager_get_path(
+ethervox_result_t ethervox_model_manager_get_path(
     ethervox_model_manager_t* manager,
     const ethervox_model_info_t* model_info,
     char* path_buffer,
@@ -104,22 +105,22 @@ bool ethervox_model_manager_is_available(
     ethervox_model_manager_t* manager,
     const ethervox_model_info_t* model_info);
 
-int ethervox_model_manager_ensure_available(
+ethervox_result_t ethervox_model_manager_ensure_available(
     ethervox_model_manager_t* manager,
     const ethervox_model_info_t* model_info);
 
 // Model discovery
-int ethervox_model_manager_list_available(
+ethervox_result_t ethervox_model_manager_list_available(
     ethervox_model_manager_t* manager,
     ethervox_model_info_t*** models,
     size_t* count);
 
 // Cleanup
-int ethervox_model_manager_delete_model(
+ethervox_result_t ethervox_model_manager_delete_model(
     ethervox_model_manager_t* manager,
     const ethervox_model_info_t* model_info);
 
-int ethervox_model_manager_clean_cache(ethervox_model_manager_t* manager);
+ethervox_result_t ethervox_model_manager_clean_cache(ethervox_model_manager_t* manager);
 
 // Utility functions
 const char* ethervox_model_status_to_string(ethervox_model_status_t status);

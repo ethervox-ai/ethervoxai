@@ -36,3 +36,31 @@ if(VOICE_ASSISTANT_SOURCES)
         endif()
     endif()
 endif()
+
+# Memory Tools Example -----------------------------------------------------
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/memory_example.c")
+    add_executable(memory_example memory_example.c)
+    
+    target_include_directories(memory_example PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    
+    # Link against ethervoxai library
+    target_link_libraries(memory_example PRIVATE ethervoxai)
+    
+    message(STATUS "Added memory_example target")
+endif()
+
+# Memory-Only Mode Example (no file persistence) ---------------------------
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/memory_example_memonly.c")
+    add_executable(memory_example_memonly memory_example_memonly.c)
+    
+    target_include_directories(memory_example_memonly PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    
+    # Link against ethervoxai library
+    target_link_libraries(memory_example_memonly PRIVATE ethervoxai)
+    
+    message(STATUS "Added memory_example_memonly target")
+endif()

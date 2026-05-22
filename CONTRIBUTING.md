@@ -51,7 +51,17 @@ sudo apt install build-essential cmake git nodejs npm python3
 
 git clone https://github.com/ethervox-ai/ethervoxai.git
 cd ethervoxai
+
+# Initialize dependencies (choose one method):
+
+# Method 1: Automatic (recommended) - dependencies download during cmake configure
+mkdir build && cd build
+cmake ..  # First run downloads llama.cpp and whisper.cpp (~2-5 min one-time)
+
+# Method 2: Manual git submodules (for offline development)
 git submodule update --init --recursive
+
+# Note: After first setup, external/ is cached and never re-downloaded
 ```text
 
 ### For ESP32 Development

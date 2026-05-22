@@ -1,0 +1,67 @@
+# Makefile for testing compute tools and Governor
+# Quick compilation without full CMake setup
+
+CC = gcc
+CFLAGS = -Wall -Wextra -Werror -std=c11 -I./include -g
+LDFLAGS = -lm
+
+# Source files
+TOOL_SRCS = \
+	src/plugins/compute_tools/calculator_plugin.c \
+	src/plugins/compute_tools/percentage_plugin.c \
+	src/plugins/compute_tools/compute_tools_registry.c \
+	src/governor/tool_registry.c
+
+GOV_SRCS = \
+	src/governor/governor.c
+
+# Test files
+TEST_TOOLS_SRC = src/governor/test_compute_tools.c
+TEST_GOV_SRC = src/governor/test_governor.c
+
+# Object files
+TOOL_OBJS = $(TOOL_SRCS:.c=.o)
+GOV_OBJS = $(GOV_SRCS:.c=.o)
+TEST_TOOLS_OBJ = $(TEST_TOOLS_SRC:.c=.o)
+TEST_GOV_OBJ = $(TEST_GOV_SRC:.c=.o)
+
+# Executables
+TARGET_TOOLS = test_compute_tools
+TARGET_GOV = test_governor
+
+.PHONY: all clean test test-tools test-gov
+
+all: $(TARGET_TOOLS) $(TARGET_GOV)
+
+$(TARGET_TOOLS): $(TOOL_OBJS) $(TEST_TOOLS_OBJ)
+	@echo "Linking $@..."
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	@echo "✓ Build complete!"
+
+$(TARGET_GOV): $(TOOL_OBJS) $(GOV_OBJS) $(TEST_GOV_OBJ)
+	@echo "Linking $@..."
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	@echo "✓ Build complete!"
+
+%.o: %.c
+	@echo "Compiling $<..."
+	$(CC) $(CFLAGS) -c $< -o $@
+
+test-tools: $(TARGET_TOOLS)
+	@echo ""
+	@echo "Running compute tools tests..."
+	@echo ""
+	./$(TARGET_TOOLS)
+
+test-gov: $(TARGET_GOV)
+	@echo ""
+	@echo "Running Governor tests..."
+	@echo ""
+	./$(TARGET_GOV)
+
+test: test-tools test-gov
+
+clean:
+	@echo "Cleaning..."
+	rm -f $(TOOL_OBJS) $(GOV_OBJS) $(TEST_TOOLS_OBJ) $(TEST_GOV_OBJ) $(TARGET_TOOLS) $(TARGET_GOV)
+	@echo "✓ Clean complete!"

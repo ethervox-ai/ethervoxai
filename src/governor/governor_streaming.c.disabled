@@ -1,0 +1,777 @@
+/**
+ * @file governor_streaming.c
+ * @brief Governor with streaming state machine architecture
+ *
+ * This is a complete rewrite of the Governor orchestration system using
+ * a state machine approach with inline tool execution and smart buffering.
+ * 
+ * Key differences from governor.c:
+ * - Single-pass generation (no iteration loop)
+ * - Inline tool execution (pause/resume, not stop/restart)
+ * - Smart lookahead buffering (only buffer potential sequences)
+ * - Transparent to user (no XML tags visible)
+ * - Clean, testable helper functions
+ *
+ * Copyright (c) 2024-2026 EthervoxAI Team
+ * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ */
+
+#include "ethervox/governor.h"
+#include "governor_helpers.h"  // Use clean helper functions
+
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#include "ethervox/chat_template.h"
+#include "ethervox/config.h"
+#include "ethervox/device_profile.h"
+#include "ethervox/error.h"
+
+#ifdef _WIN32
+#include <malloc.h>
+#endif
+
+#if defined(ETHERVOX_WITH_LLAMA) && defined(LLAMA_CPP_AVAILABLE) && LLAMA_CPP_AVAILABLE
+#include <ggml.h>
+#include <llama.h>
+#define LLAMA_HEADER_AVAILABLE 1
+#else
+#define LLAMA_HEADER_AVAILABLE 0
+#endif
+
+#define GOV_LOG(...) ETHERVOX_LOGI(__VA_ARGS__)
+#define GOV_ERROR(...) ETHERVOX_LOGE(__VA_ARGS__)
+
+// ============================================================================
+// Streaming State Machine Types
+// ============================================================================
+
+/**
+ * Generation states for the streaming state machine
+ */
+typedef enum {
+    GEN_STATE_GENERATING,       // Normal token generation and streaming
+    GEN_STATE_BUFFERING,        // Buffering potential stop sequence or tool call
+    GEN_STATE_TOOL_DETECTED,    // Complete tool call detected, preparing execution
+    GEN_STATE_TOOL_EXECUTING,   // Tools are executing (generation paused)
+    GEN_STATE_STOPPED,          // Stop sequence detected or max tokens reached
+    GEN_STATE_ERROR             // Error occurred
+} generation_state_t;
+
+/**
+ * Buffer type for tracking what we're accumulating
+ */
+typedef enum {
+    BUFFER_TYPE_NONE,           // Not buffering
+    BUFFER_TYPE_STOP_SEQUENCE,  // Potential stop sequence
+    BUFFER_TYPE_TOOL_CALL       // Potential or confirmed tool call
+} buffer_type_t;
+
+/**
+ * Streaming context for state machine
+ * 
+ * Now uses clean helper structures instead of raw buffers
+ */
+typedef struct {
+    generation_state_t state;
+    buffer_type_t buffer_type;
+    
+    // REFACTORED: Use string_buffer_t instead of raw char arrays
+    string_buffer_t lookahead_buffer;   // Potential stop sequences/tool starts
+    string_buffer_t tool_call_buffer;   // Accumulating tool call
+    string_buffer_t full_response;      // Complete generated response
+    string_buffer_t streamed_buffer;    // What's been streamed to UI
+    
+    // Streaming control
+    bool can_stream;
+    bool inside_tool_call;
+    
+    // Tool execution state
+    char** tool_calls;          // Array of tool call strings
+    int num_tools;
+    
+    // REFACTORED: Use generation_stats_t instead of raw counters
+    generation_stats_t stats;
+    
+    // REFACTORED: Use error_context_t for rich error info
+    error_context_t error;
+    
+} streaming_context_t;
+
+// ============================================================================
+// Forward Declarations
+// ============================================================================
+
+#if defined(ETHERVOX_WITH_LLAMA) && LLAMA_HEADER_AVAILABLE
+
+// State handlers
+static void handle_generating_state(streaming_context_t* ctx, const char* token_text,
+                                    struct ethervox_governor* governor,
+                                    void (*token_callback)(const char*, void*), void* user_data);
+
+static void handle_buffering_state(streaming_context_t* ctx, const char* token_text,
+                                   struct ethervox_governor* governor,
+                                   void (*token_callback)(const char*, void*), void* user_data);
+
+static void handle_tool_execution(streaming_context_t* ctx, struct ethervox_governor* governor,
+                                  void (*token_callback)(const char*, void*), void* user_data,
+                                  ethervox_governor_progress_callback progress_callback);
+
+// Buffering and sequence detection
+static bool is_potential_sequence_start(const char* token, struct ethervox_governor* governor);
+static bool could_be_stop_sequence(const char* buffer, struct ethervox_governor* governor);
+static bool is_stop_sequence(const char* buffer, struct ethervox_governor* governor);
+static bool could_be_tool_call(const char* buffer, struct ethervox_governor* governor);
+static bool is_complete_tool_call(const char* buffer, struct ethervox_governor* governor);
+
+// Tool execution
+static int extract_tool_calls_from_buffer(const char* buffer, char*** tool_calls_out);
+static void execute_tools_inline(streaming_context_t* ctx, struct ethervox_governor* governor,
+                                ethervox_governor_progress_callback progress_callback, void* user_data);
+static void inject_tool_result_tokens(struct ethervox_governor* governor, const char* tool_result);
+
+// Utility
+static void stream_token_safe(streaming_context_t* ctx, const char* token,
+                              void (*callback)(const char*, void*), void* user_data);
+static void flush_lookahead_buffer(streaming_context_t* ctx,
+                                   void (*callback)(const char*, void*), void* user_data);
+
+#endif // LLAMA_HEADER_AVAILABLE
+
+// ============================================================================
+// Initialization (preserved from original)
+// ============================================================================
+
+// [NOTE: All initialization, model loading, and cleanup functions remain unchanged]
+// [They would be copied from the original governor.c file]
+// [Including: ethervox_governor_create, ethervox_governor_load_model, etc.]
+
+// ============================================================================
+// NEW: Streaming State Machine Implementation
+// ============================================================================
+
+#if defined(ETHERVOX_WITH_LLAMA) && LLAMA_HEADER_AVAILABLE
+
+/**
+ * Main execution function - COMPLETELY REWRITTEN with streaming state machine
+ */
+ethervox_governor_status_t ethervox_governor_execute_streaming(
+    ethervox_governor_t* governor, const char* user_query, char** response, char** error,
+    ethervox_confidence_metrics_t* metrics, ethervox_governor_progress_callback progress_callback,
+    void (*token_callback)(const char* token, void* user_data), void* user_data) {
+    
+    if (!governor || !governor->initialized || !user_query || !response) {
+        if (error) *error = strdup("Invalid parameters");
+        return ETHERVOX_GOVERNOR_ERROR;
+    }
+
+    if (!governor->llm_loaded || !governor->llm_ctx) {
+        if (error) *error = strdup("Governor model not loaded");
+        return ETHERVOX_GOVERNOR_ERROR;
+    }
+
+    GOV_LOG("=================================================================");
+    GOV_LOG("STREAMING GOVERNOR: Starting execution for query: '%s'", user_query);
+    GOV_LOG("=================================================================");
+
+    // Reset interrupt flag
+    governor->interrupt_requested = false;
+
+    // Initialize streaming context
+    streaming_context_t stream_ctx = {0};
+    stream_ctx.state = GEN_STATE_GENERATING;
+    stream_ctx.buffer_type = BUFFER_TYPE_NONE;
+    stream_ctx.can_stream = true;
+    
+    // Initialize error context and stats
+    error_context_clear(&stream_ctx.error);
+    stats_init(&stream_ctx.stats);
+    
+    // Initialize buffers using helper functions
+    if (!string_buffer_init(&stream_ctx.lookahead_buffer, 2048) ||
+        !string_buffer_init(&stream_ctx.tool_call_buffer, 8192) ||
+        !string_buffer_init(&stream_ctx.full_response, 65536) ||
+        !string_buffer_init(&stream_ctx.streamed_buffer, 16384)) {
+        GOV_ERROR("Failed to initialize response buffers");
+        string_buffer_free(&stream_ctx.lookahead_buffer);
+        string_buffer_free(&stream_ctx.tool_call_buffer);
+        string_buffer_free(&stream_ctx.full_response);
+        string_buffer_free(&stream_ctx.streamed_buffer);
+        if (error) *error = strdup("Memory allocation failed");
+        return ETHERVOX_GOVERNOR_ERROR;
+    }
+
+    // Get vocab and context info
+    const struct llama_vocab* vocab = llama_model_get_vocab(governor->llm_model);
+    int n_ctx = llama_n_ctx(governor->llm_ctx);
+
+    // Build user prompt using chat template
+    char conversation[8192];
+    snprintf(conversation, sizeof(conversation), "%s%s%s%s",
+             governor->chat_template->user_start,
+             user_query,
+             governor->chat_template->user_end,
+             governor->chat_template->assistant_start);
+
+    // Tokenize user prompt
+    int n_prompt_tokens = -llama_tokenize(vocab, conversation, strlen(conversation), NULL, 0, false, false);
+    if (n_prompt_tokens <= 0) {
+        GOV_ERROR("Failed to tokenize user prompt");
+        string_buffer_free(&stream_ctx.lookahead_buffer);
+        string_buffer_free(&stream_ctx.tool_call_buffer);
+        string_buffer_free(&stream_ctx.full_response);
+        string_buffer_free(&stream_ctx.streamed_buffer);
+        if (error) *error = strdup("Tokenization failed");
+        return ETHERVOX_GOVERNOR_ERROR;
+    }
+
+    llama_token* prompt_tokens = (llama_token*)malloc(n_prompt_tokens * sizeof(llama_token));
+    llama_tokenize(vocab, conversation, strlen(conversation), prompt_tokens, n_prompt_tokens, false, false);
+
+    // Check context capacity
+    if (governor->current_kv_pos + n_prompt_tokens > n_ctx) {
+        GOV_ERROR("Context window would be exceeded: %d + %d > %d",
+                  governor->current_kv_pos, n_prompt_tokens, n_ctx);
+        free(prompt_tokens);
+        string_buffer_free(&stream_ctx.lookahead_buffer);
+        string_buffer_free(&stream_ctx.tool_call_buffer);
+        string_buffer_free(&stream_ctx.full_response);
+        string_buffer_free(&stream_ctx.streamed_buffer);
+        if (error) *error = strdup("Context window exceeded");
+        return ETHERVOX_GOVERNOR_ERROR;
+    }
+
+    // Decode prompt into KV cache
+    llama_batch prompt_batch = llama_batch_init(n_prompt_tokens, 0, 1);
+    prompt_batch.n_tokens = n_prompt_tokens;
+    for (int i = 0; i < n_prompt_tokens; i++) {
+        prompt_batch.token[i] = prompt_tokens[i];
+        prompt_batch.pos[i] = governor->current_kv_pos + i;
+        prompt_batch.n_seq_id[i] = 1;
+        prompt_batch.seq_id[i][0] = 0;
+        prompt_batch.logits[i] = false;
+    }
+    prompt_batch.logits[n_prompt_tokens - 1] = true;
+
+    if (llama_decode(governor->llm_ctx, prompt_batch) != 0) {
+        GOV_ERROR("Failed to decode prompt");
+        llama_batch_free(prompt_batch);
+        free(prompt_tokens);
+        free(stream_ctx.full_response);
+        free(stream_ctx.streamed_so_far);
+        if (error) *error = strdup("Prompt decoding failed");
+        return ETHERVOX_GOVERNOR_ERROR;
+    }
+
+    llama_batch_free(prompt_batch);
+    free(prompt_tokens);
+    governor->current_kv_pos += n_prompt_tokens;
+
+    GOV_LOG("Prompt decoded successfully, KV position now: %d", governor->current_kv_pos);
+
+    // Initialize sampler
+    struct llama_sampler* sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    llama_sampler_chain_add(sampler, llama_sampler_init_penalties(
+        ETHERVOX_GOVERNOR_PENALTY_LAST_N,
+        ETHERVOX_GOVERNOR_REPETITION_PENALTY,
+        ETHERVOX_GOVERNOR_FREQUENCY_PENALTY,
+        ETHERVOX_GOVERNOR_PRESENCE_PENALTY));
+    
+    float temperature = (governor->config.temperature > 0.0f) ? governor->config.temperature : 0.3f;
+    llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature));
+    llama_sampler_chain_add(sampler, llama_sampler_init_dist(0));
+
+    int max_tokens = governor->config.max_tokens_per_response;
+    GOV_LOG("Starting generation: max_tokens=%d, temperature=%.2f", max_tokens, temperature);
+
+    // ========================================================================
+    // MAIN GENERATION LOOP - Single pass, state machine driven
+    // ========================================================================
+
+    while (stream_ctx.state != GEN_STATE_STOPPED && 
+           stream_ctx.state != GEN_STATE_ERROR &&
+           stream_ctx.tokens_generated < max_tokens) {
+
+        // Check for interrupt
+        if (governor->interrupt_requested) {
+            GOV_LOG("Generation interrupted by user");
+            stream_ctx.state = GEN_STATE_STOPPED;
+            break;
+        }
+
+        // If tools are executing, don't generate - just wait
+        if (stream_ctx.state == GEN_STATE_TOOL_EXECUTING) {
+            // Tools execute synchronously in handle_tool_execution()
+            // This state is just a marker, we'll never actually loop here
+            GOV_ERROR("Unexpected state: TOOL_EXECUTING in main loop");
+            stream_ctx.state = GEN_STATE_ERROR;
+            break;
+        }
+
+        // Check context capacity
+        if (governor->current_kv_pos >= n_ctx) {
+            GOV_LOG("Context window full, stopping generation");
+            stream_ctx.state = GEN_STATE_STOPPED;
+            break;
+        }
+
+        // Sample next token
+        llama_token token = llama_sampling_sample(sampler, governor->llm_ctx, NULL);
+        
+        // Convert token to text
+        char token_text_buffer[256] = {0};
+        int token_text_len = llama_token_to_piece(vocab, token, token_text_buffer, sizeof(token_text_buffer) - 1, 0, false);
+        if (token_text_len < 0) {
+            GOV_ERROR("Failed to convert token to text");
+            stream_ctx.state = GEN_STATE_ERROR;
+            break;
+        }
+        token_text_buffer[token_text_len] = '\0';
+        const char* token_text = token_text_buffer;
+
+        // Add to full response
+        size_t token_len = strlen(token_text);
+        if (stream_ctx.full_response_len + token_len + 1 >= stream_ctx.full_response_capacity) {
+            // Expand buffer
+            stream_ctx.full_response_capacity *= 2;
+            char* new_buffer = (char*)realloc(stream_ctx.full_response, stream_ctx.full_response_capacity);
+            if (!new_buffer) {
+                GOV_ERROR("Failed to expand response buffer");
+                stream_ctx.state = GEN_STATE_ERROR;
+                break;
+            }
+            stream_ctx.full_response = new_buffer;
+        }
+        strcat(stream_ctx.full_response, token_text);
+        stream_ctx.full_response_len += token_len;
+
+        // Add token to KV cache (ALWAYS - even when buffering)
+        llama_batch token_batch = llama_batch_init(1, 0, 1);
+        token_batch.n_tokens = 1;
+        token_batch.token[0] = token;
+        token_batch.pos[0] = governor->current_kv_pos;
+        token_batch.n_seq_id[0] = 1;
+        token_batch.seq_id[0][0] = 0;
+        token_batch.logits[0] = true;
+
+        if (llama_decode(governor->llm_ctx, token_batch) != 0) {
+            GOV_ERROR("Failed to decode token at position %d", governor->current_kv_pos);
+            llama_batch_free(token_batch);
+            stream_ctx.state = GEN_STATE_ERROR;
+            break;
+        }
+
+        llama_batch_free(token_batch);
+        governor->current_kv_pos++;
+        stream_ctx.tokens_generated++;
+        stream_ctx.tokens_since_last_flush++;
+
+        // ====================================================================
+        // STATE MACHINE: Process token based on current state
+        // ====================================================================
+
+        switch (stream_ctx.state) {
+            case GEN_STATE_GENERATING:
+                handle_generating_state(&stream_ctx, token_text, governor, token_callback, user_data);
+                break;
+
+            case GEN_STATE_BUFFERING:
+                handle_buffering_state(&stream_ctx, token_text, governor, token_callback, user_data);
+                break;
+
+            case GEN_STATE_TOOL_DETECTED:
+                // Execute tools inline
+                handle_tool_execution(&stream_ctx, governor, token_callback, user_data, progress_callback);
+                // After execution, state will be back to GENERATING
+                break;
+
+            default:
+                // Shouldn't reach here
+                GOV_ERROR("Unexpected state in generation loop: %d", stream_ctx.state);
+                stream_ctx.state = GEN_STATE_ERROR;
+                break;
+        }
+
+        // Batch flush every 10 tokens for performance
+        if (stream_ctx.tokens_since_last_flush >= 10 && stream_ctx.can_stream) {
+            stream_ctx.tokens_since_last_flush = 0;
+        }
+    }
+
+    // Flush any remaining buffered tokens
+    if (stream_ctx.state == GEN_STATE_STOPPED && stream_ctx.lookahead_count > 0) {
+        flush_lookahead_buffer(&stream_ctx, token_callback, user_data);
+    }
+
+    // Cleanup sampler
+    llama_sampler_free(sampler);
+
+    // Final response
+    if (stream_ctx.state == GEN_STATE_ERROR) {
+        free(stream_ctx.full_response);
+        free(stream_ctx.streamed_so_far);
+        if (error) *error = strdup("Generation error occurred");
+        return ETHERVOX_GOVERNOR_ERROR;
+    }
+
+    GOV_LOG("Generation complete: %d tokens, final state: %d", 
+            stream_ctx.tokens_generated, stream_ctx.state);
+
+    *response = stream_ctx.full_response;  // Transfer ownership
+    free(stream_ctx.streamed_so_far);
+
+    if (metrics) {
+        metrics->iteration_count = 1;  // Single pass!
+        metrics->tool_calls_made = stream_ctx.num_tools;
+    }
+
+    if (progress_callback) {
+        progress_callback(ETHERVOX_GOVERNOR_EVENT_COMPLETE, "Generation complete", user_data);
+    }
+
+    return ETHERVOX_GOVERNOR_SUCCESS;
+}
+
+// ============================================================================
+// State Handler: GENERATING
+// ============================================================================
+
+static void handle_generating_state(streaming_context_t* ctx, const char* token_text,
+                                    struct ethervox_governor* governor,
+                                    void (*token_callback)(const char*, void*), void* user_data) {
+    
+    // Check if this token could start a sequence
+    if (is_potential_sequence_start(token_text, governor)) {
+        // Start buffering - don't stream this token yet
+        strncpy(ctx->lookahead_buffer, token_text, sizeof(ctx->lookahead_buffer) - 1);
+        ctx->lookahead_count = 1;
+        ctx->state = GEN_STATE_BUFFERING;
+        ctx->buffer_type = BUFFER_TYPE_STOP_SEQUENCE;  // Assume stop sequence initially
+        ctx->can_stream = false;
+        
+        GOV_LOG("Buffering potential sequence starting with: '%s'", token_text);
+        return;
+    }
+
+    // Normal token - stream immediately
+    stream_token_safe(ctx, token_text, token_callback, user_data);
+}
+
+// ============================================================================
+// State Handler: BUFFERING
+// ============================================================================
+
+static void handle_buffering_state(streaming_context_t* ctx, const char* token_text,
+                                   struct ethervox_governor* governor,
+                                   void (*token_callback)(const char*, void*), void* user_data) {
+    
+    // Add token to lookahead buffer
+    strncat(ctx->lookahead_buffer, token_text, 
+            sizeof(ctx->lookahead_buffer) - strlen(ctx->lookahead_buffer) - 1);
+    ctx->lookahead_count++;
+
+    // Check if it's completing a stop sequence
+    if (is_stop_sequence(ctx->lookahead_buffer, governor)) {
+        GOV_LOG("Stop sequence detected: '%s'", ctx->lookahead_buffer);
+        ctx->state = GEN_STATE_STOPPED;
+        // Don't stream the buffer - it's a stop sequence
+        return;
+    }
+
+    // Check if it could still be a stop sequence
+    if (could_be_stop_sequence(ctx->lookahead_buffer, governor)) {
+        // Keep buffering
+        return;
+    }
+
+    // Check if it's a tool call
+    if (could_be_tool_call(ctx->lookahead_buffer, governor)) {
+        ctx->buffer_type = BUFFER_TYPE_TOOL_CALL;
+        
+        // Check if tool call is complete
+        if (is_complete_tool_call(ctx->lookahead_buffer, governor)) {
+            GOV_LOG("Complete tool call detected in buffer");
+            // Copy to tool_call_buffer
+            strncpy(ctx->tool_call_buffer, ctx->lookahead_buffer, sizeof(ctx->tool_call_buffer) - 1);
+            ctx->inside_tool_call = true;
+            ctx->state = GEN_STATE_TOOL_DETECTED;
+            ctx->lookahead_buffer[0] = '\0';
+            ctx->lookahead_count = 0;
+            return;
+        }
+        
+        // Still accumulating tool call - keep buffering
+        return;
+    }
+
+    // Not a stop sequence or tool call - false alarm
+    // Stream the buffered content
+    GOV_LOG("False alarm - streaming buffered content: '%s'", ctx->lookahead_buffer);
+    for (int i = 0; i < ctx->lookahead_count - 1; i++) {
+        // Stream character by character from buffer
+        char temp[2] = {ctx->lookahead_buffer[i], '\0'};
+        stream_token_safe(ctx, temp, token_callback, user_data);
+    }
+    
+    // Stream current token
+    stream_token_safe(ctx, token_text, token_callback, user_data);
+    
+    // Clear buffer and return to generating
+    ctx->lookahead_buffer[0] = '\0';
+    ctx->lookahead_count = 0;
+    ctx->state = GEN_STATE_GENERATING;
+    ctx->can_stream = true;
+}
+
+// ============================================================================
+// Tool Execution Handler
+// ============================================================================
+
+static void handle_tool_execution(streaming_context_t* ctx, struct ethervox_governor* governor,
+                                  void (*token_callback)(const char*, void*), void* user_data,
+                                  ethervox_governor_progress_callback progress_callback) {
+    
+    GOV_LOG("Executing tools inline (generation paused at kv_pos=%d)", governor->current_kv_pos);
+
+    // Extract tool calls
+    ctx->num_tools = extract_tool_calls_from_buffer(ctx->tool_call_buffer, &ctx->tool_calls);
+    
+    if (ctx->num_tools == 0) {
+        GOV_ERROR("Failed to extract tools from buffer");
+        ctx->state = GEN_STATE_GENERATING;  // Continue anyway
+        return;
+    }
+
+    GOV_LOG("Extracted %d tool call(s), executing...", ctx->num_tools);
+
+    // Execute each tool
+    for (int i = 0; i < ctx->num_tools; i++) {
+        char* tool_result = NULL;
+        char* tool_error = NULL;
+
+        // Parse tool name for notification
+        const char* tool_name = "unknown";
+        // TODO: Extract tool name from ctx->tool_calls[i]
+
+        if (progress_callback) {
+            char msg[256];
+            snprintf(msg, sizeof(msg), "Executing tool: %s", tool_name);
+            progress_callback(ETHERVOX_GOVERNOR_EVENT_TOOL_CALL, msg, user_data);
+        }
+
+        // Execute tool (this is synchronous)
+        int status = execute_tool_call(ctx->tool_calls[i], governor->tool_registry, 
+                                       &tool_result, &tool_error);
+
+        if (status == 0 && tool_result) {
+            GOV_LOG("Tool %d executed successfully", i);
+            
+            if (progress_callback) {
+                progress_callback(ETHERVOX_GOVERNOR_EVENT_TOOL_RESULT, tool_result, user_data);
+            }
+
+            // Inject result into KV cache
+            inject_tool_result_tokens(governor, tool_result);
+
+            // Optional: Stream notification to user
+            if (token_callback) {
+                char notification[128];
+                snprintf(notification, sizeof(notification), "\n[✓ %s]\n", tool_name);
+                stream_token_safe(ctx, notification, token_callback, user_data);
+            }
+
+            free(tool_result);
+        } else {
+            GOV_ERROR("Tool %d failed: %s", i, tool_error ? tool_error : "unknown");
+            free(tool_error);
+        }
+
+        free(ctx->tool_calls[i]);
+    }
+
+    free(ctx->tool_calls);
+    ctx->tool_calls = NULL;
+    ctx->num_tools = 0;
+
+    // Clear tool buffer
+    ctx->tool_call_buffer[0] = '\0';
+    ctx->inside_tool_call = false;
+
+    // Resume generation
+    ctx->state = GEN_STATE_GENERATING;
+    ctx->can_stream = true;
+    
+    GOV_LOG("Tools complete - resuming generation from kv_pos=%d", governor->current_kv_pos);
+}
+
+// ============================================================================
+// Sequence Detection Functions
+// ============================================================================
+
+static bool is_potential_sequence_start(const char* token, struct ethervox_governor* governor) {
+    // Check if token could start a stop sequence or tool call
+    if (token[0] == '<') {
+        return true;  // Could be <|im_end|>, <tool_call>, etc.
+    }
+    return false;
+}
+
+static bool could_be_stop_sequence(const char* buffer, struct ethervox_governor* governor) {
+    // Check if buffer is a prefix of any stop sequence
+    const char** stop_seqs = chat_template_get_stop_sequences(governor->chat_template);
+    if (!stop_seqs) return false;
+
+    size_t buf_len = strlen(buffer);
+    for (int i = 0; stop_seqs[i] != NULL; i++) {
+        size_t seq_len = strlen(stop_seqs[i]);
+        if (buf_len <= seq_len && strncmp(buffer, stop_seqs[i], buf_len) == 0) {
+            return true;  // Buffer is a prefix
+        }
+    }
+    return false;
+}
+
+static bool is_stop_sequence(const char* buffer, struct ethervox_governor* governor) {
+    // Check if buffer exactly matches a stop sequence
+    const char** stop_seqs = chat_template_get_stop_sequences(governor->chat_template);
+    if (!stop_seqs) return false;
+
+    for (int i = 0; stop_seqs[i] != NULL; i++) {
+        if (strcmp(buffer, stop_seqs[i]) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool could_be_tool_call(const char* buffer, struct ethervox_governor* governor) {
+    // Check if buffer starts with "<tool" or contains tool call markers
+    if (strstr(buffer, "<tool") == buffer) {
+        return true;
+    }
+    return false;
+}
+
+static bool is_complete_tool_call(const char* buffer, struct ethervox_governor* governor) {
+    // Check both XML formats
+    tool_format_type_t format = chat_template_get_tool_format(governor->chat_template);
+    
+    if (format == TOOL_FORMAT_JSON_IN_XML) {
+        // <tool_call>\n{...}\n</tool_call>
+        return (strstr(buffer, "</tool_call>") != NULL);
+    } else {
+        // <tool_call name="..." />
+        return (strstr(buffer, "/>") != NULL);
+    }
+}
+
+// ============================================================================
+// Tool Extraction and Execution
+// ============================================================================
+
+static int extract_tool_calls_from_buffer(const char* buffer, char*** tool_calls_out) {
+    // Reuse existing extract_tool_calls function from tool_call_parser.c
+    // This is a simplified placeholder
+    *tool_calls_out = (char**)malloc(sizeof(char*) * 10);
+    
+    tool_format_type_t format = TOOL_FORMAT_XML_ATTRIBUTE;  // Detect from buffer
+    if (strstr(buffer, "</tool_call>")) {
+        format = TOOL_FORMAT_JSON_IN_XML;
+    }
+
+    if (format == TOOL_FORMAT_JSON_IN_XML) {
+        return extract_tool_calls_json(buffer, *tool_calls_out, 10);
+    } else {
+        return extract_tool_calls(buffer, *tool_calls_out, 10);
+    }
+}
+
+static void inject_tool_result_tokens(struct ethervox_governor* governor, const char* tool_result) {
+    const struct llama_vocab* vocab = llama_model_get_vocab(governor->llm_model);
+    
+    // Format: <tool_result>...</tool_result>
+    char formatted_result[8192];
+    snprintf(formatted_result, sizeof(formatted_result), 
+             "<tool_result>%s</tool_result>", tool_result);
+
+    // Tokenize
+    int n_tokens = -llama_tokenize(vocab, formatted_result, strlen(formatted_result), 
+                                    NULL, 0, false, false);
+    if (n_tokens <= 0) {
+        GOV_ERROR("Failed to tokenize tool result");
+        return;
+    }
+
+    llama_token* tokens = (llama_token*)malloc(n_tokens * sizeof(llama_token));
+    llama_tokenize(vocab, formatted_result, strlen(formatted_result), 
+                   tokens, n_tokens, false, false);
+
+    // Decode into KV cache at current position
+    int n_ctx = llama_n_ctx(governor->llm_ctx);
+    if (governor->current_kv_pos + n_tokens > n_ctx) {
+        GOV_ERROR("Cannot inject tool result - would exceed context");
+        free(tokens);
+        return;
+    }
+
+    llama_batch batch = llama_batch_init(n_tokens, 0, 1);
+    batch.n_tokens = n_tokens;
+    for (int i = 0; i < n_tokens; i++) {
+        batch.token[i] = tokens[i];
+        batch.pos[i] = governor->current_kv_pos + i;
+        batch.n_seq_id[i] = 1;
+        batch.seq_id[i][0] = 0;
+        batch.logits[i] = false;
+    }
+    batch.logits[n_tokens - 1] = true;
+
+    if (llama_decode(governor->llm_ctx, batch) != 0) {
+        GOV_ERROR("Failed to decode tool result");
+    } else {
+        governor->current_kv_pos += n_tokens;
+        GOV_LOG("Injected tool result (%d tokens) at KV position %d", 
+                n_tokens, governor->current_kv_pos - n_tokens);
+    }
+
+    llama_batch_free(batch);
+    free(tokens);
+}
+
+// ============================================================================
+// Streaming Utilities
+// ============================================================================
+
+static void stream_token_safe(streaming_context_t* ctx, const char* token,
+                              void (*callback)(const char*, void*), void* user_data) {
+    if (!callback || !ctx->can_stream) {
+        return;
+    }
+
+    // Track what we've streamed
+    strncat(ctx->streamed_so_far, token, 16384 - ctx->streamed_length - 1);
+    ctx->streamed_length += strlen(token);
+
+    // Stream to user
+    callback(token, user_data);
+}
+
+static void flush_lookahead_buffer(streaming_context_t* ctx,
+                                   void (*callback)(const char*, void*), void* user_data) {
+    if (ctx->lookahead_count > 0 && callback) {
+        GOV_LOG("Flushing lookahead buffer: '%s'", ctx->lookahead_buffer);
+        callback(ctx->lookahead_buffer, user_data);
+        
+        strncat(ctx->streamed_so_far, ctx->lookahead_buffer, 
+                16384 - ctx->streamed_length - 1);
+        ctx->streamed_length += strlen(ctx->lookahead_buffer);
+    }
+}
+
+#endif // LLAMA_HEADER_AVAILABLE
+
+// ============================================================================
+// NOTE: All other functions (init, load, cleanup) remain unchanged
+// ============================================================================

@@ -23,6 +23,7 @@ extern "C" {
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "ethervox/error.h"
 
 // SDK version information
 #define ETHERVOX_SDK_VERSION_MAJOR 1
@@ -263,36 +264,36 @@ struct ethervox_sdk_t {
 };
 
 // SDK Core Functions
-int ethervox_sdk_init(ethervox_sdk_t* sdk);
+ethervox_result_t ethervox_sdk_init(ethervox_sdk_t* sdk);
 void ethervox_sdk_cleanup(ethervox_sdk_t* sdk);
 const char* ethervox_sdk_get_version_string(void);
 bool ethervox_sdk_is_compatible(uint32_t major, uint32_t minor);
 
 // Intent Plugin Management
-int ethervox_sdk_register_intent_plugin(ethervox_sdk_t* sdk, ethervox_intent_plugin_t* plugin);
-int ethervox_sdk_unregister_intent_plugin(ethervox_sdk_t* sdk, const char* plugin_name);
+ethervox_result_t ethervox_sdk_register_intent_plugin(ethervox_sdk_t* sdk, ethervox_intent_plugin_t* plugin);
+ethervox_result_t ethervox_sdk_unregister_intent_plugin(ethervox_sdk_t* sdk, const char* plugin_name);
 ethervox_intent_plugin_t* ethervox_sdk_find_intent_plugin(ethervox_sdk_t* sdk, const char* name);
-int ethervox_sdk_process_intent(ethervox_sdk_t* sdk, const ethervox_stt_input_t* input,
+ethervox_result_t ethervox_sdk_process_intent(ethervox_sdk_t* sdk, const ethervox_stt_input_t* input,
                                 ethervox_intent_result_t* result);
 
 // Model Router Management
-int ethervox_sdk_set_model_router(ethervox_sdk_t* sdk, ethervox_model_router_t* router);
-int ethervox_sdk_add_model_config(ethervox_sdk_t* sdk, const ethervox_model_config_t* config);
-int ethervox_sdk_route_llm_request(ethervox_sdk_t* sdk, const ethervox_llm_request_t* request,
+ethervox_result_t ethervox_sdk_set_model_router(ethervox_sdk_t* sdk, ethervox_model_router_t* router);
+ethervox_result_t ethervox_sdk_add_model_config(ethervox_sdk_t* sdk, const ethervox_model_config_t* config);
+ethervox_result_t ethervox_sdk_route_llm_request(ethervox_sdk_t* sdk, const ethervox_llm_request_t* request,
                                    ethervox_llm_response_t* response);
 
 // Diagnostics Management
-int ethervox_sdk_set_log_callback(ethervox_sdk_t* sdk, ethervox_log_callback_fn callback,
+ethervox_result_t ethervox_sdk_set_log_callback(ethervox_sdk_t* sdk, ethervox_log_callback_fn callback,
                                   void* user_data);
 void ethervox_sdk_log(ethervox_sdk_t* sdk, ethervox_log_level_t level, const char* component,
                       const char* format, ...);
-int ethervox_sdk_get_system_metrics(ethervox_sdk_t* sdk, ethervox_system_metrics_t* metrics);
-int ethervox_sdk_export_diagnostics(ethervox_sdk_t* sdk, const char* filepath);
+ethervox_result_t ethervox_sdk_get_system_metrics(ethervox_sdk_t* sdk, ethervox_system_metrics_t* metrics);
+ethervox_result_t ethervox_sdk_export_diagnostics(ethervox_sdk_t* sdk, const char* filepath);
 
 // Device Profile Management
-int ethervox_sdk_load_device_profile(ethervox_sdk_t* sdk, const char* profile_path);
-int ethervox_sdk_save_device_profile(ethervox_sdk_t* sdk, const char* profile_path);
-int ethervox_sdk_create_device_profile(ethervox_sdk_t* sdk, const char* profile_name,
+ethervox_result_t ethervox_sdk_load_device_profile(ethervox_sdk_t* sdk, const char* profile_path);
+ethervox_result_t ethervox_sdk_save_device_profile(ethervox_sdk_t* sdk, const char* profile_path);
+ethervox_result_t ethervox_sdk_create_device_profile(ethervox_sdk_t* sdk, const char* profile_name,
                                        const ethervox_device_profile_t* template);
 
 // Utility Functions

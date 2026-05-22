@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "ethervox/error.h"
 
 // Global SDK instance for single-instance usage
 static ethervox_sdk_t* g_sdk_instance = NULL;
@@ -41,9 +42,9 @@ bool ethervox_sdk_is_compatible(uint32_t major, uint32_t minor) {
 }
 
 // Initialize SDK
-int ethervox_sdk_init(ethervox_sdk_t* sdk) {
+ethervox_result_t ethervox_sdk_init(ethervox_sdk_t* sdk) {
   if (!sdk)
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
 
   memset(sdk, 0, sizeof(ethervox_sdk_t));
 
@@ -55,7 +56,7 @@ int ethervox_sdk_init(ethervox_sdk_t* sdk) {
   sdk->diagnostics = (ethervox_diagnostics_t*)calloc(1, sizeof(ethervox_diagnostics_t));
   if (!sdk->diagnostics) {
     snprintf(sdk->last_error, sizeof(sdk->last_error), "%s", "Failed to allocate diagnostics");
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
 
   sdk->diagnostics->min_log_level = ETHERVOX_LOG_INFO;
@@ -68,7 +69,7 @@ int ethervox_sdk_init(ethervox_sdk_t* sdk) {
   if (!sdk->device_profile) {
     free(sdk->diagnostics);
     snprintf(sdk->last_error, sizeof(sdk->last_error), "%s", "Failed to allocate device profile");
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
 
   // Set default device profile
@@ -86,7 +87,7 @@ int ethervox_sdk_init(ethervox_sdk_t* sdk) {
 
   printf("EtherVox SDK v%s initialized\n", ethervox_sdk_get_version_string());
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 // Cleanup SDK
@@ -129,16 +130,16 @@ void ethervox_sdk_cleanup(ethervox_sdk_t* sdk) {
 }
 
 // Intent Plugin Management
-int ethervox_sdk_register_intent_plugin(ethervox_sdk_t* sdk, ethervox_intent_plugin_t* plugin) {
+ethervox_result_t ethervox_sdk_register_intent_plugin(ethervox_sdk_t* sdk, ethervox_intent_plugin_t* plugin) {
   if (!sdk || !plugin || sdk->intent_plugin_count >= 16)
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
 
   // Check for duplicate plugin names
   for (uint32_t i = 0; i < sdk->intent_plugin_count; i++) {
     if (strcmp(sdk->intent_plugins[i]->name, plugin->name) == 0) {
       snprintf(sdk->last_error, sizeof(sdk->last_error), "Plugin '%s' already registered",
                plugin->name);
-      return -1;
+      return ETHERVOX_ERROR_INVALID_ARGUMENT;
     }
   }
 
@@ -152,12 +153,12 @@ int ethervox_sdk_register_intent_plugin(ethervox_sdk_t* sdk, ethervox_intent_plu
 
   printf("Registered intent plugin: %s v%s\n", plugin->name, plugin->version);
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
-int ethervox_sdk_unregister_intent_plugin(ethervox_sdk_t* sdk, const char* plugin_name) {
+ethervox_result_t ethervox_sdk_unregister_intent_plugin(ethervox_sdk_t* sdk, const char* plugin_name) {
   if (!sdk || !plugin_name)
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
 
   for (uint32_t i = 0; i < sdk->intent_plugin_count; i++) {
     if (strcmp(sdk->intent_plugins[i]->name, plugin_name) == 0) {
@@ -173,12 +174,12 @@ int ethervox_sdk_unregister_intent_plugin(ethervox_sdk_t* sdk, const char* plugi
       sdk->intent_plugin_count--;
 
       printf("Unregistered intent plugin: %s\n", plugin_name);
-      return 0;
+      return ETHERVOX_SUCCESS;
     }
   }
 
   snprintf(sdk->last_error, sizeof(sdk->last_error), "Plugin '%s' not found", plugin_name);
-  return -1;
+  return ETHERVOX_ERROR_INVALID_ARGUMENT;
 }
 
 ethervox_intent_plugin_t* ethervox_sdk_find_intent_plugin(ethervox_sdk_t* sdk, const char* name) {
@@ -194,10 +195,10 @@ ethervox_intent_plugin_t* ethervox_sdk_find_intent_plugin(ethervox_sdk_t* sdk, c
   return NULL;
 }
 
-int ethervox_sdk_process_intent(ethervox_sdk_t* sdk, const ethervox_stt_input_t* input,
+ethervox_result_t ethervox_sdk_process_intent(ethervox_sdk_t* sdk, const ethervox_stt_input_t* input,
                                 ethervox_intent_result_t* result) {
   if (!sdk || !input || !result)
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
 
   // Initialize result
   memset(result, 0, sizeof(ethervox_intent_result_t));
@@ -239,20 +240,20 @@ int ethervox_sdk_process_intent(ethervox_sdk_t* sdk, const ethervox_stt_input_t*
 
     if (ret == 0 && result->type != ETHERVOX_INTENT_UNKNOWN) {
       plugin->successful_requests++;
-      return 0;  // Successfully parsed intent
+      return ETHERVOX_SUCCESS;  // Successfully parsed intent
     }
   }
 
   // No plugin could parse the intent
   snprintf(sdk->last_error, sizeof(sdk->last_error),
            "No plugin could parse intent for language '%s'", input->language);
-  return -1;
+  return ETHERVOX_ERROR_INVALID_ARGUMENT;
 }
 
 // Model Router Management
-int ethervox_sdk_set_model_router(ethervox_sdk_t* sdk, ethervox_model_router_t* router) {
+ethervox_result_t ethervox_sdk_set_model_router(ethervox_sdk_t* sdk, ethervox_model_router_t* router) {
   if (!sdk || !router)
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
 
   if (sdk->model_router) {
     free(sdk->model_router);
@@ -262,26 +263,26 @@ int ethervox_sdk_set_model_router(ethervox_sdk_t* sdk, ethervox_model_router_t* 
 
   printf("Set model router: %s (%d models)\n", router->name, router->model_count);
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
-int ethervox_sdk_add_model_config(ethervox_sdk_t* sdk, const ethervox_model_config_t* config) {
+ethervox_result_t ethervox_sdk_add_model_config(ethervox_sdk_t* sdk, const ethervox_model_config_t* config) {
   if (!sdk || !config)
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
 
   if (!sdk->model_router) {
     // Create default model router
     sdk->model_router = (ethervox_model_router_t*)calloc(1, sizeof(ethervox_model_router_t));
     if (!sdk->model_router) {
   snprintf(sdk->last_error, sizeof(sdk->last_error), "%s", "Failed to allocate model router");
-      return -1;
+      return ETHERVOX_ERROR_INVALID_ARGUMENT;
     }
   snprintf(sdk->model_router->name, sizeof(sdk->model_router->name), "%s", "Default Router");
   }
 
   if (sdk->model_router->model_count >= 16) {
   snprintf(sdk->last_error, sizeof(sdk->last_error), "%s", "Maximum number of models reached");
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
 
   sdk->model_router->models[sdk->model_router->model_count] = *config;
@@ -290,19 +291,19 @@ int ethervox_sdk_add_model_config(ethervox_sdk_t* sdk, const ethervox_model_conf
   printf("Added model configuration: %s (%s)\n", config->model_name,
          ethervox_model_type_to_string(config->type));
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 // Diagnostics Management
-int ethervox_sdk_set_log_callback(ethervox_sdk_t* sdk, ethervox_log_callback_fn callback,
+ethervox_result_t ethervox_sdk_set_log_callback(ethervox_sdk_t* sdk, ethervox_log_callback_fn callback,
                                   void* user_data) {
   if (!sdk || !sdk->diagnostics)
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
 
   sdk->diagnostics->log_callback = callback;
   sdk->diagnostics->log_user_data = user_data;
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 void ethervox_sdk_log(ethervox_sdk_t* sdk, ethervox_log_level_t level, const char* component,

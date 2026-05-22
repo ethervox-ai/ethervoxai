@@ -1,4 +1,5 @@
 /**
+#include "ethervox/error.h"
  * @file plugin_manager.c
  * @brief Plugin management system for EthervoxAI
  *
@@ -68,9 +69,9 @@ const char* ethervox_plugin_status_to_string(ethervox_plugin_status_t status) {
 }
 
 // Initialize plugin manager
-int ethervox_plugin_manager_init(ethervox_plugin_manager_t* manager, const char* plugin_dir) {
+ethervox_result_t ethervox_plugin_manager_init(ethervox_plugin_manager_t* manager, const char* plugin_dir) {
   if (!manager) {
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
   memset(manager, 0, sizeof(ethervox_plugin_manager_t));
 
@@ -87,7 +88,7 @@ int ethervox_plugin_manager_init(ethervox_plugin_manager_t* manager, const char*
   if (written < 0 || written >= (int)sizeof(manager->config_file)) {
     fprintf(stderr, "Error: Plugin config path too long or invalid (needs %d bytes, have %zu)\n",
             written, sizeof(manager->config_file));
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
 
   // Set max plugins
@@ -101,7 +102,7 @@ int ethervox_plugin_manager_init(ethervox_plugin_manager_t* manager, const char*
   ethervox_plugin_register_builtin_huggingface(manager);
   ethervox_plugin_register_builtin_local_rag(manager);
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 // Cleanup plugin manager
@@ -148,9 +149,9 @@ ethervox_plugin_t* ethervox_plugin_find(ethervox_plugin_manager_t* manager,
 }
 
 // Load plugin (placeholder implementation)
-int ethervox_plugin_load(ethervox_plugin_manager_t* manager, const char* plugin_name) {
+ethervox_result_t ethervox_plugin_load(ethervox_plugin_manager_t* manager, const char* plugin_name) {
   if (!manager || !plugin_name) {
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
 
   // Find empty slot
@@ -177,11 +178,11 @@ int ethervox_plugin_load(ethervox_plugin_manager_t* manager, const char* plugin_
       manager->loaded_plugins++;
 
       printf("Plugin loaded: %s\n", plugin_name);
-      return 0;
+      return ETHERVOX_SUCCESS;
     }
   }
 
-  return -1;  // No available slots
+  return ETHERVOX_ERROR_INVALID_ARGUMENT;  // No available slots
 }
 
 // Execute plugin
@@ -202,9 +203,9 @@ static int local_rag_execute_wrapper(const void* input, void* output) {
                                        (ethervox_llm_response_t*)output, NULL);
 }
 
-int ethervox_plugin_execute(ethervox_plugin_t* plugin, const void* input, void* output) {
+ethervox_result_t ethervox_plugin_execute(ethervox_plugin_t* plugin, const void* input, void* output) {
   if (!plugin || plugin->status != ETHERVOX_PLUGIN_STATUS_LOADED) {
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
 
   plugin->last_used = time(NULL);
@@ -218,14 +219,14 @@ int ethervox_plugin_execute(ethervox_plugin_t* plugin, const void* input, void* 
     return plugin->execute(input, output);
   }
 
-  return -1;
+  return ETHERVOX_ERROR_INVALID_ARGUMENT;
 }
 
 // OpenAI plugin implementation (keep only ONE definition)
-int ethervox_llm_plugin_openai(const ethervox_llm_request_t* request,
+ethervox_result_t ethervox_llm_plugin_openai(const ethervox_llm_request_t* request,
                                ethervox_llm_response_t* response, void* user_data) {
   if (!request || !response) {
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
 
   // Simulate OpenAI API call
@@ -242,14 +243,14 @@ int ethervox_llm_plugin_openai(const ethervox_llm_request_t* request,
   response->truncated = false;
   response->finish_reason = strdup("stop");
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 // HuggingFace plugin implementation
-int ethervox_llm_plugin_huggingface(const ethervox_llm_request_t* request,
+ethervox_result_t ethervox_llm_plugin_huggingface(const ethervox_llm_request_t* request,
                                     ethervox_llm_response_t* response, void* user_data) {
   if (!request || !response) {
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
 
   // user_data can contain model name if needed
@@ -269,14 +270,14 @@ int ethervox_llm_plugin_huggingface(const ethervox_llm_request_t* request,
   response->truncated = false;
   response->finish_reason = strdup("stop");
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 // Local RAG plugin implementation
-int ethervox_llm_plugin_local_rag(const ethervox_llm_request_t* request,
+ethervox_result_t ethervox_llm_plugin_local_rag(const ethervox_llm_request_t* request,
                                   ethervox_llm_response_t* response, void* user_data) {
   if (!request || !response) {
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
 
   // Simulate local RAG processing
@@ -293,13 +294,13 @@ int ethervox_llm_plugin_local_rag(const ethervox_llm_request_t* request,
   response->truncated = false;
   response->finish_reason = strdup("rag_complete");
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 // Register built-in OpenAI plugin
-int ethervox_plugin_register_builtin_openai(ethervox_plugin_manager_t* manager) {
+ethervox_result_t ethervox_plugin_register_builtin_openai(ethervox_plugin_manager_t* manager) {
   if (!manager || manager->plugin_count >= ETHERVOX_MAX_PLUGINS) {
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
 
   ethervox_plugin_t* plugin = &manager->plugins[manager->plugin_count];
@@ -312,13 +313,13 @@ int ethervox_plugin_register_builtin_openai(ethervox_plugin_manager_t* manager) 
   plugin->user_data = NULL;
 
   manager->plugin_count++;
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 // Register built-in HuggingFace plugin
-int ethervox_plugin_register_builtin_huggingface(ethervox_plugin_manager_t* manager) {
+ethervox_result_t ethervox_plugin_register_builtin_huggingface(ethervox_plugin_manager_t* manager) {
   if (!manager || manager->plugin_count >= ETHERVOX_MAX_PLUGINS) {
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
 
   ethervox_plugin_t* plugin = &manager->plugins[manager->plugin_count];
@@ -331,13 +332,13 @@ int ethervox_plugin_register_builtin_huggingface(ethervox_plugin_manager_t* mana
   plugin->user_data = NULL;
 
   manager->plugin_count++;
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 // Register built-in Local RAG plugin
-int ethervox_plugin_register_builtin_local_rag(ethervox_plugin_manager_t* manager) {
+ethervox_result_t ethervox_plugin_register_builtin_local_rag(ethervox_plugin_manager_t* manager) {
   if (!manager || manager->plugin_count >= ETHERVOX_MAX_PLUGINS) {
-    return -1;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
 
   ethervox_plugin_t* plugin = &manager->plugins[manager->plugin_count];
@@ -350,7 +351,7 @@ int ethervox_plugin_register_builtin_local_rag(ethervox_plugin_manager_t* manage
   plugin->user_data = NULL;
 
   manager->plugin_count++;
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 // Free LLM request

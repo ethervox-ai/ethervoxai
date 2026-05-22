@@ -99,6 +99,24 @@ echo "  https://curl.se/windows/"
 cd "${PROJECT_ROOT}"
 rm -rf "${TEMP_DIR}"
 
+# Clone llama.cpp if not present
+echo "Setting up llama.cpp..."
+mkdir -p "${PROJECT_ROOT}/external"
+
+if [ ! -d "${PROJECT_ROOT}/external/llama.cpp" ]; then
+    echo "Cloning llama.cpp..."
+    cd "${PROJECT_ROOT}/external"
+    git clone https://github.com/ggerganov/llama.cpp.git
+    echo "✓ llama.cpp cloned successfully"
+else
+    echo "✓ llama.cpp already present"
+    echo "Updating llama.cpp..."
+    cd "${PROJECT_ROOT}/external/llama.cpp"
+    git pull origin master || echo "Note: Could not update llama.cpp (possibly local changes)"
+fi
+
+cd "${PROJECT_ROOT}"
+
 # Create CMake toolchain file if it doesn't exist
 TOOLCHAIN_FILE="${PROJECT_ROOT}/cmake/windows-toolchain.cmake"
 if [ ! -f "${TOOLCHAIN_FILE}" ]; then

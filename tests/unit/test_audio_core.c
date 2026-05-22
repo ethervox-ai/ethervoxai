@@ -15,7 +15,9 @@
  */
 
 #include <assert.h>
+#include "ethervox/error.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "ethervox/audio.h"
@@ -104,5 +106,5 @@ int main() {
   printf("==========================================\n");
   printf("All audio core tests completed!\n");
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }

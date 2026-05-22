@@ -65,8 +65,8 @@ int main(int argc, char* argv[]) {
     
     // Step 3: Initialize backend
     printf("3. Initializing backend...\n");
-    int result = ethervox_llm_backend_init(backend, &config);
-    if (result != ETHERVOX_SUCCESS) {
+    ethervox_result_t result = ethervox_llm_backend_init(backend, &config);
+    if (ethervox_is_error(result)) {
         fprintf(stderr, "Failed to initialize backend: %d\n", result);
         ethervox_llm_backend_free(backend);
         return 1;

@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #include "ethervox/audio.h"
+#include "ethervox/error.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -84,9 +85,9 @@ ethervox_wake_config_t ethervox_wake_get_default_config(void);
  *
  * @param runtime Wake word runtime structure
  * @param config Configuration (NULL for defaults)
- * @return 0 on success, -1 on error
+ * @return ETHERVOX_SUCCESS on success, error code on failure
  */
-int ethervox_wake_init(ethervox_wake_runtime_t* runtime, const ethervox_wake_config_t* config);
+ethervox_result_t ethervox_wake_init(ethervox_wake_runtime_t* runtime, const ethervox_wake_config_t* config);
 
 /**
  * Process audio for wake word detection
@@ -94,11 +95,24 @@ int ethervox_wake_init(ethervox_wake_runtime_t* runtime, const ethervox_wake_con
  * @param runtime Wake word runtime
  * @param audio_buffer Audio buffer from ethervox_audio_read()
  * @param result Detection result (output)
- * @return 0 on success, -1 on error
+ * @return ETHERVOX_SUCCESS on success, error code on failure
  */
-int ethervox_wake_process(ethervox_wake_runtime_t* runtime,
+ethervox_result_t ethervox_wake_process(ethervox_wake_runtime_t* runtime,
                           const ethervox_audio_buffer_t* audio_buffer,
                           ethervox_wake_result_t* result);
+
+/**
+ * Record a reference template for wake word matching
+ * 
+ * Call this function while the user says the wake word to create
+ * a reference template for improved accuracy.
+ *
+ * @param runtime Wake word runtime
+ * @param audio_buffer Audio containing the wake word
+ * @return ETHERVOX_SUCCESS on success, error code on failure
+ */
+ethervox_result_t ethervox_wake_record_template(ethervox_wake_runtime_t* runtime,
+                                   const ethervox_audio_buffer_t* audio_buffer);
 
 /**
  * Reset wake word detector state

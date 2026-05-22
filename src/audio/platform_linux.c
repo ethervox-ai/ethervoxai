@@ -19,6 +19,7 @@
 #include <time.h>
 
 #include "ethervox/audio.h"
+#include "ethervox/error.h"
 
 #ifdef ETHERVOX_PLATFORM_LINUX
 #include <alsa/asoundlib.h>
@@ -35,20 +36,23 @@ typedef struct {
   bool is_playing;
 } linux_audio_data_t;
 
-static int linux_audio_init(ethervox_audio_runtime_t* runtime,
+static ethervox_result_t linux_audio_init(ethervox_audio_runtime_t* runtime,
                             const ethervox_audio_config_t* config) {
   linux_audio_data_t* audio_data = (linux_audio_data_t*)calloc(1, sizeof(linux_audio_data_t));
   if (!audio_data) {
-    return -1;
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_OUT_OF_MEMORY, "Failed to allocate Linux audio state");
   }
   runtime->platform_data = audio_data;
 
   audio_data->buffer_frames = config->buffer_size;
   printf("Linux ALSA audio driver initialized\n");
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
-static int linux_audio_start_capture(ethervox_audio_runtime_t* runtime) {
+static ethervox_result_t linux_audio_start_capture(ethervox_audio_runtime_t* runtime) {
+  ETHERVOX_CHECK_PTR(runtime);
+  ETHERVOX_CHECK_PTR(runtime->platform_data);
+  
   linux_audio_data_t* audio_data = (linux_audio_data_t*)runtime->platform_data;
   int err;
   snd_pcm_hw_params_t* hw_params = NULL;
@@ -85,7 +89,7 @@ static int linux_audio_start_capture(ethervox_audio_runtime_t* runtime) {
 
   if (!opened_device) {
     printf("Cannot open audio device for capture: %s\n", snd_strerror(err));
-    return -1;
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_AUDIO_DEVICE_NOT_FOUND, "No ALSA capture device available");
   }
 
   printf("ALSA: using capture device '%s'\n", opened_device);
@@ -96,7 +100,7 @@ static int linux_audio_start_capture(ethervox_audio_runtime_t* runtime) {
     printf("Cannot allocate hardware parameters: %s\n", snd_strerror(err));
     snd_pcm_close(audio_data->pcm_capture);
     audio_data->pcm_capture = NULL;
-    return -1;
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_AUDIO_INIT, "Failed to allocate ALSA hw_params");
   }
 
   // Configure hardware parameters
@@ -117,22 +121,25 @@ static int linux_audio_start_capture(ethervox_audio_runtime_t* runtime) {
   snd_pcm_hw_params_free(hw_params);
   if (err < 0) {
     printf("Cannot set hardware parameters: %s\n", snd_strerror(err));
-    return -1;
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_AUDIO_INIT, "Failed to set ALSA hw_params");
   }
 
   // Prepare device
   err = snd_pcm_prepare(audio_data->pcm_capture);
   if (err < 0) {
     printf("Cannot prepare audio interface for use: %s\n", snd_strerror(err));
-    return -1;
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_AUDIO_INIT, "Failed to prepare ALSA capture");
   }
 
   audio_data->is_recording = true;
   printf("Linux audio capture started\n");
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
-static int linux_audio_stop_capture(ethervox_audio_runtime_t* runtime) {
+static ethervox_result_t linux_audio_stop_capture(ethervox_audio_runtime_t* runtime) {
+  ETHERVOX_CHECK_PTR(runtime);
+  ETHERVOX_CHECK_PTR(runtime->platform_data);
+  
   linux_audio_data_t* audio_data = (linux_audio_data_t*)runtime->platform_data;
 
   if (audio_data->pcm_capture) {
@@ -142,10 +149,13 @@ static int linux_audio_stop_capture(ethervox_audio_runtime_t* runtime) {
 
   audio_data->is_recording = false;
   printf("Linux audio capture stopped\n");
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
-static int linux_audio_start_playback(ethervox_audio_runtime_t* runtime) {
+static ethervox_result_t linux_audio_start_playback(ethervox_audio_runtime_t* runtime) {
+  ETHERVOX_CHECK_PTR(runtime);
+  ETHERVOX_CHECK_PTR(runtime->platform_data);
+  
   linux_audio_data_t* audio_data = (linux_audio_data_t*)runtime->platform_data;
   int err;
 
@@ -183,17 +193,20 @@ static int linux_audio_start_playback(ethervox_audio_runtime_t* runtime) {
 
   if (!opened_device) {
     printf("Cannot open audio device for playback: %s\n", snd_strerror(err));
-    return -1;
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_AUDIO_DEVICE_NOT_FOUND, "No ALSA playback device available");
   }
 
   printf("ALSA: using playback device '%s'\n", opened_device);
 
   audio_data->is_playing = true;
   printf("Linux audio playback started\n");
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
-static int linux_audio_stop_playback(ethervox_audio_runtime_t* runtime) {
+static ethervox_result_t linux_audio_stop_playback(ethervox_audio_runtime_t* runtime) {
+  ETHERVOX_CHECK_PTR(runtime);
+  ETHERVOX_CHECK_PTR(runtime->platform_data);
+  
   linux_audio_data_t* audio_data = (linux_audio_data_t*)runtime->platform_data;
 
   if (audio_data->pcm_playback) {
@@ -203,7 +216,7 @@ static int linux_audio_stop_playback(ethervox_audio_runtime_t* runtime) {
 
   audio_data->is_playing = false;
   printf("Linux audio playback stopped\n");
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 static uint64_t linux_get_timestamp_us(void) {
@@ -213,14 +226,14 @@ static uint64_t linux_get_timestamp_us(void) {
                                                         ETHERVOX_PLATFORM_US_PER_MS;
 }
 
-static int linux_audio_read(ethervox_audio_runtime_t* runtime, ethervox_audio_buffer_t* buffer) {
-  if (!runtime || !buffer || !runtime->platform_data) {
-    return -1;
-  }
+static ethervox_result_t linux_audio_read(ethervox_audio_runtime_t* runtime, ethervox_audio_buffer_t* buffer) {
+  ETHERVOX_CHECK_PTR(runtime);
+  ETHERVOX_CHECK_PTR(buffer);
+  ETHERVOX_CHECK_PTR(runtime->platform_data);
 
   linux_audio_data_t* audio_data = (linux_audio_data_t*)runtime->platform_data;
   if (!audio_data->pcm_capture || !audio_data->is_recording) {
-    return -1;
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_INITIALIZED, "Capture not started");
   }
 
   const uint32_t channels = runtime->config.channels;
@@ -230,7 +243,7 @@ static int linux_audio_read(ethervox_audio_runtime_t* runtime, ethervox_audio_bu
 
   int16_t* capture_buffer = (int16_t*)malloc(bytes_total);
   if (!capture_buffer) {
-    return -1;
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_OUT_OF_MEMORY, "Failed to allocate capture buffer");
   }
 
   uint32_t frames_read = 0;
@@ -247,7 +260,7 @@ static int linux_audio_read(ethervox_audio_runtime_t* runtime, ethervox_audio_bu
     } else if (rc < 0) {
       printf("ALSA capture error: %s\n", snd_strerror((int)rc));
       free(capture_buffer);
-      return -1;
+      ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_AUDIO_INIT, "ALSA read failed");
     }
 
     frames_read += (uint32_t)rc;
@@ -258,7 +271,7 @@ static int linux_audio_read(ethervox_audio_runtime_t* runtime, ethervox_audio_bu
   buffer->channels = channels;
   buffer->timestamp_us = linux_get_timestamp_us();
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 static void linux_audio_cleanup(ethervox_audio_runtime_t* runtime) {
@@ -271,7 +284,9 @@ static void linux_audio_cleanup(ethervox_audio_runtime_t* runtime) {
   printf("Linux audio driver cleaned up\n");
 }
 
-int ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime) {
+ethervox_result_t ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime) {
+  ETHERVOX_CHECK_PTR(runtime);
+  
   runtime->driver.init = linux_audio_init;
   runtime->driver.start_capture = linux_audio_start_capture;
   runtime->driver.stop_capture = linux_audio_stop_capture;
@@ -280,7 +295,7 @@ int ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime) {
   runtime->driver.read_audio = linux_audio_read;
   runtime->driver.cleanup = linux_audio_cleanup;
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 #endif  // ETHERVOX_PLATFORM_LINUX

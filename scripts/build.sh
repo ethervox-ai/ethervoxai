@@ -135,8 +135,9 @@ build_preset() {
 # Clean build directories if requested
 if [[ "$CLEAN_BUILD" == true ]]; then
     print_status "Cleaning build directories..."
-    rm -rf build*
-    print_success "Build directories cleaned"
+    # Remove build directories but preserve models/ folder and symlinks
+    find . -maxdepth 1 -type d -name "build*" -exec rm -rf {} +
+    print_success "Build directories cleaned (models/ preserved)"
 fi
 
 # Check for required tools

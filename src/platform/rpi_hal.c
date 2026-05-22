@@ -89,19 +89,17 @@ static inline void delayMicroseconds(unsigned int us) {
 #include <time.h>
 #include <unistd.h>
 
-#include "ethervox/platform.h"
-
+#include "ethervox/platform.h"#include "ethervox/error.h"
 // Raspberry Pi-specific HAL implementation
 static int wiringpi_initialized = 0;
 static int i2c_handle = -1;
 
-static int rpi_init(ethervox_platform_info_t* info) {
+static ethervox_result_t rpi_init(ethervox_platform_info_t* info) {
   printf("Initializing Raspberry Pi platform\n");
 
   // Initialize WiringPi
   if (wiringPiSetupGpio() == -1) {
-    printf("Failed to initialize WiringPi\n");
-    return -1;
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_PLATFORM_INIT, "Failed to initialize WiringPi");
   }
   wiringpi_initialized = 1;
 
@@ -116,7 +114,7 @@ static int rpi_init(ethervox_platform_info_t* info) {
     printf("Warning: SPI initialization failed\n");
   }
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 static void rpi_cleanup(ethervox_platform_info_t* info) {
@@ -124,9 +122,10 @@ static void rpi_cleanup(ethervox_platform_info_t* info) {
   wiringpi_initialized = 0;
 }
 
-static int rpi_gpio_configure(uint32_t pin, ethervox_gpio_mode_t mode) {
-  if (!wiringpi_initialized)
-    return -1;
+static ethervox_result_t rpi_gpio_configure(uint32_t pin, ethervox_gpio_mode_t mode) {
+  if (!wiringpi_initialized) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_INITIALIZED, "WiringPi not initialized");
+  }
 
   switch (mode) {
     case ETHERVOX_GPIO_INPUT:
@@ -144,18 +143,19 @@ static int rpi_gpio_configure(uint32_t pin, ethervox_gpio_mode_t mode) {
       pullUpDnControl(pin, PUD_DOWN);
       break;
     default:
-      return -1;
+      ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_INVALID_ARGUMENT, "Invalid GPIO mode");
   }
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
-static int rpi_gpio_write(uint32_t pin, bool state) {
-  if (!wiringpi_initialized)
-    return -1;
+static ethervox_result_t rpi_gpio_write(uint32_t pin, bool state) {
+  if (!wiringpi_initialized) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_INITIALIZED, "WiringPi not initialized");
+  }
 
   digitalWrite(pin, state ? HIGH : LOW);
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 static bool rpi_gpio_read(uint32_t pin) {
@@ -165,47 +165,55 @@ static bool rpi_gpio_read(uint32_t pin) {
   return digitalRead(pin) == HIGH;
 }
 
-static int rpi_i2c_write(uint32_t bus, uint8_t device_addr, const uint8_t* data, uint32_t len) {
+static ethervox_result_t rpi_i2c_write(uint32_t bus, uint8_t device_addr, const uint8_t* data, uint32_t len) {
+  ETHERVOX_CHECK_PTR(data);
   (void)bus;
   // Create new I2C handle for specific device
   int handle = wiringPiI2CSetup(device_addr);
-  if (handle < 0)
-    return -1;
+  if (handle < 0) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_PLATFORM_INIT, "Failed to setup I2C device");
+  }
 
   // First byte is typically the register address in I2C protocols
   // Write all data bytes
   for (uint32_t i = 0; i < len; i++) {
     if (wiringPiI2CWrite(handle, data[i]) < 0) {
-      return -1;
+      ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_PLATFORM_INIT, "I2C write failed");
     }
   }
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
-static int rpi_i2c_read(uint32_t bus, uint8_t device_addr, uint8_t* data, uint32_t len) {
+static ethervox_result_t rpi_i2c_read(uint32_t bus, uint8_t device_addr, uint8_t* data, uint32_t len) {
+  ETHERVOX_CHECK_PTR(data);
   (void)bus;
 
   // Create new I2C handle for specific device
   int handle = wiringPiI2CSetup(device_addr);
-  if (handle < 0)
-    return -1;
+  if (handle < 0) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_PLATFORM_INIT, "Failed to setup I2C device");
+  }
 
   // Read data directly
   for (uint32_t i = 0; i < len; i++) {
     int byte = wiringPiI2CRead(handle);
-    if (byte < 0)
-      return -1;
+    if (byte < 0) {
+      ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_PLATFORM_INIT, "I2C read failed");
+    }
     data[i] = (uint8_t)byte;
   }
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
-static int rpi_spi_transfer(uint32_t bus, const uint8_t* tx_data, uint8_t* rx_data, uint32_t len) {
+static ethervox_result_t rpi_spi_transfer(uint32_t bus, const uint8_t* tx_data, uint8_t* rx_data, uint32_t len) {
+  ETHERVOX_CHECK_PTR(tx_data);
+  ETHERVOX_CHECK_PTR(rx_data);
   (void)bus;
-  if (!tx_data || len == 0)
-    return -1;
+  if (len == 0) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_INVALID_ARGUMENT, "SPI transfer length is zero");
+  }
 
   // Copy tx_data to rx_data buffer for in-place transfer
   if (rx_data && tx_data != rx_data) {
@@ -214,7 +222,11 @@ static int rpi_spi_transfer(uint32_t bus, const uint8_t* tx_data, uint8_t* rx_da
 
   uint8_t* buffer = rx_data ? rx_data : (uint8_t*)tx_data;
 
-  return wiringPiSPIDataRW(0, buffer, len);
+  if (wiringPiSPIDataRW(0, buffer, len) < 0) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_PLATFORM_INIT, "SPI transfer failed");
+  }
+  
+  return ETHERVOX_SUCCESS;
 }
 
 static uint32_t rpi_delay_ms(uint32_t ms) {
@@ -283,9 +295,8 @@ static float rpi_get_cpu_temperature(void) {
 }
 
 // Register Raspberry Pi-specific HAL functions
-int rpi_hal_register(ethervox_platform_t* platform) {
-  if (!platform)
-    return -1;
+ethervox_result_t rpi_hal_register(ethervox_platform_t* platform) {
+  ETHERVOX_CHECK_PTR(platform);
 
   platform->hal.init = rpi_init;
   platform->hal.cleanup = rpi_cleanup;
@@ -308,7 +319,7 @@ int rpi_hal_register(ethervox_platform_t* platform) {
   platform->hal.get_free_heap_size = rpi_get_free_heap_size;
   platform->hal.get_cpu_temperature = rpi_get_cpu_temperature;
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 #endif  // ETHERVOX_PLATFORM_RPI

@@ -40,6 +40,8 @@
 #endif
 #endif
 
+#include "ethervox/error.h"
+
 // Desktop platform HAL implementation (Windows/Linux/macOS)
 // Note: Desktop platforms don't typically have GPIO/SPI/I2C access
 
@@ -59,16 +61,16 @@ static void desktop_cleanup(ethervox_platform_info_t* info) {
 
 // GPIO functions not available on desktop - return error
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters) -- signature fixed by HAL contract
-static int desktop_gpio_configure(uint32_t pin, ethervox_gpio_mode_t mode) {
+static ethervox_result_t desktop_gpio_configure(uint32_t pin, ethervox_gpio_mode_t mode) {
   (void)pin;
   (void)mode;
-  return -1;  // GPIO not available on desktop
+  ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_SUPPORTED, "GPIO not supported on desktop");
 }
 
-static int desktop_gpio_write(uint32_t pin, bool state) {
+static ethervox_result_t desktop_gpio_write(uint32_t pin, bool state) {
   (void)pin;
   (void)state;
-  return -1;  // GPIO not available on desktop
+  ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_SUPPORTED, "GPIO not supported on desktop");
 }
 
 static bool desktop_gpio_read(uint32_t pin) {
@@ -78,31 +80,31 @@ static bool desktop_gpio_read(uint32_t pin) {
 
 // I2C functions not available on standard desktop - return error
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters) -- signature fixed by HAL contract
-static int desktop_i2c_write(uint32_t bus, uint8_t device_addr, const uint8_t* data, uint32_t len) {
+static ethervox_result_t desktop_i2c_write(uint32_t bus, uint8_t device_addr, const uint8_t* data, uint32_t len) {
   (void)bus;
   (void)device_addr;
   (void)data;
   (void)len;
-  return -1;  // Not supported on desktop
+  ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_SUPPORTED, "I2C not supported on desktop");
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters) -- signature fixed by HAL contract
-static int desktop_i2c_read(uint32_t bus, uint8_t device_addr, uint8_t* data, uint32_t len) {
+static ethervox_result_t desktop_i2c_read(uint32_t bus, uint8_t device_addr, uint8_t* data, uint32_t len) {
   (void)bus;
   (void)device_addr;
   (void)data;
   (void)len;
-  return -1;  // Not supported on desktop
+  ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_SUPPORTED, "I2C not supported on desktop");
 }
 
 // SPI functions not available on standard desktop - return error
-static int desktop_spi_transfer(uint32_t bus, const uint8_t* tx_data, uint8_t* rx_data,
-                                uint32_t len) {
+static ethervox_result_t desktop_spi_transfer(uint32_t bus, const uint8_t* tx_data, uint8_t* rx_data,
+                             uint32_t len) {
   (void)bus;
   (void)tx_data;
   (void)rx_data;
   (void)len;
-  return -1;  // Not supported on desktop
+  ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_SUPPORTED, "SPI not supported on desktop");
 }
 
 // Timing functions
@@ -244,10 +246,8 @@ static float desktop_get_cpu_temperature(void) {
 }
 
 // Register desktop-specific HAL functions
-int desktop_hal_register(ethervox_platform_t* platform) {
-  if (!platform) {
-    return -1;
-  }
+ethervox_result_t desktop_hal_register(ethervox_platform_t* platform) {
+  ETHERVOX_CHECK_PTR(platform);
   
   platform->hal.init = desktop_init;
   platform->hal.cleanup = desktop_cleanup;
@@ -272,7 +272,15 @@ int desktop_hal_register(ethervox_platform_t* platform) {
   platform->hal.get_free_heap_size = desktop_get_free_heap_size;
   platform->hal.get_cpu_temperature = desktop_get_cpu_temperature;
 
-  return 0;
+  return ETHERVOX_SUCCESS;
+}
+
+/**
+ * Stub for ethervox_get_android_files_dir() on non-Android platforms
+ * Returns NULL since this is desktop (macOS/Linux/Windows)
+ */
+const char* ethervox_get_android_files_dir(void) {
+  return NULL;  // Not on Android, use HOME directory instead
 }
 
 #endif  // ETHERVOX_PLATFORM_DESKTOP

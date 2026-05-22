@@ -1,0 +1,20 @@
+# espeak-generated pronunciaIPA format (--ipa) for Piper TTS
+# Format: WORD<tab>IPA_PRONUNCIATION-SAMPA format for Piper TTS
+# Format: WORD<tab>X-SAMPA_PHONEMES
+
+a	ˈa
+de	dˈe
+el	ˈel
+en	ˈen
+gracias	ɡɾˈasjas
+hola	ˈola
+la	lˈa
+mundo	mˈundo
+no	nˈo
+por favor	poɾ faβˈoɾ
+que	kˈe
+se	sˈe
+ser	sˈer
+sí	sˈi
+un	ˈun
+y	ˈi

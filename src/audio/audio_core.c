@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include "ethervox/audio.h"
+#include "ethervox/error.h"
 
 static const float kEthervoxAudioLanguageConfidenceDefault = 0.85f;
 static const float kEthervoxAudioFinalConfidenceDefault = 0.90f;
@@ -40,56 +41,55 @@ ethervox_audio_config_t ethervox_audio_get_default_config(void) {
 }
 
 // Initialize audio runtime
-int ethervox_audio_init(ethervox_audio_runtime_t* runtime, const ethervox_audio_config_t* config) {
-  if (!runtime || !config) {
-    return -1;
-  }
+ethervox_result_t ethervox_audio_init(ethervox_audio_runtime_t* runtime, const ethervox_audio_config_t* config) {
+  ETHERVOX_CHECK_PTR(runtime);
+  ETHERVOX_CHECK_PTR(config);
 
   memset(runtime, 0, sizeof(ethervox_audio_runtime_t));
   runtime->config = *config;
 
   // Register platform-specific driver
-  int result = ethervox_audio_register_platform_driver(runtime);
-  if (result != 0) {
-    fprintf(stderr, "Failed to register platform audio driver (err=%d)\n", result);
-    return result;
+  ethervox_result_t result = ethervox_audio_register_platform_driver(runtime);
+  if (ethervox_is_error(result)) {
+    ETHERVOX_RETURN_ERROR(result, "Failed to register platform audio driver");
   }
 
   // Initialize platform-specific audio subsystem
   if (runtime->driver.init) {
     result = runtime->driver.init(runtime, config);
-    if (result == 0) {
+    if (ethervox_is_success(result)) {
       runtime->is_initialized = true;
   snprintf(runtime->current_language, sizeof(runtime->current_language), "%s", "en");  // Default language
       runtime->language_confidence = 1.0f;
     } else {
-      fprintf(stderr, "Platform audio driver initialization failed (err=%d)\n", result);
+      ETHERVOX_RETURN_ERROR(result, "Platform audio driver initialization failed");
     }
   }
 
-  return result;
+  return ETHERVOX_SUCCESS;
 }
 
 // Start audio processing
-int ethervox_audio_start(ethervox_audio_runtime_t* runtime) {
-  if (!runtime || !runtime->is_initialized) {
-    return -1;
+ethervox_result_t ethervox_audio_start(ethervox_audio_runtime_t* runtime) {
+  ETHERVOX_CHECK_PTR(runtime);
+  if (!runtime->is_initialized) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_INITIALIZED, "Audio runtime not initialized");
   }
 
-  int result = 0;
+  ethervox_result_t result = ETHERVOX_SUCCESS;
 
   // Start audio capture
   if (runtime->driver.start_capture) {
     result = runtime->driver.start_capture(runtime);
-    if (result == 0) {
+    if (ethervox_is_success(result)) {
       runtime->is_capturing = true;
     }
   }
 
   // Start audio playback
-  if (result == 0 && runtime->driver.start_playback) {
+  if (ethervox_is_success(result) && runtime->driver.start_playback) {
     result = runtime->driver.start_playback(runtime);
-    if (result == 0) {
+    if (ethervox_is_success(result)) {
       runtime->is_playing = true;
     }
   }
@@ -97,68 +97,67 @@ int ethervox_audio_start(ethervox_audio_runtime_t* runtime) {
   return result;
 }
 
-int ethervox_audio_start_capture(ethervox_audio_runtime_t* runtime) {
-  if (!runtime || !runtime->is_initialized) {
-    return -1;
+ethervox_result_t ethervox_audio_start_capture(ethervox_audio_runtime_t* runtime) {
+  ETHERVOX_CHECK_PTR(runtime);
+  if (!runtime->is_initialized) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_INITIALIZED, "Audio runtime not initialized");
   }
 
   if (runtime->is_capturing) {
-    return 0;
+    return ETHERVOX_SUCCESS;
   }
 
   if (!runtime->driver.start_capture) {
-    fprintf(stderr, "Audio driver does not support start_capture\n");
-    return -1;
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_SUPPORTED, "Audio driver does not support start_capture");
   }
 
-  int result = runtime->driver.start_capture(runtime);
-  if (result == 0) {
+  ethervox_result_t result = runtime->driver.start_capture(runtime);
+  if (ethervox_is_success(result)) {
     runtime->is_capturing = true;
   }
   return result;
 }
 
-int ethervox_audio_stop_capture(ethervox_audio_runtime_t* runtime) {
-  if (!runtime || !runtime->is_initialized) {
-    return -1;
+ethervox_result_t ethervox_audio_stop_capture(ethervox_audio_runtime_t* runtime) {
+  ETHERVOX_CHECK_PTR(runtime);
+  if (!runtime->is_initialized) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_INITIALIZED, "Audio runtime not initialized");
   }
 
   if (!runtime->is_capturing) {
-    return 0;
+    return ETHERVOX_SUCCESS;
   }
 
   if (!runtime->driver.stop_capture) {
-    fprintf(stderr, "Audio driver does not support stop_capture\n");
-    return -1;
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_SUPPORTED, "Audio driver does not support stop_capture");
   }
 
-  int result = runtime->driver.stop_capture(runtime);
-  if (result == 0) {
+  ethervox_result_t result = runtime->driver.stop_capture(runtime);
+  if (ethervox_is_success(result)) {
     runtime->is_capturing = false;
   }
   return result;
 }
 
-int ethervox_audio_read(ethervox_audio_runtime_t* runtime, ethervox_audio_buffer_t* buffer) {
-  if (!runtime || !runtime->is_initialized || !buffer) {
-    return -1;
+ethervox_result_t ethervox_audio_read(ethervox_audio_runtime_t* runtime, ethervox_audio_buffer_t* buffer) {
+  ETHERVOX_CHECK_PTR(runtime);
+  ETHERVOX_CHECK_PTR(buffer);
+  if (!runtime->is_initialized) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_INITIALIZED, "Audio runtime not initialized");
   }
 
   if (!runtime->driver.read_audio) {
-    fprintf(stderr, "Audio driver does not support read_audio\n");
-    return -1;
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_SUPPORTED, "Audio driver does not support read_audio");
   }
 
   return runtime->driver.read_audio(runtime, buffer);
 }
 
 // Stop audio processing
-int ethervox_audio_stop(ethervox_audio_runtime_t* runtime) {
-  if (!runtime) {
-    return -1;
-  }
+ethervox_result_t ethervox_audio_stop(ethervox_audio_runtime_t* runtime) {
+  ETHERVOX_CHECK_PTR(runtime);
 
-  int result = 0;
+  ethervox_result_t result = ETHERVOX_SUCCESS;
 
   // Stop audio capture
   if (runtime->is_capturing && runtime->driver.stop_capture) {
@@ -168,8 +167,8 @@ int ethervox_audio_stop(ethervox_audio_runtime_t* runtime) {
 
   // Stop audio playback
   if (runtime->is_playing && runtime->driver.stop_playback) {
-    int playback_result = runtime->driver.stop_playback(runtime);
-    if (result == 0) {
+    ethervox_result_t playback_result = runtime->driver.stop_playback(runtime);
+    if (ethervox_is_success(result)) {
       result = playback_result;
     }
     runtime->is_playing = false;
@@ -194,11 +193,10 @@ void ethervox_audio_cleanup(ethervox_audio_runtime_t* runtime) {
 }
 
 // Language detection (placeholder implementation)
-int ethervox_language_detect(const ethervox_audio_buffer_t* buffer,
+ethervox_result_t ethervox_language_detect(const ethervox_audio_buffer_t* buffer,
                              ethervox_language_detect_t* result) {
-  if (!buffer || !result) {
-    return -1;
-  }
+  ETHERVOX_CHECK_PTR(buffer);
+  ETHERVOX_CHECK_PTR(result);
 
   // Placeholder: Simple heuristic based on audio characteristics
   // In a real implementation, this would use ML models
@@ -206,20 +204,62 @@ int ethervox_language_detect(const ethervox_audio_buffer_t* buffer,
   result->confidence = kEthervoxAudioLanguageConfidenceDefault;
   result->is_ambient = true;
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }
 
 // TTS synthesis (placeholder implementation)
-int ethervox_tts_synthesize(ethervox_audio_runtime_t* runtime,
+ethervox_result_t ethervox_tts_synthesize(ethervox_audio_runtime_t* runtime,
                             const ethervox_tts_request_t* request,
                             ethervox_audio_buffer_t* output) {
-  if (!runtime || !request || !output) {
-    return -1;
-  }
+  ETHERVOX_CHECK_PTR(runtime);
+  ETHERVOX_CHECK_PTR(request);
+  ETHERVOX_CHECK_PTR(output);
 
-  // Placeholder: Generate simple tone as audio output
+#ifdef __APPLE__
+  // Use macOS `say` command for TTS
+  // Build command with proper escaping
+  char command[2048];
+  
+  // Escape single quotes in text for shell
+  char escaped_text[1024];
+  const char* src = request->text;
+  char* dst = escaped_text;
+  while (*src && (dst - escaped_text) < (int)sizeof(escaped_text) - 10) {
+    if (*src == '\'') {
+      *dst++ = '\'';
+      *dst++ = '\\';
+      *dst++ = '\'';
+      *dst++ = '\'';
+    } else {
+      *dst++ = *src;
+    }
+    src++;
+  }
+  *dst = '\0';
+  
+  snprintf(command, sizeof(command), "say '%s' &", escaped_text);
+  
+  // Execute TTS in background
+  int result = system(command);
+  
+  // Return empty buffer (audio plays directly via system)
+  output->data = NULL;
+  output->size = 0;
+  output->channels = 1;
+  output->timestamp_us = 0;
+  
+  if (result != 0) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_TTS_SYNTHESIS_FAILED, "TTS system command failed");
+  }
+  return ETHERVOX_SUCCESS;
+  
+#else
+  // Fallback: Generate simple tone as audio output
   uint32_t samples = runtime->config.sample_rate * kEthervoxAudioTtsDurationSeconds;
   output->data = (float*)malloc(samples * sizeof(float));
+  if (!output->data) {
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_OUT_OF_MEMORY, "Failed to allocate TTS output buffer");
+  }
   output->size = samples;
   output->channels = 1;
   output->timestamp_us = 0;
@@ -233,7 +273,8 @@ int ethervox_tts_synthesize(ethervox_audio_runtime_t* runtime,
                       sinf(kEthervoxAudioTwoPi * kEthervoxAudioToneFrequencyHz * time_s);
   }
 
-  return 0;
+  return ETHERVOX_SUCCESS;
+#endif
 }
 
 // Free audio buffer

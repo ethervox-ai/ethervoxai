@@ -5,12 +5,29 @@ add_library(ethervox_audio STATIC
     platform_linux.c
     platform_esp32.c
     platform_rpi.c
+    reference_buffer.c
+    aec_speex.c
 )
 
 target_include_directories(ethervox_audio PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
 )
+
+# Find Speex for AEC
+find_package(PkgConfig)
+if(PkgConfig_FOUND)
+    pkg_check_modules(SPEEX speexdsp)
+    if(SPEEX_FOUND)
+        target_link_libraries(ethervox_audio ${SPEEX_LIBRARIES})
+        target_include_directories(ethervox_audio PRIVATE ${SPEEX_INCLUDE_DIRS})
+        message(STATUS "Speex DSP found: ${SPEEX_VERSION}")
+    else()
+        message(WARNING "Speex DSP not found - AEC will use passthrough mode. Install with: brew install speex")
+    endif()
+else()
+    message(WARNING "PkgConfig not found - skipping Speex detection")
+endif()
 
 # Platform-specific linking
 if(TARGET_PLATFORM STREQUAL "WINDOWS")

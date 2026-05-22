@@ -2,6 +2,30 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "CMake: Configure (Default)",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--preset",
+				"default"
+			],
+			"group": "build",
+			"problemMatcher": [],
+			"detail": "Configure project with default CMake preset"
+		},
+		{
+			"label": "CMake: Configure (Debug)",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--preset",
+				"debug"
+			],
+			"group": "build",
+			"problemMatcher": [],
+			"detail": "Configure project in debug mode"
+		},
+		{
 			"label": "Build EthervoxAI",
 			"type": "shell",
 			"command": "npm",
@@ -9,11 +33,205 @@
 				"run",
 				"build"
 			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"isBackground": false,
+			"detail": "Build complete project (core + dashboard)"
+		},
+		{
+			"label": "Build: Core Only",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build:core"
+			],
 			"group": "build",
 			"problemMatcher": [
-				"$tsc"
+				"$gcc"
 			],
-			"isBackground": false
+			"detail": "Build only the C++ core"
+		},
+		{
+			"label": "Build: Dashboard",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build:dashboard"
+			],
+			"group": "build",
+			"problemMatcher": [],
+			"detail": "Build only the web dashboard"
+		},
+		{
+			"label": "Test: All",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test"
+			],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			},
+			"problemMatcher": [],
+			"detail": "Run all tests (core + dashboard)"
+		},
+		{
+			"label": "Test: Core (CTest)",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:core"
+			],
+			"group": "test",
+			"problemMatcher": [],
+			"detail": "Run all C++ core tests with CTest"
+		},
+		{
+			"label": "Test: Specific Unit Test",
+			"type": "shell",
+			"command": "./tests/${input:testName}",
+			"group": "test",
+			"problemMatcher": [],
+			"detail": "Run a specific test executable",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Test: Audio Core",
+			"type": "shell",
+			"command": "./tests/test_audio_core",
+			"group": "test",
+			"problemMatcher": [],
+			"detail": "Run audio core tests"
+		},
+		{
+			"label": "Test: Phonemizer (All)",
+			"type": "shell",
+			"command": "ctest",
+			"args": [
+				"-L",
+				"phonemizer",
+				"--output-on-failure"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/build"
+			},
+			"group": "test",
+			"problemMatcher": [],
+			"detail": "Run all phonemizer tests"
+		},
+		{
+			"label": "Clean Build",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"clean"
+			],
+			"problemMatcher": [],
+			"detail": "Clean all build artifacts"
+		},
+		{
+			"label": "ESP32: Configure (S3)",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"configure:esp32-s3"
+			],
+			"group": "build",
+			"problemMatcher": [],
+			"detail": "Configure for ESP32-S3 platform"
+		},
+		{
+			"label": "ESP32: Build (S3)",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build:esp32-s3"
+			],
+			"group": "build",
+			"problemMatcher": [],
+			"detail": "Build for ESP32-S3 platform"
+		},
+		{
+			"label": "RPi: Configure",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"configure:rpi"
+			],
+			"group": "build",
+			"problemMatcher": [],
+			"detail": "Configure for Raspberry Pi 4"
+		},
+		{
+			"label": "RPi: Build",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build:rpi"
+			],
+			"group": "build",
+			"problemMatcher": [],
+			"detail": "Build for Raspberry Pi 4"
+		}
+	],
+	"inputs": [
+		{
+			"id": "testName",
+			"type": "pickString",
+			"description": "Select test to run",
+			"options": [
+				"test_audio_core",
+				"test_config",
+				"test_error",
+				"test_context_overflow",
+				"test_memory_tools",
+				"test_secret_mode",
+				"test_adaptive_memory",
+				"test_plugin_manager",
+				"test_kv_cache_management",
+				"test_memory_archive",
+				"test_file_tools",
+				"test_file_append",
+				"test_unit_conversion",
+				"test_tool_manifest",
+				"test_mobile_optimization",
+				"test_wake_word",
+				"test_voice_conversation",
+				"test_audio_integration",
+				"test_settings_persistence",
+				"test_cache_summarization",
+				"test_aec_infrastructure",
+				"test_tts_text_to_phoneme",
+				"test_tts_synthesis",
+				"test_voice_training",
+				"test_voice_training_integration",
+				"test_mic_direct",
+				"test_phonemizer",
+				"test_phonemizer_chinese",
+				"test_phonemizer_german",
+				"test_piper_phonemizers",
+				"test_tool_descriptions"
+			]
 		}
 	]
 }

@@ -186,7 +186,7 @@ int pipeline_init(voice_pipeline_t* pipeline, const char* language_override, boo
   printf("=== EthervoxAI Voice Assistant ===\n\n");
 
   // Initialize platform
-  if (ethervox_platform_init(&pipeline->platform) != 0) {
+  if (ethervox_is_error(ethervox_platform_init(&pipeline->platform))) {
     fprintf(stderr, "Failed to initialize platform\n");
     return -1;
   }
@@ -326,8 +326,8 @@ int pipeline_init(voice_pipeline_t* pipeline, const char* language_override, boo
               printf("Size: %.2f MB\n", (float)selected_model->size_bytes / 1024.0f / 1024.0f);
               printf("This may take several minutes depending on your connection.\n");
               
-              int dl_result = ethervox_model_manager_ensure_available(pipeline->model_manager, selected_model);
-              if (dl_result != 0) {
+              ethervox_result_t dl_result = ethervox_model_manager_ensure_available(pipeline->model_manager, selected_model);
+              if (ethervox_is_error(dl_result)) {
                 fprintf(stderr, "⚠️  Failed to download model\n");
                 fprintf(stderr, "Please download manually from:\n%s\n", selected_model->url);
                 ethervox_llm_backend_cleanup(pipeline->llm_backend);
@@ -512,9 +512,9 @@ static void pipeline_run_voice(voice_pipeline_t* pipeline) {
       }
 
       ethervox_stt_result_t stt_result = {0};
-      int stt_status = ethervox_stt_process(&pipeline->stt, &audio_buffer, &stt_result);
+      ethervox_result_t stt_status = ethervox_stt_process(&pipeline->stt, &audio_buffer, &stt_result);
 
-      if (stt_status == 0 && (stt_result.is_final || stt_result.is_partial)) {
+      if (ethervox_is_success(stt_status) && (stt_result.is_final || stt_result.is_partial)) {
         const char* transcript = stt_result.text ? stt_result.text : "";
         printf("\n📝 Heard: \"%s\"\n", transcript);
 

@@ -219,9 +219,9 @@ int main() {
     input.processing_time_ms = 150;
 
     ethervox_intent_result_t result;
-    int ret = ethervox_sdk_process_intent(&sdk, &input, &result);
+    ethervox_result_t ret = ethervox_sdk_process_intent(&sdk, &input, &result);
 
-    if (ret == 0) {
+    if (ethervox_is_success(ret)) {
       printf("  Intent: %s (confidence: %.2f)\n", ethervox_intent_type_to_string(result.type),
              result.confidence);
       printf("  Entities: %s\n", result.entities);

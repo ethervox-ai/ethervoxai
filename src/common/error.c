@@ -67,28 +67,101 @@ const char* ethervox_error_string(ethervox_result_t result) {
         case ETHERVOX_ERROR_STT_INIT: return "STT initialization failed";
         case ETHERVOX_ERROR_STT_MODEL_NOT_FOUND: return "STT model not found";
         case ETHERVOX_ERROR_STT_PROCESSING: return "STT processing failed";
+        case ETHERVOX_ERROR_STT_MODEL_LOAD_FAILED: return "STT model load failed";
+        case ETHERVOX_ERROR_STT_TRANSCRIPTION_FAILED: return "STT transcription failed";
+        case ETHERVOX_ERROR_STT_LANGUAGE_NOT_SUPPORTED: return "STT language not supported";
+        case ETHERVOX_ERROR_STT_AUDIO_FORMAT_INVALID: return "STT audio format invalid";
+        
+        // TTS errors
+        case ETHERVOX_ERROR_TTS_INIT: return "TTS initialization failed";
+        case ETHERVOX_ERROR_TTS_MODEL_NOT_FOUND: return "TTS model not found";
+        case ETHERVOX_ERROR_TTS_SYNTHESIS_FAILED: return "TTS synthesis failed";
+        case ETHERVOX_ERROR_TTS_VOICE_NOT_FOUND: return "TTS voice not found";
+        case ETHERVOX_ERROR_TTS_PHONEMIZATION_FAILED: return "TTS phonemization failed";
+        case ETHERVOX_ERROR_TTS_AUDIO_OUTPUT_FAILED: return "TTS audio output failed";
+        case ETHERVOX_ERROR_TTS_LANGUAGE_NOT_SUPPORTED: return "TTS language not supported";
+        case ETHERVOX_ERROR_TTS_TEXT_TOO_LONG: return "TTS text too long";
         
         // Wake word errors
         case ETHERVOX_ERROR_WAKEWORD_INIT: return "Wake word initialization failed";
         case ETHERVOX_ERROR_WAKEWORD_MODEL_NOT_FOUND: return "Wake word model not found";
+        case ETHERVOX_ERROR_WAKEWORD_DETECTION_FAILED: return "Wake word detection failed";
+        case ETHERVOX_ERROR_WAKEWORD_TEMPLATE_RECORDING_FAILED: return "Wake word template recording failed";
+        
+        // LLM errors
+        case ETHERVOX_ERROR_LLM_INIT: return "LLM initialization failed";
+        case ETHERVOX_ERROR_LLM_MODEL_NOT_FOUND: return "LLM model not found";
+        case ETHERVOX_ERROR_LLM_MODEL_LOAD_FAILED: return "LLM model load failed";
+        case ETHERVOX_ERROR_LLM_INFERENCE_FAILED: return "LLM inference failed";
+        case ETHERVOX_ERROR_LLM_CONTEXT_OVERFLOW: return "LLM context overflow";
+        case ETHERVOX_ERROR_LLM_BACKEND_NOT_SUPPORTED: return "LLM backend not supported";
+        case ETHERVOX_ERROR_LLM_TOKENIZATION_FAILED: return "LLM tokenization failed";
+        case ETHERVOX_ERROR_LLM_GENERATION_TIMEOUT: return "LLM generation timeout";
         
         // Plugin errors
         case ETHERVOX_ERROR_PLUGIN_NOT_FOUND: return "Plugin not found";
         case ETHERVOX_ERROR_PLUGIN_INIT: return "Plugin initialization failed";
         case ETHERVOX_ERROR_PLUGIN_EXECUTION: return "Plugin execution failed";
         case ETHERVOX_ERROR_PLUGIN_MAX_REACHED: return "Maximum plugins reached";
+        case ETHERVOX_ERROR_PLUGIN_INVALID_MANIFEST: return "Plugin invalid manifest";
+        case ETHERVOX_ERROR_PLUGIN_DEPENDENCY_MISSING: return "Plugin dependency missing";
+        
+        // Governor/Tool errors
+        case ETHERVOX_ERROR_GOVERNOR_INIT: return "Governor initialization failed";
+        case ETHERVOX_ERROR_TOOL_NOT_FOUND: return "Tool not found";
+        case ETHERVOX_ERROR_TOOL_EXECUTION_FAILED: return "Tool execution failed";
+        case ETHERVOX_ERROR_TOOL_REGISTRY_FULL: return "Tool registry full";
+        case ETHERVOX_ERROR_TOOL_INVALID_ARGUMENTS: return "Tool invalid arguments";
+        case ETHERVOX_ERROR_TOOL_TIMEOUT: return "Tool execution timeout";
+        case ETHERVOX_ERROR_MANIFEST_PARSE_ERROR: return "Manifest parse error";
+        case ETHERVOX_ERROR_MANIFEST_VALIDATION_FAILED: return "Manifest validation failed";
         
         // Network/API errors
         case ETHERVOX_ERROR_NETWORK: return "Network error";
         case ETHERVOX_ERROR_API_CALL: return "API call failed";
         case ETHERVOX_ERROR_API_RESPONSE: return "Invalid API response";
         case ETHERVOX_ERROR_API_RATE_LIMIT: return "API rate limit exceeded";
+        case ETHERVOX_ERROR_DOWNLOAD_FAILED: return "Download failed";
+        case ETHERVOX_ERROR_DOWNLOAD_TIMEOUT: return "Download timeout";
+        case ETHERVOX_ERROR_DOWNLOAD_CHECKSUM_MISMATCH: return "Download checksum mismatch";
+        case ETHERVOX_ERROR_NETWORK_CONNECTION_FAILED: return "Network connection failed";
+        
+        // Memory system errors
+        case ETHERVOX_ERROR_MEMORY_INIT: return "Memory system initialization failed";
+        case ETHERVOX_ERROR_MEMORY_SEARCH_FAILED: return "Memory search failed";
+        case ETHERVOX_ERROR_MEMORY_STORE_FAILED: return "Memory store failed";
+        case ETHERVOX_ERROR_MEMORY_EXPORT_FAILED: return "Memory export failed";
+        case ETHERVOX_ERROR_MEMORY_IMPORT_FAILED: return "Memory import failed";
+        case ETHERVOX_ERROR_MEMORY_ARCHIVE_FAILED: return "Memory archive failed";
+        case ETHERVOX_ERROR_MEMORY_CORRUPTION: return "Memory corruption detected";
         
         // File I/O errors
         case ETHERVOX_ERROR_FILE_NOT_FOUND: return "File not found";
         case ETHERVOX_ERROR_FILE_READ: return "File read error";
         case ETHERVOX_ERROR_FILE_WRITE: return "File write error";
         case ETHERVOX_ERROR_FILE_PERMISSION: return "File permission denied";
+        case ETHERVOX_ERROR_FILE_EXISTS: return "File already exists";
+        case ETHERVOX_ERROR_FILE_DELETE_FAILED: return "File delete failed";
+        case ETHERVOX_ERROR_DIRECTORY_NOT_FOUND: return "Directory not found";
+        case ETHERVOX_ERROR_DIRECTORY_CREATE_FAILED: return "Directory create failed";
+        case ETHERVOX_ERROR_PATH_TOO_LONG: return "Path too long";
+        case ETHERVOX_ERROR_PATH_INVALID: return "Path invalid";
+        
+        // Configuration/Settings errors
+        case ETHERVOX_ERROR_CONFIG_INIT: return "Configuration initialization failed";
+        case ETHERVOX_ERROR_CONFIG_LOAD_FAILED: return "Configuration load failed";
+        case ETHERVOX_ERROR_CONFIG_SAVE_FAILED: return "Configuration save failed";
+        case ETHERVOX_ERROR_CONFIG_PARSE_ERROR: return "Configuration parse error";
+        case ETHERVOX_ERROR_CONFIG_VALIDATION_FAILED: return "Configuration validation failed";
+        case ETHERVOX_ERROR_SETTING_NOT_FOUND: return "Setting not found";
+        case ETHERVOX_ERROR_SETTING_INVALID_VALUE: return "Setting invalid value";
+        
+        // Dialogue/Conversation errors
+        case ETHERVOX_ERROR_DIALOGUE_INIT: return "Dialogue initialization failed";
+        case ETHERVOX_ERROR_CONVERSATION_FAILED: return "Conversation failed";
+        case ETHERVOX_ERROR_VOICE_TRAINING_FAILED: return "Voice training failed";
+        case ETHERVOX_ERROR_SESSION_NOT_FOUND: return "Session not found";
+        case ETHERVOX_ERROR_SESSION_EXPIRED: return "Session expired";
         
         default: return "Unknown error";
     }

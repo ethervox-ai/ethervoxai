@@ -111,8 +111,8 @@ int main(int argc, char* argv[]) {
         
         printf("   Starting download...\n\n");
         
-        int result = ethervox_model_manager_ensure_available(manager, selected_model);
-        if (result != ETHERVOX_SUCCESS) {
+        ethervox_result_t result = ethervox_model_manager_ensure_available(manager, selected_model);
+        if (ethervox_is_error(result)) {
             fprintf(stderr, "\n   ERROR: Failed to download model (error %d)\n", result);
             fprintf(stderr, "   Please download manually from:\n");
             fprintf(stderr, "   %s\n", selected_model->url);
@@ -150,8 +150,8 @@ int main(int argc, char* argv[]) {
     llm_config.temperature = 0.7f;
     llm_config.use_gpu = false;
     
-    int result = ethervox_llm_backend_init(backend, &llm_config);
-    if (result != ETHERVOX_SUCCESS) {
+    ethervox_result_t result = ethervox_llm_backend_init(backend, &llm_config);
+    if (ethervox_is_error(result)) {
         fprintf(stderr, "   ERROR: Failed to initialize backend\n");
         ethervox_llm_backend_free(backend);
         ethervox_model_manager_destroy(manager);

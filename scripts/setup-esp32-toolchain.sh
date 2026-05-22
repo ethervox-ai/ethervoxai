@@ -59,10 +59,29 @@ echo ""
 echo "Verifying ESP-IDF installation..."
 idf.py --version
 
+# Clone llama.cpp if not present
+echo ""
+echo "Setting up llama.cpp..."
+mkdir -p "${PROJECT_ROOT}/external"
+
+if [ ! -d "${PROJECT_ROOT}/external/llama.cpp" ]; then
+    echo "Cloning llama.cpp..."
+    cd "${PROJECT_ROOT}/external"
+    git clone https://github.com/ggerganov/llama.cpp.git
+    echo "✓ llama.cpp cloned successfully"
+else
+    echo "✓ llama.cpp already present"
+    echo "Updating llama.cpp..."
+    cd "${PROJECT_ROOT}/external/llama.cpp"
+    git pull origin master || echo "Note: Could not update llama.cpp (possibly local changes)"
+fi
+
+cd "${PROJECT_ROOT}"
+
 echo ""
 echo "=========================================="
 echo "  ESP32 Setup Complete!"
-echo "=========================================="
+echo "========================================="
 echo ""
 echo "ESP-IDF Path: $IDF_PATH"
 echo "Python: $(which python)"

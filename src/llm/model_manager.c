@@ -287,7 +287,7 @@ ethervox_model_status_t ethervox_model_manager_get_status(
     return ETHERVOX_MODEL_STATUS_AVAILABLE;
 }
 
-int ethervox_model_manager_get_path(
+ethervox_result_t ethervox_model_manager_get_path(
     ethervox_model_manager_t* manager,
     const ethervox_model_info_t* model_info,
     char* path_buffer,
@@ -383,7 +383,7 @@ static int download_with_wininet(ethervox_model_manager_t* manager,
     HINTERNET hInternet = NULL;
     HINTERNET hUrl = NULL;
     FILE* fp = NULL;
-    int result = ETHERVOX_ERROR_FAILED;
+    ethervox_result_t result = ETHERVOX_ERROR_FAILED;
     
     // Initialize WinINet
     hInternet = InternetOpenA("EthervoxAI-ModelManager/1.0",
@@ -447,7 +447,7 @@ static int download_with_wininet(ethervox_model_manager_t* manager,
 }
 #endif
 
-int ethervox_model_manager_download(
+ethervox_result_t ethervox_model_manager_download(
     ethervox_model_manager_t* manager,
     const ethervox_model_info_t* model_info) {
     
@@ -489,7 +489,7 @@ int ethervox_model_manager_download(
 #endif
 }
 
-int ethervox_model_manager_ensure_available(
+ethervox_result_t ethervox_model_manager_ensure_available(
     ethervox_model_manager_t* manager,
     const ethervox_model_info_t* model_info) {
     
@@ -518,13 +518,13 @@ uint64_t ethervox_model_manager_get_available_space(const char* path) {
     if (GetDiskFreeSpaceExA(path, &free_bytes, NULL, NULL)) {
         return (uint64_t)free_bytes.QuadPart;
     }
-    return 0;
+    return ETHERVOX_SUCCESS;
 #else
     struct statvfs stat;
     if (statvfs(path, &stat) == 0) {
         return (uint64_t)stat.f_bavail * stat.f_frsize;
     }
-    return 0;
+    return ETHERVOX_SUCCESS;
 #endif
 }
 
@@ -539,7 +539,7 @@ bool ethervox_model_manager_has_enough_space(const char* path, uint64_t required
     return available >= required_with_buffer;
 }
 
-int ethervox_model_manager_delete_model(
+ethervox_result_t ethervox_model_manager_delete_model(
     ethervox_model_manager_t* g_manager,
     const ethervox_model_info_t* model_info) {
     
@@ -548,7 +548,7 @@ int ethervox_model_manager_delete_model(
     }
     
     char path[1024];
-    int result = ethervox_model_manager_get_path(g_manager, model_info, path, sizeof(path));
+    ethervox_result_t result = ethervox_model_manager_get_path(g_manager, model_info, path, sizeof(path));
     if (result != ETHERVOX_SUCCESS) {
         return result;
     }
@@ -562,7 +562,7 @@ int ethervox_model_manager_delete_model(
     return ETHERVOX_SUCCESS;
 }
 
-int ethervox_model_manager_clean_cache(ethervox_model_manager_t* manager) {
+ethervox_result_t ethervox_model_manager_clean_cache(ethervox_model_manager_t* manager) {
     if (!manager) {
         return ETHERVOX_ERROR_INVALID_ARGUMENT;
     }

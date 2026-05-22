@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #include "ethervox/audio.h"
+#include "ethervox/error.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,6 +39,7 @@ typedef struct {
   bool enable_partial_results;  // Stream partial transcriptions
   bool enable_punctuation;      // Add punctuation to results
   float vad_threshold;          // Voice activity detection threshold
+  bool translate_to_english;    // Translate non-English speech to English (Whisper only)
 } ethervox_stt_config_t;
 
 /**
@@ -81,17 +83,17 @@ ethervox_stt_config_t ethervox_stt_get_default_config(void);
  *
  * @param runtime STT runtime structure
  * @param config Configuration (NULL for defaults)
- * @return 0 on success, -1 on error
+ * @return ETHERVOX_SUCCESS on success, error code otherwise
  */
-int ethervox_stt_init(ethervox_stt_runtime_t* runtime, const ethervox_stt_config_t* config);
+ethervox_result_t ethervox_stt_init(ethervox_stt_runtime_t* runtime, const ethervox_stt_config_t* config);
 
 /**
  * Start STT processing session
  *
  * @param runtime STT runtime
- * @return 0 on success, -1 on error
+ * @return ETHERVOX_SUCCESS on success, error code otherwise
  */
-int ethervox_stt_start(ethervox_stt_runtime_t* runtime);
+ethervox_result_t ethervox_stt_start(ethervox_stt_runtime_t* runtime);
 
 /**
  * Process audio for speech recognition
@@ -99,9 +101,9 @@ int ethervox_stt_start(ethervox_stt_runtime_t* runtime);
  * @param runtime STT runtime
  * @param audio_buffer Audio buffer from ethervox_audio_read()
  * @param result Recognition result (output, can be partial)
- * @return 0 on success, -1 on error, 1 if no result yet
+ * @return ETHERVOX_SUCCESS on success, error code otherwise, 1 if no result yet
  */
-int ethervox_stt_process(ethervox_stt_runtime_t* runtime,
+ethervox_result_t ethervox_stt_process(ethervox_stt_runtime_t* runtime,
                          const ethervox_audio_buffer_t* audio_buffer,
                          ethervox_stt_result_t* result);
 
@@ -110,9 +112,9 @@ int ethervox_stt_process(ethervox_stt_runtime_t* runtime,
  *
  * @param runtime STT runtime
  * @param result Final recognition result (output)
- * @return 0 on success, -1 on error
+ * @return ETHERVOX_SUCCESS on success, error code otherwise
  */
-int ethervox_stt_finalize(ethervox_stt_runtime_t* runtime, ethervox_stt_result_t* result);
+ethervox_result_t ethervox_stt_finalize(ethervox_stt_runtime_t* runtime, ethervox_stt_result_t* result);
 
 /**
  * Stop STT processing session
@@ -125,9 +127,61 @@ void ethervox_stt_stop(ethervox_stt_runtime_t* runtime);
 void ethervox_stt_result_free(ethervox_stt_result_t* result);
 
 /**
+ * Set language for transcription (hot-switch without re-init)
+ * 
+ * @param runtime STT runtime
+ * @param language Language code ("en", "es", "zh", etc.) or "auto" for detection
+ * @return ETHERVOX_SUCCESS on success, error code otherwise
+ */
+ethervox_result_t ethervox_stt_set_language(ethervox_stt_runtime_t* runtime, const char* language);
+
+/**
  * Cleanup STT engine
  */
 void ethervox_stt_cleanup(ethervox_stt_runtime_t* runtime);
+
+// Backend-specific functions (internal)
+ethervox_result_t ethervox_stt_whisper_init(ethervox_stt_runtime_t* runtime);
+ethervox_result_t ethervox_stt_whisper_start(ethervox_stt_runtime_t* runtime);
+ethervox_result_t ethervox_stt_whisper_process(ethervox_stt_runtime_t* runtime,
+                                  const ethervox_audio_buffer_t* audio_buffer,
+                                  ethervox_stt_result_t* result);
+ethervox_result_t ethervox_stt_whisper_finalize(ethervox_stt_runtime_t* runtime, ethervox_stt_result_t* result);
+void ethervox_stt_whisper_stop(ethervox_stt_runtime_t* runtime);
+void ethervox_stt_whisper_cleanup(ethervox_stt_runtime_t* runtime);
+
+// Vosk backend functions
+ethervox_result_t ethervox_stt_vosk_init(ethervox_stt_runtime_t* runtime);
+ethervox_result_t ethervox_stt_vosk_start(ethervox_stt_runtime_t* runtime);
+ethervox_result_t ethervox_stt_vosk_process(ethervox_stt_runtime_t* runtime,
+                               const ethervox_audio_buffer_t* audio_buffer,
+                               ethervox_stt_result_t* result);
+ethervox_result_t ethervox_stt_vosk_finalize(ethervox_stt_runtime_t* runtime, ethervox_stt_result_t* result);
+void ethervox_stt_vosk_stop(ethervox_stt_runtime_t* runtime);
+void ethervox_stt_vosk_cleanup(ethervox_stt_runtime_t* runtime);
+
+// Testing utilities
+/**
+ * Test Whisper with a WAV file
+ * 
+ * @param runtime STT runtime (must be initialized)
+ * @param wav_file Path to 16kHz mono WAV file
+ * @param result Output transcription result
+ * @return 0 on success, negative on error
+ */
+int ethervox_whisper_test_wav(
+    ethervox_stt_runtime_t* runtime,
+    const char* wav_file,
+    ethervox_stt_result_t* result
+);
+
+/**
+ * Quick test using the JFK sample (expected to work out of box)
+ * 
+ * @param runtime STT runtime (must be initialized)
+ * @return 0 on success, negative on error
+ */
+int ethervox_whisper_test_jfk(ethervox_stt_runtime_t* runtime);
 
 #ifdef __cplusplus
 }

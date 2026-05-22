@@ -15,12 +15,14 @@
  */
 
 #include <assert.h>
+#include "ethervox/error.h"
 #include <stdio.h>
 #include <string.h>
 
 #include "ethervox/audio.h"
 #include "ethervox/config.h"
-#include "ethervox/dialogue.h"
+#include "ethervox/governor.h"
+#include "ethervox/tool_registry.h"
 #include "ethervox/plugins.h"
 
 void test_system_initialization() {
@@ -39,18 +41,28 @@ void test_system_initialization() {
     printf("  ⚠ Audio subsystem failed to initialize (no hardware, expected)\n");
   }
 
-  // Test dialogue subsystem
-  ethervox_dialogue_engine_t dialogue_engine;
-  // int dialogue_result = ethervox_dialogue_init(&dialogue_engine, "en");
-  ethervox_llm_config_t llm_config = ethervox_dialogue_get_default_llm_config();
-  llm_config.language_code = "en";
-  int dialogue_result = ethervox_dialogue_init(&dialogue_engine, &llm_config);
-  if (dialogue_result == 0) {
-    printf("  ✓ Dialogue engine initialized successfully\n");
-    ethervox_dialogue_cleanup(&dialogue_engine);
+  // Test governor subsystem (new architecture)
+  ethervox_governor_t governor;
+  memset(&governor, 0, sizeof(governor));
+  
+  ethervox_tool_registry_t registry;
+  ethervox_tool_registry_init(&registry, 8);
+  
+  ethervox_governor_config_t gov_config = {
+    .max_iterations = 5,
+    .confidence_threshold = 0.7f,
+    .system_prompt_mode = ETHERVOX_GOVERNOR_MODE_FULL
+  };
+  
+  int governor_result = ethervox_governor_init(&governor, &gov_config, &registry);
+  if (governor_result == 0) {
+    printf("  ✓ Governor initialized successfully\n");
+    ethervox_governor_cleanup(&governor);
   } else {
-    printf("  ⚠ Dialogue engine failed to initialize (missing models, expected)\n");
+    printf("  ⚠ Governor failed to initialize (missing models, expected)\n");
   }
+  
+  ethervox_tool_registry_cleanup(&registry);
 
   // Test plugin manager
   ethervox_plugin_manager_t plugin_manager;
@@ -163,5 +175,5 @@ int main() {
   printf("Note: Some subsystem failures are expected in CI environments\n");
   printf("without audio hardware or language models.\n");
 
-  return 0;
+  return ETHERVOX_SUCCESS;
 }

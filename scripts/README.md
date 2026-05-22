@@ -4,6 +4,123 @@ This folder contains utility scripts for building, deploying, and setting up cro
 
 ---
 
+## download-governor-model.sh
+**Purpose:** Downloads the Qwen2.5-3B-Instruct quantized model for Governor orchestration.
+
+**Usage:**
+```bash
+./scripts/download-governor-model.sh
+```
+
+**Details:**
+- Downloads ~2GB Q4_K_M quantized GGUF model
+- Saves to `models/Qwen2.5-3B-Instruct-Q4_K_M.gguf`
+- Requires curl or wget
+- Resumes interrupted downloads
+
+**Example:**
+```bash
+./scripts/download-governor-model.sh
+# Model will be saved to: models/Qwen2.5-3B-Instruct-Q4_K_M.gguf
+```
+
+---
+
+## download-whisper-model.sh
+**Purpose:** Downloads Whisper STT models in GGML format for voice transcription.
+
+**Usage:**
+```bash
+./scripts/download-whisper-model.sh [model_name] [dest_dir]
+```
+
+**Parameters:**
+- `model_name` (optional): Model to download, defaults to `base`
+- `dest_dir` (optional): Destination directory, defaults to `~/.ethervox/models/whisper`
+
+**Available Models:**
+- `tiny.en` (~75 MB) - Fastest, English-only
+- `base` (~141 MB) - Multilingual, good balance **(DEFAULT)**
+- `base.en` (~141 MB) - Good balance, English-only
+- `small.en` (~466 MB) - Better accuracy, English-only
+- `medium.en` (~1.5 GB) - High accuracy, English-only
+- `tiny` (~75 MB) - Multilingual (99 languages)
+- `base` (~141 MB) - Multilingual
+- `small` (~466 MB) - Multilingual, better accuracy
+
+**Details:**
+- Downloads from HuggingFace (ggerganov/whisper.cpp)
+- Auto-validates file size
+- Requires curl or wget
+
+**Examples:**
+```bash
+# Download default model (base)
+./scripts/download-whisper-model.sh
+
+# Download specific model
+./scripts/download-whisper-model.sh small.en
+
+# Download to custom location
+./scripts/download-whisper-model.sh base ~/mymodels/whisper
+```
+
+**Auto-Download:**
+Voice tools will automatically attempt to download `base` (multilingual) if no model is found during initialization. The download script can also be run manually for other models or custom locations, including the English-only `.en` variants if desired.
+
+---
+
+## download-piper-model.sh
+**Purpose:** Downloads Piper neural TTS models in ONNX format for high-quality text-to-speech.
+
+**Usage:**
+```bash
+./scripts/download-piper-model.sh [voice_name] [dest_dir]
+```
+
+**Parameters:**
+- `voice_name` (optional) - Voice identifier (default: `en_US-lessac-medium`)
+- `dest_dir` (optional) - Destination directory (default: `~/.ethervox/models/piper`)
+
+**Multilingual Support - 40+ Languages:**
+- English (US/UK): `en_US-lessac-medium` (recommended), `en_GB-alan-medium`
+- Spanish: `es_MX-ald-medium`, `es_ES-mls_10246-low`
+- French: `fr_FR-siwis-medium`, `fr_FR-tom-medium`
+- German: `de_DE-thorsten-medium`, `de_DE-eva_k-medium`
+- Italian: `it_IT-riccardo-medium`
+- Portuguese: `pt_BR-faber-medium`
+- Russian: `ru_RU-ruslan-medium`
+- Chinese (Mandarin): `zh_CN-huayan-medium`
+- Japanese: `ja_JP-natsuya_enu-medium`
+- Korean: `ko_KR-kss-medium`
+- Arabic: `ar_JO-kareem-medium`
+- Hindi: `hi_IN-wavylocal-medium`
+- Plus many more! Run `./scripts/download-piper-model.sh list` for full list
+
+**Features:**
+- Downloads ONNX model + JSON config from HuggingFace (rhasspy/piper-voices)
+- Validates both files are present
+- Shows download progress
+- Idempotent (skips if already downloaded)
+
+**Examples:**
+```bash
+# Download default voice (lessac medium)
+./scripts/download-piper-model.sh
+
+# Download specific voice
+./scripts/download-piper-model.sh en_US-amy-medium
+
+# Custom destination
+./scripts/download-piper-model.sh en_US-lessac-high ~/custom/path
+```
+
+**Dependencies:**
+- Requires ONNX Runtime: `brew install onnxruntime` (macOS)
+- Used with AEC for echo-cancelled voice conversations
+
+---
+
 ## build.sh
 **Purpose:** Cross-platform build orchestrator for EthervoxAI.
 
