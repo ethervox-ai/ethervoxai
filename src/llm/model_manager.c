@@ -329,13 +329,30 @@ static int download_with_curl(ethervox_model_manager_t* manager,
         return ETHERVOX_ERROR_FAILED;
     }
     
-    // Open file for writing (portable)
+    // Open file for writing
+#ifdef _WIN32
     FILE* fp = fopen(dest_path, "wb");
     if (!fp) {
         ETHERVOX_LOG_ERROR("Failed to create file for writing: %s", dest_path);
         curl_easy_cleanup(curl);
         return ETHERVOX_ERROR_FAILED;
     }
+#else
+    int fd = open(dest_path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        ETHERVOX_LOG_ERROR("Failed to create file for writing: %s", dest_path);
+        curl_easy_cleanup(curl);
+        return ETHERVOX_ERROR_FAILED;
+    }
+
+    FILE* fp = fdopen(fd, "wb");
+    if (!fp) {
+        ETHERVOX_LOG_ERROR("Failed to associate stream with file descriptor for: %s", dest_path);
+        close(fd);
+        curl_easy_cleanup(curl);
+        return ETHERVOX_ERROR_FAILED;
+    }
+#endif
     
     // Setup download context
     download_context_t ctx;
