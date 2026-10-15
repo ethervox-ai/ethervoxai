@@ -218,6 +218,16 @@ struct mtmd_context* ethervox_model_handle_get_mtmd(
 );
 
 /**
+ * Serialize inference on a model handle. Callers that drive the handle's llama_context directly
+ * (e.g. ethervox_vision_generate) must hold this for the whole decode, the same lock the pool's
+ * own generation paths take.
+ */
+void ethervox_model_handle_lock(ethervox_model_handle_t* handle);
+
+/** Releases the lock taken by ethervox_model_handle_lock(). */
+void ethervox_model_handle_unlock(ethervox_model_handle_t* handle);
+
+/**
  * Memory pressure callback (C3.4)
  * 
  * Called by the host when the OS signals memory pressure. The pool will evict

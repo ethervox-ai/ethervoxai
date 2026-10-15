@@ -678,6 +678,18 @@ struct mtmd_context* ethervox_model_handle_get_mtmd(
     return handle ? handle->mtmd_ctx : NULL;
 }
 
+void ethervox_model_handle_lock(ethervox_model_handle_t* handle) {
+    if (handle) {
+        MUTEX_LOCK(handle->inference_mutex);
+    }
+}
+
+void ethervox_model_handle_unlock(ethervox_model_handle_t* handle) {
+    if (handle) {
+        MUTEX_UNLOCK(handle->inference_mutex);
+    }
+}
+
 // ============================================================================
 // C3.4: Memory Pressure and LRU Eviction
 // ============================================================================
