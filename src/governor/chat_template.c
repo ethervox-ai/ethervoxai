@@ -8,6 +8,7 @@
 
 #include "ethervox/chat_template.h"
 #include "ethervox/error.h"
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -84,6 +85,31 @@ static const chat_template_t granite4_template = {
         NULL
     },
     .stop_sequence_count = 4,
+    .tool_format = TOOL_FORMAT_JSON_IN_XML,
+    .ignore_eog = false
+};
+
+// IBM Granite 4.2+ template (chat_template.jinja of ibm-granite/granite-4.2-*): ChatML roles,
+// <think>...</think> reasoning, and tool calls as <tool_call><function=NAME><parameter=K>V.
+// Tool results are a user turn holding <tool_response>.
+static const chat_template_t granite42_template = {
+    .type = CHAT_TEMPLATE_GRANITE_4_2,
+    .system_start = "<|im_start|>system\n",
+    .system_end = "<|im_end|>\n",
+    .user_start = "<|im_start|>user\n",
+    .user_end = "<|im_end|>\n",
+    .assistant_start = "<|im_start|>assistant\n",
+    .assistant_end = "<|im_end|>\n",
+    .tool_result_start = "<|im_start|>user\n<tool_response>\n",
+    .tool_result_end = "\n</tool_response>\n<|im_end|>\n<|im_start|>assistant\n",
+    .tool_response_start = "<|im_start|>user\n<tool_response>\n",
+    .tool_response_end = "\n</tool_response>\n<|im_end|>\n",
+    .stop_sequences = {
+        "<|im_end|>",
+        "<|im_start|>",
+        NULL
+    },
+    .stop_sequence_count = 2,
     .tool_format = TOOL_FORMAT_JSON_IN_XML,
     .ignore_eog = false
 };
@@ -188,6 +214,12 @@ chat_template_type_t chat_template_detect(const char* model_path) {
     
     // Check for Granite
     if (strstr(lower_path, "granite")) {
+        // Granite 4.2 and later: reasoning models with their own (ChatML) format.
+        const char* four = strstr(lower_path, "granite-4.");
+        if (!four) four = strstr(lower_path, "granite_4.");
+        if (four && atoi(four + strlen("granite-4.")) >= 2) {
+            return CHAT_TEMPLATE_GRANITE_4_2;
+        }
         // Check for version 3
         if (strstr(lower_path, "granite-3") || strstr(lower_path, "granite_3")) {
             return CHAT_TEMPLATE_GRANITE_3;
@@ -215,6 +247,10 @@ chat_template_type_t chat_template_detect(const char* model_path) {
     return CHAT_TEMPLATE_QWEN;
 }
 
+bool chat_template_supports_thinking(const chat_template_t* tmpl) {
+    return tmpl && tmpl->type == CHAT_TEMPLATE_GRANITE_4_2;
+}
+
 const chat_template_t* chat_template_get(chat_template_type_t type, const char* model_path) {
     // Auto-detect if requested
     if (type == CHAT_TEMPLATE_AUTO && model_path) {
@@ -228,6 +264,8 @@ const chat_template_t* chat_template_get(chat_template_type_t type, const char* 
             return &granite3_template;
         case CHAT_TEMPLATE_GRANITE_4:  // CHAT_TEMPLATE_GRANITE is an alias for this
             return &granite4_template;
+        case CHAT_TEMPLATE_GRANITE_4_2:
+            return &granite42_template;
         case CHAT_TEMPLATE_PHI:
             return &phi_template;
         case CHAT_TEMPLATE_LLAMA3:

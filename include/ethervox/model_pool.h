@@ -218,6 +218,12 @@ struct mtmd_context* ethervox_model_handle_get_mtmd(
 );
 
 /**
+ * The path the model was loaded from (valid while the handle lives), or NULL. Used to pick the
+ * model's chat template.
+ */
+const char* ethervox_model_handle_get_path(ethervox_model_handle_t* handle);
+
+/**
  * Serialize inference on a model handle. Callers that drive the handle's llama_context directly
  * (e.g. ethervox_vision_generate) must hold this for the whole decode, the same lock the pool's
  * own generation paths take.

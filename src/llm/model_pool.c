@@ -678,6 +678,10 @@ struct mtmd_context* ethervox_model_handle_get_mtmd(
     return handle ? handle->mtmd_ctx : NULL;
 }
 
+const char* ethervox_model_handle_get_path(ethervox_model_handle_t* handle) {
+    return handle ? handle->model_path : NULL;
+}
+
 void ethervox_model_handle_lock(ethervox_model_handle_t* handle) {
     if (handle) {
         MUTEX_LOCK(handle->inference_mutex);

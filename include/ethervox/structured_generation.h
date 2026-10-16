@@ -81,7 +81,42 @@ typedef struct {
      */
     const ethervox_chat_turn_t* history;
     uint32_t history_count;
+    /**
+     * How much the model reasons before answering -- an `ethervox_thinking_mode_t`. Only models
+     * with thinking modes (Granite 4.2+, `chat_template_supports_thinking`) act on it; others
+     * ignore it. 0 (default) = the model's own default (full thinking).
+     */
+    int32_t thinking_mode;
 } ethervox_structured_gen_params_t;
+
+/**
+ * Thinking modes of Granite 4.2+ (https://www.ibm.com/granite/docs/models/granite4-2).
+ */
+typedef enum {
+    ETHERVOX_THINKING_DEFAULT = 0,  /**< The model's default: full thinking */
+    ETHERVOX_THINKING_OFF = 1,      /**< No reasoning: a direct answer (`enable_thinking=False`) */
+    ETHERVOX_THINKING_LOW = 2,      /**< Brief reasoning for simpler queries (`low_effort=True`) */
+    ETHERVOX_THINKING_FULL = 3      /**< Full chain-of-thought reasoning in <think>...</think> */
+} ethervox_thinking_mode_t;
+
+/**
+ * As ethervox_structured_render_prompt_with_history, for the model at `model_path` (its chat
+ * template is detected from the file name; NULL = Granite 4.0/4.1) and a thinking mode. Granite 4.2+
+ * is rendered exactly as its chat_template.jinja does: ChatML roles, `<think></think>` on earlier
+ * assistant turns, tool calls as `<function=NAME><parameter=K>` blocks (the JSON `<tool_call>`
+ * envelope the caller supplies is converted), and the generation prompt opening `<think>`.
+ */
+ethervox_result_t ethervox_structured_render_prompt_for_model(
+    const char* system_prompt,
+    const ethervox_chat_turn_t* history,
+    uint32_t history_count,
+    const char* prompt,
+    const ethervox_chat_turn_t* turns,
+    uint32_t turn_count,
+    const char* model_path,
+    int32_t thinking_mode,
+    char** out
+);
 
 /**
  * Renders system + user + `turns` + the assistant-start marker exactly as
