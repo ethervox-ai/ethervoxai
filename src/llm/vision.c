@@ -29,6 +29,35 @@
 #define VISION_PROMPT_PREFIX "<|start_of_role|>user<|end_of_role|>"
 #define VISION_PROMPT_SUFFIX "<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>"
 
+// Greedy decoding can fall into a loop, repeating one passage until the token cap (a page that
+// should take seconds then takes minutes). The tail is a loop when the same stretch occurs again
+// and again until the repetition spans at least VISION_LOOP_MIN_SPAN bytes (and at least
+// VISION_LOOP_MIN_REPEATS times). Returns the stretch's length and sets *repeats, or returns 0
+// when there is no loop. Runs of a single short unit (dot leaders, rules) are left alone.
+#define VISION_LOOP_MIN_PERIOD 6
+#define VISION_LOOP_MAX_PERIOD 600
+#define VISION_LOOP_MIN_REPEATS 4
+#define VISION_LOOP_MIN_SPAN 160
+#define VISION_LOOP_CHECK_EVERY 32
+
+static size_t tail_loop_period(const char* text, size_t len, size_t* repeats_out) {
+  for (size_t period = VISION_LOOP_MIN_PERIOD; period <= VISION_LOOP_MAX_PERIOD; period++) {
+    size_t needed = (VISION_LOOP_MIN_SPAN + period - 1) / period;
+    if (needed < VISION_LOOP_MIN_REPEATS) needed = VISION_LOOP_MIN_REPEATS;
+    if (len < period * needed) continue;
+    const char* tail = text + len - period;
+    size_t repeats = 1;
+    while (repeats < needed && memcmp(tail, tail - period * repeats, period) == 0) {
+      repeats++;
+    }
+    if (repeats >= needed) {
+      *repeats_out = repeats;
+      return period;
+    }
+  }
+  return 0;
+}
+
 static ethervox_result_t decode_locked(
     ethervox_model_handle_t* handle, const void* image, size_t image_size, const char* prompt,
     uint32_t max_tokens, const ethervox_cancel_token_t* cancel, char** out_text) {
@@ -95,6 +124,7 @@ static ethervox_result_t decode_locked(
   ethervox_result_t result = ETHERVOX_SUCCESS;
   if (max_tokens == 0) max_tokens = VISION_DEFAULT_MAX_TOKENS;
   llama_pos pos = n_past;
+  llama_batch batch = llama_batch_init(1, 0, 1);
   for (uint32_t i = 0; i < max_tokens; i++) {
     if (cancel && ethervox_cancel_token_is_cancelled(cancel)) {
       result = ETHERVOX_ERROR_INTERRUPTED;
@@ -124,7 +154,18 @@ static ethervox_result_t decode_locked(
       out[len] = '\0';
     }
 
-    llama_batch batch = llama_batch_init(1, 0, 1);
+    if (i % VISION_LOOP_CHECK_EVERY == VISION_LOOP_CHECK_EVERY - 1) {
+      size_t repeats = 0;
+      size_t period = tail_loop_period(out, len, &repeats);
+      if (period > 0) {
+        // The page was not read: what came before the loop is as likely to be garbage as text,
+        // so report failure and let the caller fall back to another reader.
+        ETHERVOX_LOG_WARN("[Vision] output was repeating itself after %u tokens; giving up", i + 1);
+        (void)repeats;
+        result = ETHERVOX_ERROR_FAILED;
+        break;
+      }
+    }
     batch.n_tokens = 1;
     batch.token[0] = token;
     batch.pos[0] = pos;
@@ -132,7 +173,6 @@ static ethervox_result_t decode_locked(
     batch.seq_id[0][0] = 0;
     batch.logits[0] = true;
     int rc = llama_decode(ctx, batch);
-    llama_batch_free(batch);
     if (rc != 0) {
       ETHERVOX_LOG_ERROR("[Vision] llama_decode failed (rc=%d)", rc);
       result = ETHERVOX_ERROR_FAILED;
@@ -140,6 +180,7 @@ static ethervox_result_t decode_locked(
     }
     pos++;
   }
+  llama_batch_free(batch);
   llama_sampler_free(sampler);
 
   if (result != ETHERVOX_SUCCESS) {
