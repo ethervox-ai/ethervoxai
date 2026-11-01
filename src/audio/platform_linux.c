@@ -298,4 +298,24 @@ ethervox_result_t ethervox_audio_register_platform_driver(ethervox_audio_runtime
   return ETHERVOX_SUCCESS;
 }
 
+#include <math.h>
+
+/**
+ * RMS energy of a block of normalized float samples. Android, macOS and Windows define the same
+ * function in their platform files; the Linux build was missing it, so voice_conversation.c did not link.
+ */
+float ethervox_audio_calculate_rms_energy(const float* samples, uint32_t count) {
+  if (!samples || count == 0) {
+    return 0.0f;
+  }
+
+  double sum_sq = 0.0;
+  for (uint32_t i = 0; i < count; i++) {
+    double sample = (double)samples[i];
+    sum_sq += sample * sample;
+  }
+
+  return (float)sqrt(sum_sq / (double)count);
+}
+
 #endif  // ETHERVOX_PLATFORM_LINUX
