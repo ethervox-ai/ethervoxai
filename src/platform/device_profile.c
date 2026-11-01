@@ -13,6 +13,9 @@
 #include "ethervox/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #ifdef __ANDROID__
 #include <sys/system_properties.h>
@@ -78,7 +81,17 @@ static void detect_memory(long* total_mb, long* available_mb) {
   }
 #endif
   
-#if defined(_SC_PHYS_PAGES) && defined(_SC_PAGESIZE)
+#ifdef _WIN32
+  {
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    if (GlobalMemoryStatusEx(&status)) {
+      *total_mb = (long)(status.ullTotalPhys / (1024 * 1024));
+      *available_mb = (*total_mb) / 2;  // same conservative estimate as elsewhere
+      return;
+    }
+  }
+#elif defined(_SC_PHYS_PAGES) && defined(_SC_PAGESIZE)
   {
     long pages = sysconf(_SC_PHYS_PAGES);
     long page_size = sysconf(_SC_PAGESIZE);

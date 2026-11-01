@@ -48,7 +48,7 @@ static void cleanup_test_dir(void) {
 static void create_text_file(const char* filename, const char* content) {
     char path[512];
     snprintf(path, sizeof(path), "%s/%s", TEST_DIR, filename);
-    FILE* f = fopen(path, "w");
+    FILE* f = fopen(path, "wb");
     CHECK(f != NULL);
     fputs(content, f);
     fclose(f);
@@ -68,7 +68,7 @@ static void create_binary_file(const char* filename, const unsigned char* data, 
 static void create_large_text_file(const char* filename, size_t size_kb) {
     char path[512];
     snprintf(path, sizeof(path), "%s/%s", TEST_DIR, filename);
-    FILE* f = fopen(path, "w");
+    FILE* f = fopen(path, "wb");
     CHECK(f != NULL);
     
     // Write repeated content to reach desired size

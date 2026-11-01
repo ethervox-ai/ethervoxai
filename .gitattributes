@@ -1,0 +1,4 @@
+
+# Golden fixtures are compared byte-for-byte; never let a checkout rewrite their line endings
+tests/**/*.gbnf text eol=lf
+tests/**/*.json text eol=lf

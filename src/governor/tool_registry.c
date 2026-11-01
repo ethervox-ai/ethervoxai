@@ -52,7 +52,9 @@ ethervox_result_t ethervox_tool_registry_add(ethervox_tool_registry_t* registry,
     
     // Expand capacity if needed
     if (registry->tool_count >= registry->capacity) {
-        uint32_t new_capacity = registry->capacity * 2;
+        // A zero-initialised registry has capacity 0; doubling that would realloc 0 bytes and the
+        // memcpy below would then write past the allocation.
+        uint32_t new_capacity = registry->capacity ? registry->capacity * 2 : 8;
         ethervox_tool_t* new_tools = (ethervox_tool_t*)realloc(
             registry->tools,
             new_capacity * sizeof(ethervox_tool_t)
