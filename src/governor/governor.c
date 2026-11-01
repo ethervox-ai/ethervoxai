@@ -3235,6 +3235,20 @@ static uint32_t compute_ngram_hash_djb2(const char* tokens[], int n) {
   return hash;
 }
 
+// N-gram repetition detector state, shared by the generation loop (which fills it) and
+// governor_should_stop() (which reads it). It used to be declared twice with different layouts and
+// sizes (an anonymous struct parameter here, a typedef inside the loop), so the checker read past the end
+// of the real object. One definition keeps them identical.
+#define NGRAM_SIZE 4
+#define MAX_NGRAM_HISTORY 100
+
+typedef struct {
+  uint32_t hashes[MAX_NGRAM_HISTORY];
+  char last_tokens[NGRAM_SIZE][128];
+  int history_count;
+  int token_count;
+} ngram_detector_t;
+
 /**
  * Consolidated stop condition checker - determines if generation should stop
  * 
@@ -3262,12 +3276,7 @@ static bool governor_should_stop(
     const char* buffer,
     int generated_count,
     int max_tokens,
-    const struct {
-      char last_tokens[8][128];
-      uint32_t hashes[256];
-      int token_count;
-      int history_count;
-    }* ngram_detector,
+    const ngram_detector_t* ngram_detector,
     const char** finish_reason,
     bool* should_include_token) {
   
@@ -3344,11 +3353,8 @@ static bool governor_should_stop(
   }
   
   // ========================================================================
-  // 4. Repetition loop detection (cycle ≤8 tokens repeated >3 times)
+  // 4. Repetition loop detection (a 4-token cycle seen more than 3 times)
   // ========================================================================
-  #define NGRAM_SIZE 8
-  #define MAX_NGRAM_HISTORY 256
-  
   if (ngram_detector && ngram_detector->token_count >= NGRAM_SIZE) {
     // Have full n-gram history - check for repetition
     // Build current n-gram hash (including the new token via text match)
@@ -4244,21 +4250,12 @@ ethervox_governor_status_t ethervox_governor_execute(
     // Increased from 8 to 16 for robust stop sequence detection (stop sequences
     // can span multiple tokens when tokenized, especially with special tokens)
     #define LOOKAHEAD_SIZE 16  // Buffer up to 16 tokens for stop sequence detection
-    #define MAX_NGRAM_HISTORY 100
-    #define NGRAM_SIZE 4
     
     typedef struct {
       char tokens[LOOKAHEAD_SIZE][128];
       int count;
     } token_lookahead_t;
     
-    typedef struct {
-      uint32_t hashes[MAX_NGRAM_HISTORY];
-      char last_tokens[NGRAM_SIZE][128];
-      int history_count;
-      int token_count;
-    } ngram_detector_t;
-
     // Track what we've STREAMED to the UI (not just generated)
     // Doubled size from 8192 to 16384 for safety margin
     char streamed_output_buffer[16384] = {0};  // Accumulates streamed tokens
