@@ -259,8 +259,9 @@ endif()
 
 # Define runtime directory paths based on platform
 if(TARGET_PLATFORM STREQUAL "WINDOWS")
-    # Windows: %USERPROFILE%\.ethervox
-    add_definitions(-DETHERVOX_RUNTIME_DIR_BASE="%USERPROFILE%\\\\.ethervox")
+    # Windows: %USERPROFILE%\.ethervox comes from the fallback in include/ethervox/config.h. It is not
+    # passed as a compile definition: a global -D with embedded quotes and %...% is rejected by MSVC
+    # (D8038) and, being global, also reached llama.cpp's targets.
 elseif(TARGET_PLATFORM STREQUAL "ANDROID")
     # Android: app-specific internal storage (handled at runtime via Java)
     add_definitions(-DETHERVOX_RUNTIME_DIR_BASE=NULL)
