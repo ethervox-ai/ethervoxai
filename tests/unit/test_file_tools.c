@@ -255,7 +255,7 @@ void test_large_file_rejected(void) {
     int result = ethervox_file_read(&config, path, &content, &size);
     
     // Should be rejected due to size
-    CHECK(result == -1);
+    CHECK(result == ETHERVOX_ERROR_INVALID_ARGUMENT);
     CHECK(content == NULL);
     
     ethervox_file_tools_cleanup(&config);
@@ -401,7 +401,7 @@ void test_extension_filtering(void) {
     // Should fail for .xyz
     char path2[512];
     snprintf(path2, sizeof(path2), "%s/not_allowed.xyz", TEST_DIR);
-    CHECK(ethervox_file_read(&config, path2, &content, &size) == -1);
+    CHECK(ethervox_file_read(&config, path2, &content, &size) == ETHERVOX_ERROR_INVALID_ARGUMENT);
     
     ethervox_file_tools_cleanup(&config);
     cleanup_test_dir();
@@ -434,7 +434,7 @@ void test_path_validation(void) {
     int result = ethervox_file_read(&config, "/tmp/outside.txt", &content, &size);
     
     // Should be rejected
-    CHECK(result == -1);
+    CHECK(result == ETHERVOX_ERROR_INVALID_ARGUMENT);
     CHECK(content == NULL);
     
     ethervox_file_tools_cleanup(&config);

@@ -168,9 +168,11 @@ static int test_wake_word_errors(void) {
     ethervox_wake_runtime_t runtime;
     memset(&runtime, 0, sizeof(runtime));
     
-    // NULL config
+    // NULL config selects the defaults (documented: "NULL for defaults")
     int result = ethervox_wake_init(&runtime, NULL);
-    CHECK(result != 0);
+    CHECK(result == 0);
+    ethervox_wake_cleanup(&runtime);
+    memset(&runtime, 0, sizeof(runtime));
     
     // Valid init
     ethervox_wake_config_t config = ethervox_wake_get_default_config();

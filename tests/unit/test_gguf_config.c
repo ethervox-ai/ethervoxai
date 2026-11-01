@@ -62,9 +62,9 @@ static void test_kv_cache_estimation(void) {
     CHECK(kv_8k > kv_4k);
     CHECK(kv_8k == kv_4k * 2);  // Should be exactly 2x
     
-    // For Phi-3.5 (32 layers), 8K context should be ~2GB
+    // 32 layers x 3072 dims x K+V x fp16 x 8192 tokens = exactly 3 GiB
     CHECK(kv_8k > 1500);  // At least 1.5GB
-    CHECK(kv_8k < 3000);  // Less than 3GB
+    CHECK(kv_8k < 4000);  // Less than 4GB
     
     printf("  ✓ KV cache estimation: 2K=%zu MB, 4K=%zu MB, 8K=%zu MB\n",
            kv_2k, kv_4k, kv_8k);
@@ -79,9 +79,10 @@ static void test_context_support(void) {
     // Initialize device profiling
     ethervox_device_profile_init();
     
-    ethervox_model_metadata_t metadata;
+    ethervox_model_metadata_t metadata = {0};
     metadata.context_length_train = 8192;
     metadata.layer_count = 32;
+    metadata.embedding_dims = 3072;
     metadata.model_size_bytes = 2ULL * 1024 * 1024 * 1024;  // 2GB
     
     // Small context should always be supported
@@ -147,9 +148,10 @@ static void test_tier_based_scaling(void) {
     
     ethervox_device_profile_init();
     
-    ethervox_model_metadata_t metadata;
+    ethervox_model_metadata_t metadata = {0};
     metadata.context_length_train = 16384;  // Large context model
     metadata.layer_count = 32;
+    metadata.embedding_dims = 3072;
     metadata.model_size_bytes = 2ULL * 1024 * 1024 * 1024;
     
     ethervox_runtime_config_t config;
@@ -172,9 +174,10 @@ static void test_config_consistency(void) {
     
     ethervox_device_profile_init();
     
-    ethervox_model_metadata_t metadata;
+    ethervox_model_metadata_t metadata = {0};
     metadata.context_length_train = 8192;
     metadata.layer_count = 32;
+    metadata.embedding_dims = 3072;
     metadata.model_size_bytes = 2ULL * 1024 * 1024 * 1024;
     
     ethervox_runtime_config_t config;
@@ -205,8 +208,10 @@ static void test_memory_constraints(void) {
     
     // Simulate large model (4GB)
     ethervox_model_metadata_t large_model;
+    memset(&large_model, 0, sizeof(large_model));
     large_model.context_length_train = 32768;
     large_model.layer_count = 32;
+    large_model.embedding_dims = 3072;
     large_model.model_size_bytes = 4ULL * 1024 * 1024 * 1024;
     
     ethervox_runtime_config_t config;
