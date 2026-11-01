@@ -109,6 +109,8 @@ jobs:
           build-essential \
           libasound2-dev \
           libcurl4-openssl-dev \
+          libncurses-dev \
+          libreadline-dev \
           libssl-dev \
           pkg-config \
           ninja-build
