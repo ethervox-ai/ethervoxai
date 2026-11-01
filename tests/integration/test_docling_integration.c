@@ -34,7 +34,9 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#ifndef _WIN32
 #include <pwd.h>
+#endif
 
 // Expand ~ in paths to home directory
 static char* expand_tilde(const char* path) {
@@ -44,8 +46,12 @@ static char* expand_tilde(const char* path) {
     
     const char* home = getenv("HOME");
     if (!home) {
+#ifdef _WIN32
+        home = getenv("USERPROFILE");
+#else
         struct passwd* pw = getpwuid(getuid());
         home = pw ? pw->pw_dir : NULL;
+#endif
     }
     if (!home) {
         return strdup(path);  // fallback

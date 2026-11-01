@@ -72,6 +72,7 @@ jobs:
             platform: windows
             cmake_preset: windows-release
             cmake_platform: WINDOWS
+            shell: 'msys2 {0}'
           - os: macos-latest
             platform: macos
             cmake_preset: macos-release
@@ -116,15 +117,23 @@ jobs:
           pkg-config \
           ninja-build
 
-    - name: Install Windows dependencies
+    # Windows is built with MinGW-w64 (GCC) via MSYS2, not MSVC: the core relies on GNU C
+    # (statement attributes, variable-length arrays) and POSIX headers that MSVC lacks.
+    # Note a MinGW-built core links into a Rust x86_64-pc-windows-gnu target, not -msvc.
+    - name: Setup MSYS2 (MinGW-w64)
       if: matrix.platform == 'windows'
-      run: |
-        choco install ninja
-        # Windows SDK and MSVC are pre-installed on GitHub runners
-
-    - name: Setup MSVC environment
-      if: matrix.platform == 'windows'
-      uses: ilammy/msvc-dev-cmd@v1
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          git
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-ninja
+          mingw-w64-x86_64-pkgconf
+          mingw-w64-x86_64-curl
+          mingw-w64-x86_64-speexdsp
 
     - name: Install macOS dependencies
       if: matrix.platform == 'macos'
@@ -133,16 +142,20 @@ jobs:
 
 
     - name: Configure CMake
+      shell: ${{ matrix.shell || 'bash' }}
       run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DTARGET_PLATFORM=${{ matrix.cmake_platform }}
 
     - name: Build C project
+      shell: ${{ matrix.shell || 'bash' }}
       # -k 0 keeps going after a failure so one run lists every broken file, not just the first.
       run: cmake --build build --config ${{ env.BUILD_TYPE }} -- -k 0
 
     - name: Run unit tests
+      shell: ${{ matrix.shell || 'bash' }}
       run: ctest --test-dir build --output-on-failure -C ${{ env.BUILD_TYPE }} || true
 
     - name: Package artifacts
+      shell: ${{ matrix.shell || 'bash' }}
       run: |
         cmake --build build --config ${{ env.BUILD_TYPE }} --target package
         mkdir -p artifacts

@@ -342,18 +342,24 @@ target_include_directories(test_simple_generation PRIVATE ${CMAKE_SOURCE_DIR}/in
 # Run: ./tests/test_simple_generation ~/.ethervox/models/governor/granite-4.0-h-1b-Q4_K_M.gguf
 
 # Session forking benchmark (TASK-C3.2) - measures ≥4× throughput improvement
+# Uses fork(), which Windows does not have
+if(NOT WIN32)
 add_executable(bench_fork bench_fork.c)
 target_link_libraries(bench_fork ethervoxai)
 target_include_directories(bench_fork PRIVATE ${CMAKE_SOURCE_DIR}/include)
+endif()
 # Not added to ctest (requires model file and is a benchmark, not a test)
 # Run manually: ./tests/bench_fork [model.gguf]
 # Example: ./tests/bench_fork ~/models/granite-3.0-8b-instruct-Q4_K_M.gguf
 # Target: ≥4× speedup for 300-document classification workload
 
 # Session forking leak test (TASK-C3.2) - verify 300 forks don't leak
+# Uses fork(), which Windows does not have
+if(NOT WIN32)
 add_executable(test_session_leak test_session_leak.c)
 target_link_libraries(test_session_leak ethervoxai)
 target_include_directories(test_session_leak PRIVATE ${CMAKE_SOURCE_DIR}/include)
+endif()
 # Run with ASan/LSan: ./tests/test_session_leak [model.gguf]
 # Should complete with zero leaks reported by sanitizers
 

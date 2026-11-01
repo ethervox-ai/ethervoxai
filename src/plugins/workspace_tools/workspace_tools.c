@@ -355,7 +355,11 @@ static int tool_workspace_highlight_nodes_wrapper(const char* args_json, char** 
   
   // Extract the array substring
   size_t array_len = p - array_start;
-  char* node_ids_json = strndup(array_start, array_len);
+  char* node_ids_json = (char*)malloc(array_len + 1);
+  if (node_ids_json) {
+    memcpy(node_ids_json, array_start, array_len);
+    node_ids_json[array_len] = '\0';
+  }
   
   ethervox_log(ETHERVOX_LOG_LEVEL_INFO, __FILE__, __LINE__, __func__,
                "Highlighting nodes: %s", node_ids_json);
