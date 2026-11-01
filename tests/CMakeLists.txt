@@ -182,11 +182,14 @@ add_test(NAME MemoryArchive COMMAND test_memory_archive)
 set_tests_properties(MemoryArchive PROPERTIES TIMEOUT 30 LABELS "unit")
 
 # File tools tests (Phase 1: Binary detection, token estimation, error handling)
+# File tools exist only in profiles with ETHERVOX_FEATURE_FILE_TOOLS (not EDGE/WORKSPACE).
+if(ETHERVOX_FEATURE_FILE_TOOLS)
 add_executable(test_file_tools unit/test_file_tools.c)
 target_link_libraries(test_file_tools ethervoxai)
 target_include_directories(test_file_tools PRIVATE ${CMAKE_SOURCE_DIR}/include)
 add_test(NAME FileTools COMMAND test_file_tools)
 set_tests_properties(FileTools PROPERTIES TIMEOUT 60 LABELS "unit")
+endif()
 
 # File append tool tests
 add_executable(test_file_append unit/test_file_append.c)

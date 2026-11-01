@@ -3251,7 +3251,9 @@ file_tools_cleanup:
   } tool_reg_result_t;
 
   tool_reg_result_t tool_registrations[] = {
+#if ETHERVOX_FEATURE_FILE_TOOLS
       {"Path Config", ethervox_path_config_register(&registry, &path_config)},
+#endif
       {"Unit Conversion", ethervox_unit_conversion_register(&registry)},
 #if HAVE_LIBCURL && ETHERVOX_FEATURE_WEATHER
       {"Weather Forecast", ethervox_weather_tools_register(&registry)},

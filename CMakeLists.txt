@@ -738,8 +738,15 @@ endif()
 # file_tools code or catalogue contract, not just an unreached registration
 # call - previously this flag only skipped the main.c call site, while the
 # plugin (and its embedded catalogue JSON) still linked into every profile.
+if(NOT WIN32)
+    # path_config.c is pure path configuration (no file mutation) and voice_tools.c, which every profile
+    # builds, depends on it, so it is part of the library in every profile.
+    list(APPEND ETHERVOXAI_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/file_tools/path_config.c")
+endif()
+
 if(NOT WIN32 AND ETHERVOX_FEATURE_FILE_TOOLS)
     file(GLOB FILE_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/file_tools/*.c")
+    list(REMOVE_ITEM FILE_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/file_tools/path_config.c")
     list(APPEND ETHERVOXAI_CORE_SOURCES ${FILE_TOOLS_SOURCES})
     message(STATUS "File tools plugin sources included")
 elseif(WIN32)
