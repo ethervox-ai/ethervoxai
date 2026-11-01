@@ -215,13 +215,16 @@ jobs:
   build-raspberry-pi:
     name: Build Raspberry Pi
     runs-on: ubuntu-latest
+    # QUARANTINED until ADR-0033 decides the Pi's role (end date 2026-12-15, BACKLOG-143): the job still
+    # runs and stays visible, but a failure does not block merges. If still undecided on that date, remove
+    # the job instead of leaving it red. `make configure-rpi` does not exist; replace it with the CMake
+    # presets when the role is decided.
+    continue-on-error: true
     strategy:
       matrix:
-        target: ['pi-zero', 'pi-4']
+        # Pi Zero is out of scope (ADR-0033); Pi 5 joins when its preset exists.
+        target: ['pi-4']
         include:
-          - target: 'pi-zero'
-            cmake_preset: 'rpi-zero-release'
-            arch: 'armhf'
           - target: 'pi-4'
             cmake_preset: 'rpi-4-release'
             arch: 'arm64'
