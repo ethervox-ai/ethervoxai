@@ -255,7 +255,7 @@ ethervox_result_t ethervox_paths_get_default(ethervox_paths_t* paths,
         return ETHERVOX_ERROR_INVALID_ARGUMENT;
     }
     
-    // data_dir: %APPDATA%\EthervoxAI\
+    // data_dir: %APPDATA%\EthervoxAI
     int written = snprintf(buf_ptr, remaining, "%s\\EthervoxAI", app_data);
     if (written < 0 || (size_t)written >= remaining) {
         return ETHERVOX_ERROR_INVALID_ARGUMENT;
@@ -264,7 +264,7 @@ ethervox_result_t ethervox_paths_get_default(ethervox_paths_t* paths,
     buf_ptr += written + 1;
     remaining -= written + 1;
     
-    // cache_dir: %LOCALAPPDATA%\EthervoxAI\Cache\
+    // cache_dir: %LOCALAPPDATA%\EthervoxAI\Cache
     written = snprintf(buf_ptr, remaining, "%s\\EthervoxAI\\Cache", local_app_data);
     if (written < 0 || (size_t)written >= remaining) {
         return ETHERVOX_ERROR_INVALID_ARGUMENT;
@@ -273,7 +273,7 @@ ethervox_result_t ethervox_paths_get_default(ethervox_paths_t* paths,
     buf_ptr += written + 1;
     remaining -= written + 1;
     
-    // models_dir: %APPDATA%\EthervoxAI\models\
+    // models_dir: %APPDATA%\EthervoxAI\models
     written = snprintf(buf_ptr, remaining, "%s\\EthervoxAI\\models", app_data);
     if (written < 0 || (size_t)written >= remaining) {
         return ETHERVOX_ERROR_INVALID_ARGUMENT;
@@ -282,7 +282,7 @@ ethervox_result_t ethervox_paths_get_default(ethervox_paths_t* paths,
     buf_ptr += written + 1;
     remaining -= written + 1;
     
-    // temp_dir: %LOCALAPPDATA%\EthervoxAI\Temp\
+    // temp_dir: %LOCALAPPDATA%\EthervoxAI\Temp
     written = snprintf(buf_ptr, remaining, "%s\\EthervoxAI\\Temp", local_app_data);
     if (written < 0 || (size_t)written >= remaining) {
         return ETHERVOX_ERROR_INVALID_ARGUMENT;
