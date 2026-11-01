@@ -340,7 +340,7 @@ jobs:
 
     - name: Install analysis tools
       run: |
-        pip install radon lizard tokei
+        pip install radon lizard
         sudo apt-get install -y cloc
 
     - name: Generate code metrics
