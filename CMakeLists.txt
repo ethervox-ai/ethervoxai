@@ -960,6 +960,10 @@ if(ANDROID)
     message(STATUS "Enabled 16KB page alignment for Android")
 else()
     add_library(ethervoxai STATIC ${ETHERVOXAI_SOURCES})
+    if(MSVC)
+        # <stdatomic.h> (cancel_token.c) needs MSVC's opt-in C11 atomics support (VS 2022 17.5+).
+        target_compile_options(ethervoxai PRIVATE /experimental:c11atomics)
+    endif()
 endif()
 
 # Phonemizer removed (TASK-C1.0)
