@@ -142,12 +142,22 @@ static void windows_audio_cleanup(ethervox_audio_runtime_t* runtime) {
   printf("Windows audio driver cleaned up\n");
 }
 
+// Capture is opened by start_capture but no buffering loop exists yet, so reading reports that
+// plainly instead of leaving the driver slot NULL for callers to crash on.
+static ethervox_result_t windows_audio_read(ethervox_audio_runtime_t* runtime,
+                                            ethervox_audio_buffer_t* buffer) {
+  ETHERVOX_CHECK_PTR(runtime);
+  ETHERVOX_CHECK_PTR(buffer);
+  return ETHERVOX_ERROR_NOT_IMPLEMENTED;
+}
+
 ethervox_result_t ethervox_audio_register_platform_driver(ethervox_audio_runtime_t* runtime) {
   ETHERVOX_CHECK_PTR(runtime);
   
   runtime->driver.init = windows_audio_init;
   runtime->driver.start_capture = windows_audio_start_capture;
   runtime->driver.stop_capture = windows_audio_stop_capture;
+  runtime->driver.read_audio = windows_audio_read;
   runtime->driver.start_playback = windows_audio_start_playback;
   runtime->driver.stop_playback = windows_audio_stop_playback;
   runtime->driver.cleanup = windows_audio_cleanup;

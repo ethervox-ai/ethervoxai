@@ -116,6 +116,17 @@ static void test_get_default() {
 /**
  * Test: Path join
  */
+// On Windows the join inserts '\\'; normalise so the same expectations hold on every platform.
+static void normalize_seps(char* path) {
+#ifdef _WIN32
+    for (char* p = path; *p; p++) {
+        if (*p == '\\') *p = '/';
+    }
+#else
+    (void)path;
+#endif
+}
+
 static void test_path_join() {
     printf("\n🧪 Test: Path join\n");
     
@@ -125,16 +136,19 @@ static void test_path_join() {
     // Join with trailing separator
     result = ethervox_path_join("/tmp/", "file.txt", out, sizeof(out));
     TEST_ASSERT(result == ETHERVOX_SUCCESS, "Join should succeed");
+    normalize_seps(out);
     TEST_ASSERT(strcmp(out, "/tmp/file.txt") == 0, "Should handle trailing separator");
     
     // Join without trailing separator
     result = ethervox_path_join("/tmp", "file.txt", out, sizeof(out));
     TEST_ASSERT(result == ETHERVOX_SUCCESS, "Join should succeed");
+    normalize_seps(out);
     TEST_ASSERT(strcmp(out, "/tmp/file.txt") == 0, "Should add separator");
     
     // Join with nested path
     result = ethervox_path_join("/tmp", "foo/bar.txt", out, sizeof(out));
     TEST_ASSERT(result == ETHERVOX_SUCCESS, "Join should succeed");
+    normalize_seps(out);
     TEST_ASSERT(strcmp(out, "/tmp/foo/bar.txt") == 0, "Should handle nested paths");
     
     TEST_LOG("Path join output: %s", out);
