@@ -1212,34 +1212,6 @@ if(BUILD_EXECUTABLES AND NOT ANDROID AND NOT WIN32)
     set_target_properties(ethervoxai_app PROPERTIES OUTPUT_NAME ethervoxai)
 endif()
 
-# Voice quality tuner tool (Unix only - uses termios.h)
-if(BUILD_EXECUTABLES AND NOT ANDROID AND NOT WIN32)
-    add_executable(voice_tuner tools/voice_tuner.c)
-    target_link_libraries(voice_tuner PRIVATE ethervoxai cjson)
-    target_include_directories(voice_tuner PRIVATE 
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${cjson_SOURCE_DIR})
-    set_target_properties(voice_tuner PROPERTIES OUTPUT_NAME ethervox-tune-voice)
-    if(TARGET_PLATFORM STREQUAL "IOS" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
-        install(TARGETS voice_tuner RUNTIME DESTINATION bin BUNDLE DESTINATION .)
-    else()
-        install(TARGETS voice_tuner RUNTIME DESTINATION bin)
-    endif()
-    
-    # Emotion tester tool for multi-speaker models
-    add_executable(emotion_tester tools/emotion_tester.c)
-    target_link_libraries(emotion_tester PRIVATE ethervoxai cjson)
-    target_include_directories(emotion_tester PRIVATE 
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${cjson_SOURCE_DIR})
-    set_target_properties(emotion_tester PROPERTIES OUTPUT_NAME ethervox-test-emotions)
-    if(TARGET_PLATFORM STREQUAL "IOS" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
-        install(TARGETS emotion_tester RUNTIME DESTINATION bin BUNDLE DESTINATION .)
-    else()
-        install(TARGETS emotion_tester RUNTIME DESTINATION bin)
-    endif()
-endif()
-
 # Optional: Examples and tests (if directories exist and not Android)
 if(BUILD_EXAMPLES AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples" AND NOT ANDROID)
     add_subdirectory(examples)
