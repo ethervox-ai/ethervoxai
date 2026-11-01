@@ -43,7 +43,10 @@ typedef enum {
     CHAT_TEMPLATE_LLAMA3,    // Meta Llama 3 format: <|begin_of_text|><|start_header_id|>role<|end_header_id|>
     CHAT_TEMPLATE_LFM,       // Liquid AI LFM2.5 format: ChatML with tool calling tokens
     CHAT_TEMPLATE_CHATML = CHAT_TEMPLATE_QWEN,  // ChatML alias (same as Qwen)
-    CHAT_TEMPLATE_AUTO       // Auto-detect from model name/metadata
+    CHAT_TEMPLATE_AUTO,      // Auto-detect from model name/metadata
+    // Explicit value: the aliases above (CHAT_TEMPLATE_GRANITE, CHAT_TEMPLATE_CHATML) restart the
+    // implicit numbering, so an implicit value here would collide with an earlier template.
+    CHAT_TEMPLATE_GRANITE_4_2 = 7  // IBM Granite 4.2+: ChatML roles (<|im_start|>), <think> reasoning, <function=...> tool calls
 } chat_template_type_t;
 
 /**
@@ -94,6 +97,12 @@ typedef struct {
     bool ignore_eog;                        // If true, ignore EOG tokens and continue generation
     
 } chat_template_t;
+
+/**
+ * Whether `tmpl` belongs to a model with switchable reasoning ("thinking") modes -- Granite 4.2+
+ * (https://www.ibm.com/granite/docs/models/granite4-2).
+ */
+bool chat_template_supports_thinking(const chat_template_t* tmpl);
 
 /**
  * Get chat template for a specific model type

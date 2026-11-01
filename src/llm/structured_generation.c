@@ -13,6 +13,8 @@
 #include "ethervox/grammar.h"
 #include "ethervox/logging.h"
 #include "llama.h"
+#include "cJSON.h"
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,6 +54,15 @@ typedef struct {
     // `total_token_count` above already tracks completion tokens, reused as-is.
     int n_prompt_tokens;
     struct timespec start_time;
+
+    // Granite 4.2+ reasoning (see `ethervox_thinking_mode_t`)
+    const char* model_path;          // The loaded model file (chat template detection)
+    bool thinking_model;             // The model's template has thinking modes
+    bool in_reasoning;               // Currently between <think> and </think>
+    int reasoning_token_count;       // Reasoning tokens produced so far
+    int reasoning_token_cap;         // After this many, </think> is forced
+    llama_token think_open_token;    // Single-token <think>, or LLAMA_TOKEN_NULL
+    llama_token think_close_token;   // Single-token </think>, or LLAMA_TOKEN_NULL
 
     // Sampling state
     struct llama_sampler* sampler;
@@ -93,6 +104,31 @@ static ethervox_result_t init_generation_context(
     
     gen_ctx->vocab = llama_model_get_vocab(gen_ctx->model);
     clock_gettime(CLOCK_MONOTONIC, &gen_ctx->start_time);
+
+    // Granite 4.2+: the prompt opens <think> (unless thinking is off), so the output starts as
+    // reasoning and ends it with </think>; both are single tokens.
+    gen_ctx->model_path = ethervox_model_handle_get_path(handle);
+    const char* model_path = gen_ctx->model_path;
+    const chat_template_t* tmpl = chat_template_get(CHAT_TEMPLATE_AUTO, model_path);
+    gen_ctx->think_open_token = LLAMA_TOKEN_NULL;
+    gen_ctx->think_close_token = LLAMA_TOKEN_NULL;
+    if (chat_template_supports_thinking(tmpl)) {
+        llama_token id = LLAMA_TOKEN_NULL;
+        if (llama_tokenize(gen_ctx->vocab, "<think>", 7, &id, 1, false, true) == 1) {
+            gen_ctx->think_open_token = id;
+        }
+        if (llama_tokenize(gen_ctx->vocab, "</think>", 8, &id, 1, false, true) == 1) {
+            gen_ctx->think_close_token = id;
+        }
+        gen_ctx->thinking_model = gen_ctx->think_close_token != LLAMA_TOKEN_NULL;
+        if (gen_ctx->thinking_model && params->thinking_mode != ETHERVOX_THINKING_OFF) {
+            gen_ctx->in_reasoning = true;
+            // Reasoning does not count against max_tokens (the answer's budget), but it is
+            // bounded: past the cap </think> is forced so the model still answers.
+            gen_ctx->reasoning_token_cap =
+                params->thinking_mode == ETHERVOX_THINKING_LOW ? 1024 : 3072;
+        }
+    }
 
     return ETHERVOX_SUCCESS;
 }
@@ -220,8 +256,10 @@ static struct llama_sampler* create_sampler(
     }
     
     // Add penalties (frequency, presence, repeat)
-    llama_sampler_chain_add(sampler, 
-        llama_sampler_init_penalties(128, 1.1f, 0.0f, 0.0f));
+    if (!gen_ctx->thinking_model) {
+        llama_sampler_chain_add(sampler,
+            llama_sampler_init_penalties(128, 1.1f, 0.0f, 0.0f));
+    }
     
     // Add grammar constraint BEFORE temperature. At temperature <= 0 (greedy), the temperature
     // sampler collapses every candidate's logit to -inf except the single argmax token
@@ -274,13 +312,21 @@ static struct llama_sampler* create_sampler(
         }
     }
     
+    // Granite 4.2: IBM recommends temperature 1.0 and top_p 0.95 for every task (chat, reasoning
+    // and tool calling), and the 1.1 repetition penalty above would cut into a reasoning trace.
+    float temperature = gen_ctx->params->temperature;
+    float top_p = gen_ctx->params->top_p;
+    if (gen_ctx->thinking_model) {
+        temperature = 1.0f;
+        top_p = 0.95f;
+    }
     // Add temperature
     llama_sampler_chain_add(sampler, 
-        llama_sampler_init_temp(gen_ctx->params->temperature));
+        llama_sampler_init_temp(temperature));
     
     // Add top-k and top-p
     llama_sampler_chain_add(sampler, llama_sampler_init_top_k(40));
-    llama_sampler_chain_add(sampler, llama_sampler_init_top_p(gen_ctx->params->top_p, 1));
+    llama_sampler_chain_add(sampler, llama_sampler_init_top_p(top_p, 1));
     
     // Add final distribution sampler with seed
     // If seed=0, use time-based random seed; otherwise use specified seed
@@ -313,12 +359,243 @@ ethervox_result_t ethervox_structured_render_prompt_with_history(
     uint32_t turn_count,
     char** out
 ) {
+    return ethervox_structured_render_prompt_for_model(
+        system_prompt, history, history_count, prompt, turns, turn_count, NULL,
+        ETHERVOX_THINKING_DEFAULT, out);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Granite 4.2+ rendering (chat_template.jinja of ibm-granite/granite-4.2-*)
+// ---------------------------------------------------------------------------------------------
+
+typedef struct {
+    char* data;
+    size_t len;
+    size_t cap;
+    bool failed;
+} text_builder_t;
+
+static void tb_append(text_builder_t* tb, const char* text, size_t n) {
+    if (tb->failed) return;
+    if (tb->len + n + 1 > tb->cap) {
+        size_t cap = tb->cap ? tb->cap : 1024;
+        while (cap < tb->len + n + 1) cap *= 2;
+        char* grown = (char*)realloc(tb->data, cap);
+        if (!grown) { tb->failed = true; return; }
+        tb->data = grown;
+        tb->cap = cap;
+    }
+    memcpy(tb->data + tb->len, text, n);
+    tb->len += n;
+    tb->data[tb->len] = '\0';
+}
+
+static void tb_str(text_builder_t* tb, const char* text) { tb_append(tb, text, strlen(text)); }
+
+/** `text` without leading/trailing whitespace, as a [start, start+len) view. */
+static const char* trim_view(const char* text, size_t* len) {
+    const char* start = text;
+    while (*start && isspace((unsigned char)*start)) start++;
+    size_t n = strlen(start);
+    while (n > 0 && isspace((unsigned char)start[n - 1])) n--;
+    *len = n;
+    return start;
+}
+
+/** What follows the last </think>, or the whole text when it has none. */
+static const char* after_last_think(const char* text) {
+    const char* last = NULL;
+    for (const char* p = strstr(text, "</think>"); p; p = strstr(p + 1, "</think>")) last = p;
+    return last ? last + strlen("</think>") : text;
+}
+
+/**
+ * Appends one tool call the way the 4.2 template prints it:
+ *   <tool_call>\n<function=NAME>\n<parameter=K>\nV\n</parameter>\n</function>\n</tool_call>\n
+ * `json` is the `{"name": ..., "arguments": {...}}` envelope ev-agent produces.
+ */
+static bool append_tool_call_xml(text_builder_t* tb, const char* json) {
+    cJSON* root = cJSON_Parse(json);
+    if (!root) return false;
+    const cJSON* name = cJSON_GetObjectItemCaseSensitive(root, "name");
+    const cJSON* args = cJSON_GetObjectItemCaseSensitive(root, "arguments");
+    if (!cJSON_IsString(name) || !name->valuestring) { cJSON_Delete(root); return false; }
+    tb_str(tb, "<tool_call>\n<function=");
+    tb_str(tb, name->valuestring);
+    tb_str(tb, ">\n");
+    if (cJSON_IsObject(args)) {
+        const cJSON* arg = NULL;
+        cJSON_ArrayForEach(arg, args) {
+            tb_str(tb, "<parameter=");
+            tb_str(tb, arg->string ? arg->string : "");
+            tb_str(tb, ">\n");
+            if (cJSON_IsString(arg)) {
+                tb_str(tb, arg->valuestring ? arg->valuestring : "");
+            } else if (cJSON_IsBool(arg)) {
+                tb_str(tb, cJSON_IsTrue(arg) ? "True" : "False");  // as the jinja template prints it
+            } else {
+                char* printed = cJSON_PrintUnformatted(arg);
+                if (printed) { tb_str(tb, printed); free(printed); }
+            }
+            tb_str(tb, "\n</parameter>\n");
+        }
+    }
+    tb_str(tb, "</function>\n</tool_call>\n");
+    cJSON_Delete(root);
+    return true;
+}
+
+/**
+ * An in-run assistant turn. Ordinary text becomes `<think></think>text`; a turn that holds a JSON
+ * `<tool_call>` envelope has it converted to the XML form, as the template renders tool calls.
+ */
+static void append_assistant_turn_42(text_builder_t* tb, const chat_template_t* tmpl, const char* content) {
+    tb_str(tb, tmpl->assistant_start);
+    const char* call = strstr(content, "<tool_call>");
+    const char* visible_end = call ? call : content + strlen(content);
+    char* head = (char*)malloc((size_t)(visible_end - content) + 1);
+    if (!head) { tb->failed = true; return; }
+    memcpy(head, content, (size_t)(visible_end - content));
+    head[visible_end - content] = '\0';
+
+    // Reasoning is kept only when the turn carries it; otherwise an empty block, as the template does.
+    const char* close_tag = strstr(head, "</think>");
+    size_t text_len;
+    const char* text = trim_view(after_last_think(head), &text_len);
+    if (close_tag) {
+        const char* open_tag = strstr(head, "<think>");
+        tb_str(tb, "<think>");
+        const char* reasoning_start = open_tag ? open_tag + strlen("<think>") : head;
+        tb_append(tb, reasoning_start, (size_t)(close_tag - reasoning_start));
+        tb_str(tb, "</think>");
+    } else {
+        tb_str(tb, "<think></think>");
+    }
+    tb_append(tb, text, text_len);
+
+    if (call) {
+        tb_str(tb, "\n");
+        const char* body = call + strlen("<tool_call>");
+        const char* end = strstr(body, "</tool_call>");
+        size_t body_len = end ? (size_t)(end - body) : strlen(body);
+        char* json = (char*)malloc(body_len + 1);
+        if (json) {
+            memcpy(json, body, body_len);
+            json[body_len] = '\0';
+            size_t jl;
+            const char* jt = trim_view(json, &jl);
+            char* trimmed = (char*)malloc(jl + 1);
+            if (trimmed) {
+                memcpy(trimmed, jt, jl);
+                trimmed[jl] = '\0';
+                if (!append_tool_call_xml(tb, trimmed)) {
+                    // Not our envelope: keep whatever the caller wrote.
+                    tb_str(tb, "<tool_call>\n");
+                    tb_append(tb, jt, jl);
+                    tb_str(tb, "\n</tool_call>\n");
+                }
+                free(trimmed);
+            }
+            free(json);
+        }
+    } else if (text_len == 0) {
+        // nothing after the (empty) reasoning
+    }
+    free(head);
+    tb_str(tb, tmpl->assistant_end);
+}
+
+static ethervox_result_t render_prompt_granite42(
+    const chat_template_t* tmpl,
+    const char* system_prompt,
+    const ethervox_chat_turn_t* history,
+    uint32_t history_count,
+    const char* prompt,
+    const ethervox_chat_turn_t* turns,
+    uint32_t turn_count,
+    int32_t thinking_mode,
+    char** out
+) {
+    text_builder_t tb = {0};
+    if (system_prompt && system_prompt[0] != '\0') {
+        tb_str(&tb, tmpl->system_start);
+        tb_str(&tb, system_prompt);
+        tb_str(&tb, tmpl->system_end);
+    }
+    for (uint32_t i = 0; i < history_count; i++) {
+        const char* content = history[i].content ? history[i].content : "";
+        if (history[i].role == ETHERVOX_CHAT_ROLE_USER) {
+            tb_str(&tb, tmpl->user_start);
+            tb_str(&tb, content);
+            tb_str(&tb, tmpl->user_end);
+        } else if (history[i].role == ETHERVOX_CHAT_ROLE_ASSISTANT) {
+            // Earlier answers keep no reasoning (the template's truncate_history_thinking).
+            size_t n;
+            const char* text = trim_view(after_last_think(content), &n);
+            tb_str(&tb, tmpl->assistant_start);
+            tb_str(&tb, "<think></think>");
+            tb_append(&tb, text, n);
+            tb_str(&tb, tmpl->assistant_end);
+        } else {
+            free(tb.data);
+            return ETHERVOX_ERROR_INVALID_ARGUMENT;
+        }
+    }
+    tb_str(&tb, tmpl->user_start);
+    tb_str(&tb, prompt);
+    if (thinking_mode == ETHERVOX_THINKING_LOW) {
+        tb_str(&tb, "\n\n{reasoning effort: low}");
+    }
+    tb_str(&tb, tmpl->user_end);
+    for (uint32_t i = 0; i < turn_count; i++) {
+        const char* content = turns[i].content ? turns[i].content : "";
+        if (turns[i].role == ETHERVOX_CHAT_ROLE_ASSISTANT) {
+            append_assistant_turn_42(&tb, tmpl, content);
+        } else if (turns[i].role == ETHERVOX_CHAT_ROLE_TOOL) {
+            tb_str(&tb, tmpl->tool_response_start);
+            tb_str(&tb, content);
+            tb_str(&tb, tmpl->tool_response_end);
+        } else {
+            free(tb.data);
+            return ETHERVOX_ERROR_INVALID_ARGUMENT;
+        }
+    }
+    tb_str(&tb, tmpl->assistant_start);
+    tb_str(&tb, thinking_mode == ETHERVOX_THINKING_OFF ? "<think></think>" : "<think>\n");
+    if (tb.failed || !tb.data) {
+        free(tb.data);
+        return ETHERVOX_ERROR_OUT_OF_MEMORY;
+    }
+    *out = tb.data;
+    return ETHERVOX_SUCCESS;
+}
+
+ethervox_result_t ethervox_structured_render_prompt_for_model(
+    const char* system_prompt,
+    const ethervox_chat_turn_t* history,
+    uint32_t history_count,
+    const char* prompt,
+    const ethervox_chat_turn_t* turns,
+    uint32_t turn_count,
+    const char* model_path,
+    int32_t thinking_mode,
+    char** out
+) {
     if (!prompt || !out || (turn_count > 0 && !turns) || (history_count > 0 && !history)) {
         return ETHERVOX_ERROR_INVALID_ARGUMENT;
     }
-    // Every model this product ships is Granite (`MODELS-LICENSING.md`), so the template is fixed.
-    const chat_template_t* tmpl = chat_template_get(CHAT_TEMPLATE_GRANITE, NULL);
-
+    // Granite 4.0/4.1 unless the model's file name says 4.2+, which has its own format and modes.
+    const chat_template_t* tmpl = model_path
+        ? chat_template_get(CHAT_TEMPLATE_AUTO, model_path)
+        : chat_template_get(CHAT_TEMPLATE_GRANITE, NULL);
+    if (chat_template_supports_thinking(tmpl)) {
+        return render_prompt_granite42(
+            tmpl, system_prompt, history, history_count, prompt, turns, turn_count, thinking_mode, out);
+    }
+    if (model_path && tmpl->type != CHAT_TEMPLATE_GRANITE_4 && tmpl->type != CHAT_TEMPLATE_GRANITE_3) {
+        // A non-Granite file name: this product only ships Granite, so keep the 4.x format.
+        tmpl = chat_template_get(CHAT_TEMPLATE_GRANITE, NULL);
+    }
     // Heap-allocated: prompt length is caller-controlled. Each turn adds a bounded marker overhead.
     size_t capacity = 512 + strlen(prompt) + (system_prompt ? strlen(system_prompt) : 0);
     for (uint32_t i = 0; i < turn_count; i++) {
@@ -480,9 +757,9 @@ static ethervox_result_t prefill_prompt(
     llama_memory_t mem = llama_get_memory(gen_ctx->ctx);
 
     char* formatted = NULL;
-    ethervox_result_t render_result = ethervox_structured_render_prompt_with_history(
+    ethervox_result_t render_result = ethervox_structured_render_prompt_for_model(
         params->system_prompt, params->history, params->history_count, prompt, params->turns,
-        params->turn_count, &formatted);
+        params->turn_count, gen_ctx->model_path, params->thinking_mode, &formatted);
     if (render_result != ETHERVOX_SUCCESS) {
         return render_result;
     }
@@ -566,9 +843,15 @@ static ethervox_result_t generate_tokens(generation_context_t* gen_ctx) {
     uint32_t max_tokens = gen_ctx->params->max_tokens;
     bool finished_on_eog = false;
     
-    for (uint32_t i = 0; i < max_tokens; i++) {
-        // Sample next token
+    // `i` counts answer tokens only; reasoning tokens are bounded separately (see above).
+    uint32_t i = 0;
+    while (i < max_tokens) {
+        // Sample next token. Reasoning is bounded: past the cap the model is made to close its
+        // <think> block so it still answers.
         llama_token new_token = llama_sampler_sample(gen_ctx->sampler, gen_ctx->ctx, -1);
+        if (gen_ctx->in_reasoning && gen_ctx->reasoning_token_count >= gen_ctx->reasoning_token_cap) {
+            new_token = gen_ctx->think_close_token;
+        }
         
         // Check for EOS
         if (llama_vocab_is_eog(gen_ctx->vocab, new_token)) {
@@ -587,6 +870,43 @@ static ethervox_result_t generate_tokens(generation_context_t* gen_ctx) {
         char piece[256];
         int n_piece = llama_token_to_piece(gen_ctx->vocab, new_token, piece, sizeof(piece) - 1, 0, false);
         
+        // Granite 4.2 reasoning: <think> / </think> are markers, and the text between them is
+        // delivered as REASONING events, never as part of the answer.
+        if (gen_ctx->thinking_model
+            && (new_token == gen_ctx->think_open_token || new_token == gen_ctx->think_close_token)) {
+            gen_ctx->in_reasoning = (new_token == gen_ctx->think_open_token);
+            n_piece = 0;
+        } else if (gen_ctx->in_reasoning) {
+            if (n_piece > 0) {
+                piece[n_piece] = '\0';
+                ethervox_event_t reasoning_event = {
+                    .type = ETHERVOX_EVENT_REASONING,
+                    .token = { .text = piece, .token_id = new_token }
+                };
+                gen_ctx->reasoning_token_count++;
+                gen_ctx->total_token_count++;
+                if (!fire_event(gen_ctx, &reasoning_event)) {
+                    fire_usage_event(gen_ctx);
+                    ethervox_event_t cancelled_event = {
+                        .type = ETHERVOX_EVENT_FINISHED,
+                        .finished = { .finish_reason = "cancelled" }
+                    };
+                    fire_event(gen_ctx, &cancelled_event);
+                    llama_sampler_free(gen_ctx->sampler);
+                    return ETHERVOX_SUCCESS;
+                }
+            } else {
+                gen_ctx->reasoning_token_count++;
+            }
+            n_piece = 0;
+            struct llama_batch reasoning_batch = llama_batch_get_one(&new_token, 1);
+            if (llama_decode(gen_ctx->ctx, reasoning_batch) != 0) {
+                llama_sampler_free(gen_ctx->sampler);
+                return ETHERVOX_ERROR_FAILED;
+            }
+            continue;
+        }
+
         if (n_piece > 0) {
             // llama_token_to_piece() does not NUL-terminate; callers across the FFI boundary
             // (ev-llm's token_text()) read this as a C string via CStr::from_ptr, so leaving it
@@ -679,6 +999,7 @@ static ethervox_result_t generate_tokens(generation_context_t* gen_ctx) {
             llama_sampler_free(gen_ctx->sampler);
             return ETHERVOX_ERROR_FAILED;
         }
+        i++;
     }
     
     // Loop exhausted max_tokens without hitting EOS or cancellation -- no FINISHED event fires
@@ -734,7 +1055,8 @@ ethervox_structured_gen_params_t ethervox_structured_gen_params_default(void) {
         .turns = NULL,
         .turn_count = 0,
         .history = NULL,
-        .history_count = 0
+        .history_count = 0,
+        .thinking_mode = ETHERVOX_THINKING_DEFAULT
     };
     return params;
 }

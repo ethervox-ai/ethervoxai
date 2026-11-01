@@ -17,15 +17,26 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # Git Information Extraction (REQUIRED)
 # =============================================================================
 
-# Get version tag (cpp repo uses v* pattern, not backend-v*)
+# Get version tag. Releases are tagged `core-vX.Y.Z`; older tags are plain `vX.Y.Z`, used only
+# when no `core-v*` tag is reachable.
 execute_process(
-    COMMAND git describe --tags --abbrev=0 --match=v*
+    COMMAND git describe --tags --abbrev=0 --match=core-v*
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_VERSION_TAG
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET
     RESULT_VARIABLE GIT_TAG_RESULT
 )
+if(NOT GIT_TAG_RESULT EQUAL 0 OR NOT GIT_VERSION_TAG)
+    execute_process(
+        COMMAND git describe --tags --abbrev=0 --match=v*
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_VERSION_TAG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE GIT_TAG_RESULT
+    )
+endif()
 
 # Get branch name (REQUIRED)
 execute_process(
@@ -61,8 +72,8 @@ message(STATUS "Git Commit: ${GIT_COMMIT_HASH}")
 
 # Set backend version string
 if(GIT_TAG_RESULT EQUAL 0 AND GIT_VERSION_TAG)
-    # Tag exists - strip 'v' prefix (e.g., v0.0.5 -> 0.0.5)
-    string(REPLACE "v" "" ETHERVOX_BACKEND_VERSION "${GIT_VERSION_TAG}")
+    # Tag exists - strip the prefix (core-v0.5.0 -> 0.5.0, v0.0.5 -> 0.0.5)
+    string(REGEX REPLACE "^(core-)?v" "" ETHERVOX_BACKEND_VERSION "${GIT_VERSION_TAG}")
     message(STATUS "Backend Version Tag: ${ETHERVOX_BACKEND_VERSION}")
 else()
     # No tag - use branch-commit format

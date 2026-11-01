@@ -54,7 +54,14 @@ typedef enum {
     ETHERVOX_EVENT_ERROR,
 
     /** Streaming transcription segment (TASK-C3.5) - partial or final ASR result during capture */
-    ETHERVOX_EVENT_TRANSCRIPTION_SEGMENT
+    ETHERVOX_EVENT_TRANSCRIPTION_SEGMENT,
+
+    /**
+     * A piece of the model's reasoning ("thinking", Granite 4.2+): text between <think> and
+     * </think>. Delivered through the `token` payload (text, token_id); reasoning text is never
+     * delivered as ETHERVOX_EVENT_TOKEN and never part of the generated output.
+     */
+    ETHERVOX_EVENT_REASONING
 } ethervox_event_type_t;
 
 /**

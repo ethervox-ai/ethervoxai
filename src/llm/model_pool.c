@@ -226,8 +226,14 @@ static ethervox_result_t estimate_memory(
 /**
  * A requested context size of 0 means "as much of the model's trained context as fits": the KV
  * cache (f16, from the model's own layer and head shape) may take up to an eighth of the
- * machine's RAM. Any non-zero request is honoured as given.
+ * machine's RAM, and never more than AUTO_CONTEXT_MAX: a model trained for 128k tokens would
+ * otherwise reserve gigabytes of KV cache that an assistant conversation never fills, which
+ * slows loading and takes memory from everything else. Any non-zero request is honoured as given.
  */
+#define AUTO_CONTEXT_MAX 32768ull
+/* Prompt tokens evaluated per step; larger than llama.cpp's 512 default so long prompts prefill
+ * in fewer GPU passes. */
+#define PROMPT_UBATCH 1024u
 static uint32_t resolve_context_size(const struct llama_model* model, uint32_t requested) {
     if (requested != 0) {
         return requested;
@@ -248,6 +254,9 @@ static uint32_t resolve_context_size(const struct llama_model* model, uint32_t r
                        ? (ram_mb * 1024ull * 1024ull / 8ull) / bytes_per_token
                        : 8192;
     uint64_t size = fit < (uint64_t)train ? fit : (uint64_t)train;
+    if (size > AUTO_CONTEXT_MAX) {
+        size = AUTO_CONTEXT_MAX;
+    }
     size &= ~1023ull;
     if (size < 4096) {
         size = 4096;
@@ -411,6 +420,7 @@ ethervox_result_t ethervox_model_pool_load(
     ctx_params.n_ctx = resolve_context_size(model, config->context_size);
     ctx_params.n_threads = config->n_threads;
     ctx_params.n_threads_batch = config->n_threads;
+    ctx_params.n_ubatch = ctx_params.n_batch < PROMPT_UBATCH ? ctx_params.n_batch : PROMPT_UBATCH;
     ctx_params.n_seq_max = config->n_seq_max > 0 ? config->n_seq_max : 1;
     ctx_params.kv_unified = config->kv_unified;
     ctx_params.embeddings = config->embeddings;
@@ -676,6 +686,22 @@ struct mtmd_context* ethervox_model_handle_get_mtmd(
     ethervox_model_handle_t* handle
 ) {
     return handle ? handle->mtmd_ctx : NULL;
+}
+
+const char* ethervox_model_handle_get_path(ethervox_model_handle_t* handle) {
+    return handle ? handle->model_path : NULL;
+}
+
+void ethervox_model_handle_lock(ethervox_model_handle_t* handle) {
+    if (handle) {
+        MUTEX_LOCK(handle->inference_mutex);
+    }
+}
+
+void ethervox_model_handle_unlock(ethervox_model_handle_t* handle) {
+    if (handle) {
+        MUTEX_UNLOCK(handle->inference_mutex);
+    }
 }
 
 // ============================================================================
@@ -963,6 +989,7 @@ ethervox_result_t ethervox_model_pool_load_shared_context(
     ctx_params.n_ctx = resolve_context_size(shared->model, config->context_size);
     ctx_params.n_threads = config->n_threads;
     ctx_params.n_threads_batch = config->n_threads;
+    ctx_params.n_ubatch = ctx_params.n_batch < PROMPT_UBATCH ? ctx_params.n_batch : PROMPT_UBATCH;
     ctx_params.n_seq_max = config->n_seq_max > 0 ? config->n_seq_max : 1;
     ctx_params.kv_unified = config->kv_unified;
 
