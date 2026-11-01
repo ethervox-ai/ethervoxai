@@ -315,7 +315,9 @@ if(NOT cjson_POPULATED)
                    "cmake_minimum_required(VERSION 3.16)" 
                    CJSON_CMAKE_CONTENT "${CJSON_CMAKE_CONTENT}")
     file(WRITE "${cjson_SOURCE_DIR}/CMakeLists.txt" "${CJSON_CMAKE_CONTENT}")
-    add_subdirectory(${cjson_SOURCE_DIR} ${cjson_BINARY_DIR})
+    # EXCLUDE_FROM_ALL keeps cJSON's own install rules (absolute /usr/local paths) out of `install` and
+    # CPack; it is linked statically into the library, so it is still built as a dependency.
+    add_subdirectory(${cjson_SOURCE_DIR} ${cjson_BINARY_DIR} EXCLUDE_FROM_ALL)
     # Remove -Werror from cjson compilation flags
     if(TARGET cjson)
         get_target_property(CJSON_FLAGS cjson COMPILE_OPTIONS)
