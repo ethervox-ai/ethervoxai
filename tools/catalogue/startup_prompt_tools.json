@@ -1,7 +1,7 @@
 [
   {
     "name": "startup_prompt_update",
-    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "profiles": ["MOBILE", "DESKTOP"],
     "description": "Update the startup prompt that runs when the assistant starts. Use this to customize the initial greeting or behavior. The prompt will be saved and used on next restart.",
     "is_mutating": true,
     "schema": {
@@ -14,7 +14,7 @@
   },
   {
     "name": "startup_prompt_read",
-    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "profiles": ["MOBILE", "DESKTOP"],
     "description": "Read the current custom startup prompt. Returns the prompt text if a custom one exists, or indicates if using the default.",
     "is_mutating": false,
     "schema": { "type": "object", "properties": {} }

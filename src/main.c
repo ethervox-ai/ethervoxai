@@ -4041,7 +4041,9 @@ file_tools_cleanup:
 #endif
       {"Conversation", ethervox_conversation_tools_register(&registry)},
       {"Get Tool Info", ethervox_get_tool_info_register(&registry)},
+#if ETHERVOX_FEATURE_FILE_TOOLS
       {"Startup Prompt", ethervox_startup_prompt_tools_register(&registry)},
+#endif
       {"System Info", ethervox_system_info_tools_register(&registry)},
       {NULL, ETHERVOX_SUCCESS}};
 

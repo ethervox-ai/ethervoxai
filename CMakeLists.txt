@@ -753,14 +753,21 @@ file(GLOB UNIT_CONVERSION_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/unit_
 list(APPEND ETHERVOXAI_CORE_SOURCES ${UNIT_CONVERSION_SOURCES})
 message(STATUS "Unit conversion plugin sources included")
 
-# Add startup prompt tools plugin sources
-file(GLOB STARTUP_PROMPT_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/startup_prompt_tools/*.c")
-list(APPEND ETHERVOXAI_CORE_SOURCES ${STARTUP_PROMPT_TOOLS_SOURCES})
+# Add startup prompt tools plugin sources.
+# The update tool writes startup_prompt.txt with fopen(..., "w"), so the plugin follows the file-tools
+# gate: an EDGE/WORKSPACE binary contains no built-in file writer (AGENTS.md I2).
+if(ETHERVOX_FEATURE_FILE_TOOLS)
+    file(GLOB STARTUP_PROMPT_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/startup_prompt_tools/*.c")
+    list(APPEND ETHERVOXAI_CORE_SOURCES ${STARTUP_PROMPT_TOOLS_SOURCES})
+    message(STATUS "Startup prompt tools plugin sources included")
+else()
+    message(STATUS "Startup prompt tools plugin SKIPPED (ETHERVOX_FEATURE_FILE_TOOLS=OFF)")
+endif()
 
 # System info tools
 file(GLOB SYSTEM_INFO_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/system_info_tools/*.c")
 list(APPEND ETHERVOXAI_CORE_SOURCES ${SYSTEM_INFO_TOOLS_SOURCES})
-message(STATUS "Startup prompt tools plugin sources included")
+message(STATUS "System info tools plugin sources included")
 
 # Add context tools plugin sources
 file(GLOB CONTEXT_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/context_tools/*.c")
