@@ -16,13 +16,15 @@ ignores:
 
 # markdownlint configuration object
 config:
-  # MD013: Line length
-  MD013:
-    line_length: 120
-    code_blocks: false
-    tables: false
-    headings: false
-  
+  # Purely stylistic spacing/length rules are off: they produced ~3,500 findings that hid real
+  # problems. Correctness rules (broken links, heading structure, fences) stay on.
+  MD013: false
+  MD022: false
+  MD031: false
+  MD032: false
+  MD040: false
+  MD060: false
+
   # MD033: Inline HTML
   MD033:
     allowed_elements:
