@@ -196,7 +196,7 @@ int main(void) {
     // Voice tools
     ethervox_voice_session_t voice_session;
     int voice_count = 0;
-    if (ethervox_voice_tools_init(&voice_session, &memory) == 0) {
+    if (ethervox_voice_tools_init(&voice_session, &memory, NULL) == 0) {
         if (ethervox_voice_tools_register(&registry, &voice_session) == 0) {
             voice_count = 1;
             printf("  ✓ Voice tools: %d registered\n", voice_count);

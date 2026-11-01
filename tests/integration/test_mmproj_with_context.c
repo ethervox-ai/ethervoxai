@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
     printf("\nLoading text model: %s\n", model_path);
     struct llama_model_params model_params = llama_model_default_params();
     model_params.n_gpu_layers = 99;
-    model_params.load_mode = LLAMA_LOAD_MODE_MMAP;
+    model_params.use_mmap = true;
     
     struct llama_model* model = llama_model_load_from_file(model_path, model_params);
     if (!model) {
