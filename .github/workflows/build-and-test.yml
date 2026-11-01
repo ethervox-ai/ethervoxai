@@ -60,6 +60,7 @@ jobs:
   build-desktop:
     name: Build Desktop Platforms
     strategy:
+      fail-fast: false  # each platform reports on its own; one failing must not hide the others
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         include:
