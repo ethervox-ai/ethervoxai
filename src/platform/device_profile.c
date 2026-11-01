@@ -78,6 +78,18 @@ static void detect_memory(long* total_mb, long* available_mb) {
   }
 #endif
   
+#if defined(_SC_PHYS_PAGES) && defined(_SC_PAGESIZE)
+  {
+    long pages = sysconf(_SC_PHYS_PAGES);
+    long page_size = sysconf(_SC_PAGESIZE);
+    if (pages > 0 && page_size > 0) {
+      *total_mb = (long)(((long long)pages * page_size) / (1024 * 1024));
+      *available_mb = (*total_mb) / 2;  // same conservative estimate as Android
+      return;
+    }
+  }
+#endif
+
   // Fallback
   *total_mb = 4096;  // Assume 4GB
   *available_mb = 2048;

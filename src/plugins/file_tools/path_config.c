@@ -283,7 +283,7 @@ ethervox_result_t ethervox_path_config_set(
             const char* tags[] = {PATH_CONFIG_TAG};
             uint64_t memory_id = 0;
             
-            if (ethervox_memory_store_add(mem_store, text, tags, 1, 0.8f, false, &memory_id) == 0) {
+            if (ethervox_memory_store_add_always(mem_store, text, tags, 1, 0.8f, false, &memory_id) == 0) {
                 config->paths[existing_idx].memory_id = memory_id;
                 ethervox_log(ETHERVOX_LOG_LEVEL_DEBUG, __FILE__, __LINE__, __func__,
                             "Saved path to memory: %s (ID: %llu)", label, memory_id);
