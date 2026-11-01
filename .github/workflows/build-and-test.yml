@@ -79,6 +79,9 @@ jobs:
             cmake_platform: MACOS
 
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell || 'bash' }}
 
     steps:
     - name: Checkout repository
@@ -142,20 +145,16 @@ jobs:
 
 
     - name: Configure CMake
-      shell: ${{ matrix.shell || 'bash' }}
       run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DTARGET_PLATFORM=${{ matrix.cmake_platform }}
 
     - name: Build C project
-      shell: ${{ matrix.shell || 'bash' }}
       # -k 0 keeps going after a failure so one run lists every broken file, not just the first.
       run: cmake --build build --config ${{ env.BUILD_TYPE }} -- -k 0
 
     - name: Run unit tests
-      shell: ${{ matrix.shell || 'bash' }}
       run: ctest --test-dir build --output-on-failure -C ${{ env.BUILD_TYPE }} || true
 
     - name: Package artifacts
-      shell: ${{ matrix.shell || 'bash' }}
       run: |
         cmake --build build --config ${{ env.BUILD_TYPE }} --target package
         mkdir -p artifacts
