@@ -152,7 +152,12 @@ jobs:
       run: cmake --build build --config ${{ env.BUILD_TYPE }} -- -k 0
 
     - name: Run unit tests
-      run: ctest --test-dir build --output-on-failure -C ${{ env.BUILD_TYPE }} || true
+      run: |
+        # Windows has no rpath: the test executables find llama/ggml/cJSON/mtmd DLLs only via PATH.
+        if [ "${{ matrix.platform }}" = "windows" ]; then
+          export PATH="$PWD/build/bin:$PWD/build/_deps/cjson-build:$PWD/build/mtmd_build:$PATH"
+        fi
+        ctest --test-dir build --output-on-failure -C ${{ env.BUILD_TYPE }} || true
 
     - name: Package artifacts
       run: |
