@@ -13,14 +13,22 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <errno.h>
-#include <unistd.h>
 
 #ifdef _WIN32
 #include <direct.h>
+#include <io.h>
 #include <shlobj.h>
 #define PATH_SEP '\\'
 #define mkdir_p(path) _mkdir(path)
+#define access _access
+#ifndef R_OK
+#define R_OK 4
+#endif
+#ifndef W_OK
+#define W_OK 2
+#endif
 #else
+#include <unistd.h>
 #define PATH_SEP '/'
 #define mkdir_p(path) mkdir(path, 0755)
 #endif
