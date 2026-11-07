@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <pthread.h>
 
@@ -725,6 +726,101 @@ static int prefix_cache_common_length(
     return common;
 }
 
+/* Directory for the disk-backed system prefix; guarded by g_prefix.lock. */
+static char g_prefix_cache_dir[512];
+
+void ethervox_structured_set_prefix_cache_dir(const char* dir) {
+    pthread_mutex_lock(&g_prefix.lock);
+    g_prefix_cache_dir[0] = '\0';
+    if (dir && dir[0]) {
+        snprintf(g_prefix_cache_dir, sizeof(g_prefix_cache_dir), "%s", dir);
+    }
+    pthread_mutex_unlock(&g_prefix.lock);
+    if (dir && dir[0]) {
+        mkdir(dir, 0755);  // EEXIST is fine; a failed save is logged where it happens
+    }
+}
+
+static uint64_t fnv1a(uint64_t hash, const void* data, size_t len) {
+    const unsigned char* bytes = data;
+    for (size_t i = 0; i < len; i++) {
+        hash ^= bytes[i];
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
+/**
+ * Path of the saved state for this model, context size and exact prefix tokens. Any change to
+ * the prompt, model or context size changes the key, so stale state is never restored.
+ */
+static bool prefix_file_path(
+    const generation_context_t* gen_ctx, const llama_token* tokens, int n, char* out, size_t cap
+) {
+    char dir[512] = "";
+    pthread_mutex_lock(&g_prefix.lock);
+    snprintf(dir, sizeof(dir), "%s", g_prefix_cache_dir);
+    pthread_mutex_unlock(&g_prefix.lock);
+    if (dir[0] == '\0') {
+        return false;
+    }
+    const char* model = gen_ctx->model_path ? gen_ctx->model_path : "";
+    uint32_t n_ctx = llama_n_ctx(gen_ctx->ctx);
+    uint64_t hash = fnv1a(14695981039346656037ULL, model, strlen(model));
+    hash = fnv1a(hash, &n_ctx, sizeof(n_ctx));
+    hash = fnv1a(hash, tokens, (size_t)n * sizeof(llama_token));
+    snprintf(out, cap, "%s/assistant-prefix-%016llx.state", dir, (unsigned long long)hash);
+    return true;
+}
+
+/**
+ * Length of the leading system-prompt tokens: the prompt rendered with no history and no user
+ * text, compared token-by-token with the full prompt. 0 when the system prompt is empty.
+ */
+static int system_prefix_length(
+    const generation_context_t* gen_ctx,
+    const ethervox_structured_gen_params_t* params,
+    const llama_token* tokens,
+    int n_tokens
+) {
+    char* bare = NULL;
+    if (ethervox_structured_render_prompt_for_model(
+            params->system_prompt, NULL, 0, "", NULL, 0, gen_ctx->model_path,
+            params->thinking_mode, &bare) != ETHERVOX_SUCCESS) {
+        return 0;
+    }
+    int cap = (int)strlen(bare) + 256;
+    llama_token* bare_tokens = malloc((size_t)cap * sizeof(llama_token));
+    int n_bare = 0;
+    if (bare_tokens) {
+        n_bare = llama_tokenize(llama_model_get_vocab(gen_ctx->model), bare, (int)strlen(bare),
+                                bare_tokens, cap, true, true);
+    }
+    int common = 0;
+    if (n_bare > 0) {
+        int limit = n_bare < n_tokens - 1 ? n_bare : n_tokens - 1;
+        while (common < limit && bare_tokens[common] == tokens[common]) {
+            common++;
+        }
+    }
+    free(bare_tokens);
+    free(bare);
+    return common;
+}
+
+/** Evaluate tokens[from..to) in batches. Returns 0 on success. */
+static int decode_range(struct llama_context* ctx, llama_token* tokens, int from, int to) {
+    const int batch_size = 512;
+    for (int i = from; i < to; i += batch_size) {
+        int batch_count = (i + batch_size > to) ? (to - i) : batch_size;
+        struct llama_batch batch = llama_batch_get_one(tokens + i, batch_count);
+        if (llama_decode(ctx, batch) != 0) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
 /**
  * Tokenize and evaluate prompt
  *
@@ -806,22 +902,54 @@ static ethervox_result_t prefill_prompt(
     if (reuse == 0) {
         llama_memory_clear(mem, false);
     }
+
+    // The system prefix can also come from disk: restore it when this context holds nothing,
+    // otherwise decode it on its own, save it, then continue with the rest of the prompt.
+    char prefix_file[640] = "";
+    int prefix_len = 0;
+    bool save_prefix = false;
+    if (reuse == 0) {
+        prefix_len = system_prefix_length(gen_ctx, params, tokens, n_tokens);
+        if (prefix_len > 0 && prefix_file_path(gen_ctx, tokens, prefix_len, prefix_file, sizeof(prefix_file))) {
+            llama_token* restored = malloc((size_t)prefix_len * sizeof(llama_token));
+            size_t n_loaded = 0;
+            bool hit = restored &&
+                llama_state_seq_load_file(gen_ctx->ctx, prefix_file, 0, restored, (size_t)prefix_len, &n_loaded) > 0 &&
+                n_loaded == (size_t)prefix_len &&
+                memcmp(restored, tokens, (size_t)prefix_len * sizeof(llama_token)) == 0;
+            free(restored);
+            if (hit) {
+                reuse = prefix_len;
+                ETHERVOX_LOG_INFO("Restored %d-token system prefix from disk", prefix_len);
+            } else {
+                llama_memory_clear(mem, false);
+                save_prefix = true;
+            }
+        }
+    }
     ETHERVOX_LOG_INFO("Prompt %d tokens, %d reused from the previous call", n_tokens, reuse);
 
-    // Evaluate the rest of the prompt in batches
-    int batch_size = 512;
-    for (int i = reuse; i < n_tokens; i += batch_size) {
-        int batch_count = (i + batch_size > n_tokens) ? (n_tokens - i) : batch_size;
-        
-        struct llama_batch batch = llama_batch_get_one(tokens + i, batch_count);
-        
-        int result = llama_decode(gen_ctx->ctx, batch);
-        if (result != 0) {
+    if (save_prefix) {
+        if (decode_range(gen_ctx->ctx, tokens, 0, prefix_len) != 0) {
             prefix_cache_invalidate();
             free(tokens);
             free(formatted);
             return ETHERVOX_ERROR_FAILED;
         }
+        if (llama_state_seq_save_file(gen_ctx->ctx, prefix_file, 0, tokens, (size_t)prefix_len) == 0) {
+            ETHERVOX_LOG_WARN("Could not save system prefix state to %s", prefix_file);
+        } else {
+            ETHERVOX_LOG_INFO("Saved %d-token system prefix to disk", prefix_len);
+        }
+        reuse = prefix_len;
+    }
+
+    // Evaluate the rest of the prompt in batches
+    if (decode_range(gen_ctx->ctx, tokens, reuse, n_tokens) != 0) {
+        prefix_cache_invalidate();
+        free(tokens);
+        free(formatted);
+        return ETHERVOX_ERROR_FAILED;
     }
     prefix_cache_store(gen_ctx->ctx, tokens, n_tokens);
     

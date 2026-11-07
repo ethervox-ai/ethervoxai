@@ -219,6 +219,18 @@ ethervox_result_t ethervox_generate_structured(
 );
 
 /**
+ * Set the directory where the system-prompt prefix state is saved between loads.
+ *
+ * Once set, the KV state of the system prompt is written there after its first prefill and
+ * restored on later calls whose prompt begins with the same tokens, skipping the re-prefill.
+ * The file name is keyed by model path, context size and the prefix tokens, so a changed prompt
+ * or model never restores stale state. NULL or empty disables the disk cache.
+ *
+ * @param dir Existing or creatable directory, copied internally
+ */
+void ethervox_structured_set_prefix_cache_dir(const char* dir);
+
+/**
  * Get default generation parameters
  *
  * @return Default parameters struct
