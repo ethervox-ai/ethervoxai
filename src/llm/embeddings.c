@@ -190,13 +190,14 @@ ethervox_result_t ethervox_embed_texts(
             return ETHERVOX_ERROR_FAILED;
         }
         
-        // Truncate if too long
-        bool truncated = false;
-        if (n_tokens > MAX_TEXT_TOKENS) {
+        // Truncate if too long. The buffer below is sized for the FULL token count: tokenising into a
+        // buffer smaller than the text needs fails (llama_tokenize returns the negative count), so the
+        // text is tokenised whole and only the first MAX_TEXT_TOKENS tokens are decoded.
+        const int n_full = n_tokens;
+        if (n_full > MAX_TEXT_TOKENS) {
             ETHERVOX_LOG_WARN("[Embeddings] Text %zu truncated from %d to %d tokens",
-                            i, n_tokens, MAX_TEXT_TOKENS);
+                            i, n_full, MAX_TEXT_TOKENS);
             n_tokens = MAX_TEXT_TOKENS;
-            truncated = true;
         }
         
         if (n_tokens == 0) {
@@ -207,16 +208,16 @@ ethervox_result_t ethervox_embed_texts(
         }
         
         // Allocate token buffer
-        llama_token* tokens = (llama_token*)malloc(n_tokens * sizeof(llama_token));
+        llama_token* tokens = (llama_token*)malloc(n_full * sizeof(llama_token));
         if (!tokens) {
             return ETHERVOX_ERROR_OUT_OF_MEMORY;
         }
         
         // Actually tokenize
-        int n_tokenized = llama_tokenize(vocab, text, (int)strlen(text), tokens, n_tokens, true, false);
-        if (n_tokenized != n_tokens) {
+        int n_tokenized = llama_tokenize(vocab, text, (int)strlen(text), tokens, n_full, true, false);
+        if (n_tokenized != n_full) {
             free(tokens);
-            ETHERVOX_LOG_ERROR("[Embeddings] Token count mismatch: expected %d, got %d", n_tokens, n_tokenized);
+            ETHERVOX_LOG_ERROR("[Embeddings] Token count mismatch: expected %d, got %d", n_full, n_tokenized);
             return ETHERVOX_ERROR_FAILED;
         }
         

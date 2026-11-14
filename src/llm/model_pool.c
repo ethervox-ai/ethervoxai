@@ -425,17 +425,18 @@ ethervox_result_t ethervox_model_pool_load(
     ctx_params.kv_unified = config->kv_unified;
     ctx_params.embeddings = config->embeddings;
     if (config->embeddings) {
-        // llama_get_embeddings_seq() returns NULL unless pooling_type is set at context-creation
-        // time (it cannot be chosen per-call) - see llama.h's own "Returns NULL if pooling_type is
-        // LLAMA_POOLING_TYPE_NONE" contract. ethervox_embed_texts()'s `pooling` parameter is
-        // therefore only meaningful for MEAN today; a caller requesting CLS/LAST still gets a
-        // context pooled as MEAN, since ethervox_model_config_t has no per-strategy field yet.
-        // Tracked as a known limitation (E4.7), not fixed here - MEAN is this API's only verified
-        // working strategy.
-        ctx_params.pooling_type = LLAMA_POOLING_TYPE_MEAN;
+        // Pooling is fixed at context creation (llama_get_embeddings_seq() returns NULL under
+        // NONE). Use the model's own default (CLS for the Granite embedders); a model that has
+        // none, such as a decoder used as an embedder, is pooled as MEAN, retried below.
+        ctx_params.pooling_type = LLAMA_POOLING_TYPE_UNSPECIFIED;
     }
-    
+
     struct llama_context* ctx = llama_init_from_model(model, ctx_params);
+    if (ctx && config->embeddings && llama_pooling_type(ctx) == LLAMA_POOLING_TYPE_NONE) {
+        llama_free(ctx);
+        ctx_params.pooling_type = LLAMA_POOLING_TYPE_MEAN;
+        ctx = llama_init_from_model(model, ctx_params);
+    }
     if (!ctx) {
         llama_free_model(model);
         ETHERVOX_LOG_ERROR("[ModelPool] Failed to create context");
