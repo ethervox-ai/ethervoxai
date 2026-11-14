@@ -259,8 +259,9 @@ endif()
 
 # Define runtime directory paths based on platform
 if(TARGET_PLATFORM STREQUAL "WINDOWS")
-    # Windows: %USERPROFILE%\.ethervox
-    add_definitions(-DETHERVOX_RUNTIME_DIR_BASE="%USERPROFILE%\\\\.ethervox")
+    # Windows: %USERPROFILE%\.ethervox comes from the fallback in include/ethervox/config.h. It is not
+    # passed as a compile definition: a global -D with embedded quotes and %...% is rejected by MSVC
+    # (D8038) and, being global, also reached llama.cpp's targets.
 elseif(TARGET_PLATFORM STREQUAL "ANDROID")
     # Android: app-specific internal storage (handled at runtime via Java)
     add_definitions(-DETHERVOX_RUNTIME_DIR_BASE=NULL)
@@ -288,6 +289,8 @@ option(BUILD_EXECUTABLES "Build CLI executables (main app and tools)" ON)
 option(ENABLE_DEBUG "Enable debug logging" OFF)
 option(WITH_LLAMA "Enable Llama.cpp backend support" ON)
 option(WITH_TINYLLAMA "Enable TinyLlama backend support" ON)
+# TASK-N7.7: temporary transcription-latency instrumentation, removed by N7.8 - never on in playRelease.
+option(ETHERVOX_LATENCY_TRACE "Log transcription pipeline stage timings (temporary, N7.7)" OFF)
 
 # Fetch cJSON for settings persistence
 include(FetchContent)
@@ -312,7 +315,9 @@ if(NOT cjson_POPULATED)
                    "cmake_minimum_required(VERSION 3.16)" 
                    CJSON_CMAKE_CONTENT "${CJSON_CMAKE_CONTENT}")
     file(WRITE "${cjson_SOURCE_DIR}/CMakeLists.txt" "${CJSON_CMAKE_CONTENT}")
-    add_subdirectory(${cjson_SOURCE_DIR} ${cjson_BINARY_DIR})
+    # EXCLUDE_FROM_ALL keeps cJSON's own install rules (absolute /usr/local paths) out of `install` and
+    # CPack; it is linked statically into the library, so it is still built as a dependency.
+    add_subdirectory(${cjson_SOURCE_DIR} ${cjson_BINARY_DIR} EXCLUDE_FROM_ALL)
     # Remove -Werror from cjson compilation flags
     if(TARGET cjson)
         get_target_property(CJSON_FLAGS cjson COMPILE_OPTIONS)
@@ -328,8 +333,16 @@ if(NOT cjson_POPULATED)
     endif()
 endif()
 
-# Find libcurl for bug reporter (optional on Windows, not needed on Android/iOS)
-if(NOT TARGET_PLATFORM STREQUAL "ANDROID" AND NOT TARGET_PLATFORM STREQUAL "IOS" AND NOT WIN32)
+# Find libcurl only when a networked feature is compiled in. A build with every network feature OFF
+# (the WORKSPACE profile) must configure and link without libcurl, OpenSSL or any socket code (I1).
+set(ETHERVOX_NEEDS_CURL OFF)
+if(ETHERVOX_FEATURE_HTTP OR ETHERVOX_FEATURE_DOWNLOADER OR ETHERVOX_FEATURE_BUG_REPORT OR ETHERVOX_FEATURE_WEATHER)
+    set(ETHERVOX_NEEDS_CURL ON)
+endif()
+
+if(NOT ETHERVOX_NEEDS_CURL)
+    message(STATUS "Skipping CURL (no networked feature enabled)")
+elseif(NOT TARGET_PLATFORM STREQUAL "ANDROID" AND NOT TARGET_PLATFORM STREQUAL "IOS" AND NOT WIN32)
     find_package(CURL REQUIRED)
     if(CURL_FOUND)
         message(STATUS "Found CURL: ${CURL_LIBRARIES}")
@@ -350,6 +363,10 @@ endif()
 
 if(ENABLE_DEBUG)
     add_definitions(-DDEBUG_ENABLED=1)
+endif()
+
+if(ETHERVOX_LATENCY_TRACE)
+    add_definitions(-DETHERVOX_LATENCY_TRACE=1)
 endif()
 
 # LLM backend configuration
@@ -724,8 +741,15 @@ endif()
 # file_tools code or catalogue contract, not just an unreached registration
 # call - previously this flag only skipped the main.c call site, while the
 # plugin (and its embedded catalogue JSON) still linked into every profile.
+if(NOT WIN32)
+    # path_config.c is pure path configuration (no file mutation) and voice_tools.c, which every profile
+    # builds, depends on it, so it is part of the library in every profile.
+    list(APPEND ETHERVOXAI_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/file_tools/path_config.c")
+endif()
+
 if(NOT WIN32 AND ETHERVOX_FEATURE_FILE_TOOLS)
     file(GLOB FILE_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/file_tools/*.c")
+    list(REMOVE_ITEM FILE_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/file_tools/path_config.c")
     list(APPEND ETHERVOXAI_CORE_SOURCES ${FILE_TOOLS_SOURCES})
     message(STATUS "File tools plugin sources included")
 elseif(WIN32)
@@ -739,14 +763,21 @@ file(GLOB UNIT_CONVERSION_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/unit_
 list(APPEND ETHERVOXAI_CORE_SOURCES ${UNIT_CONVERSION_SOURCES})
 message(STATUS "Unit conversion plugin sources included")
 
-# Add startup prompt tools plugin sources
-file(GLOB STARTUP_PROMPT_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/startup_prompt_tools/*.c")
-list(APPEND ETHERVOXAI_CORE_SOURCES ${STARTUP_PROMPT_TOOLS_SOURCES})
+# Add startup prompt tools plugin sources.
+# The update tool writes startup_prompt.txt with fopen(..., "w"), so the plugin follows the file-tools
+# gate: an EDGE/WORKSPACE binary contains no built-in file writer (AGENTS.md I2).
+if(ETHERVOX_FEATURE_FILE_TOOLS)
+    file(GLOB STARTUP_PROMPT_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/startup_prompt_tools/*.c")
+    list(APPEND ETHERVOXAI_CORE_SOURCES ${STARTUP_PROMPT_TOOLS_SOURCES})
+    message(STATUS "Startup prompt tools plugin sources included")
+else()
+    message(STATUS "Startup prompt tools plugin SKIPPED (ETHERVOX_FEATURE_FILE_TOOLS=OFF)")
+endif()
 
 # System info tools
 file(GLOB SYSTEM_INFO_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/system_info_tools/*.c")
 list(APPEND ETHERVOXAI_CORE_SOURCES ${SYSTEM_INFO_TOOLS_SOURCES})
-message(STATUS "Startup prompt tools plugin sources included")
+message(STATUS "System info tools plugin sources included")
 
 # Add context tools plugin sources
 file(GLOB CONTEXT_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/context_tools/*.c")
@@ -929,6 +960,10 @@ if(ANDROID)
     message(STATUS "Enabled 16KB page alignment for Android")
 else()
     add_library(ethervoxai STATIC ${ETHERVOXAI_SOURCES})
+    if(MSVC)
+        # <stdatomic.h> (cancel_token.c) needs MSVC's opt-in C11 atomics support (VS 2022 17.5+).
+        target_compile_options(ethervoxai PRIVATE /experimental:c11atomics)
+    endif()
 endif()
 
 # Phonemizer removed (TASK-C1.0)
@@ -1166,7 +1201,10 @@ elseif(ANDROID)
     endif()
     
 elseif(UNIX AND NOT APPLE)
-    set(ETHERVOXAI_PLATFORM_LIBS asound pthread ${CURL_LIBRARIES} ssl crypto m)
+    set(ETHERVOXAI_PLATFORM_LIBS asound pthread m)
+    if(ETHERVOX_NEEDS_CURL)
+        list(APPEND ETHERVOXAI_PLATFORM_LIBS ${CURL_LIBRARIES} ssl crypto)
+    endif()
 elseif(APPLE)
     set(ETHERVOXAI_PLATFORM_LIBS "-framework CoreAudio" "-framework AudioToolbox" "-framework AudioUnit" "-framework CoreFoundation" pthread ${CURL_LIBRARIES})
 endif()
@@ -1204,34 +1242,6 @@ if(BUILD_EXECUTABLES AND NOT ANDROID AND NOT WIN32)
     endif()
     
     set_target_properties(ethervoxai_app PROPERTIES OUTPUT_NAME ethervoxai)
-endif()
-
-# Voice quality tuner tool (Unix only - uses termios.h)
-if(BUILD_EXECUTABLES AND NOT ANDROID AND NOT WIN32)
-    add_executable(voice_tuner tools/voice_tuner.c)
-    target_link_libraries(voice_tuner PRIVATE ethervoxai cjson)
-    target_include_directories(voice_tuner PRIVATE 
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${cjson_SOURCE_DIR})
-    set_target_properties(voice_tuner PROPERTIES OUTPUT_NAME ethervox-tune-voice)
-    if(TARGET_PLATFORM STREQUAL "IOS" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
-        install(TARGETS voice_tuner RUNTIME DESTINATION bin BUNDLE DESTINATION .)
-    else()
-        install(TARGETS voice_tuner RUNTIME DESTINATION bin)
-    endif()
-    
-    # Emotion tester tool for multi-speaker models
-    add_executable(emotion_tester tools/emotion_tester.c)
-    target_link_libraries(emotion_tester PRIVATE ethervoxai cjson)
-    target_include_directories(emotion_tester PRIVATE 
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${cjson_SOURCE_DIR})
-    set_target_properties(emotion_tester PROPERTIES OUTPUT_NAME ethervox-test-emotions)
-    if(TARGET_PLATFORM STREQUAL "IOS" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
-        install(TARGETS emotion_tester RUNTIME DESTINATION bin BUNDLE DESTINATION .)
-    else()
-        install(TARGETS emotion_tester RUNTIME DESTINATION bin)
-    endif()
 endif()
 
 # Optional: Examples and tests (if directories exist and not Android)

@@ -2754,6 +2754,41 @@ Java_com_droid_ethervox_1core_NativeLib_getLlamaPerformanceMetrics(JNIEnv* env, 
 // Global voice session state for transcription
 static ethervox_voice_session_t* g_voice_session = NULL;
 
+// Defined below, alongside the rest of the Mode 1/4 conversation JNI glue;
+// forward-declared here so the transcription-segment bridge (which needs
+// the same attach/detach pattern) can be defined before them.
+static JNIEnv* conversation_attach_env(bool* needs_detach);
+static void conversation_detach_env(bool needs_detach);
+
+// TASK-N7.8: JNI bridge for streaming transcription-segment events
+// (TASK-C3.5's ethervox_voice_tools_set_event_callback(), never previously
+// wired to Kotlin - the transport existed, nothing on the Java side called
+// it). Mirrors the g_conversation_callback_obj pattern above: a global ref
+// to the Kotlin callback, invoked from whichever native thread the event
+// arrives on (the transcription dispatch thread - see voice_tools.c) via
+// attach/detach, matching conversation_attach_env()/conversation_detach_env().
+static jobject g_transcription_segment_callback_obj = NULL;
+static jmethodID g_transcription_on_segment = NULL;
+
+static bool jni_transcription_on_segment(const ethervox_event_t* event, void* user_data) {
+  (void)user_data;
+  if (!event || event->type != ETHERVOX_EVENT_TRANSCRIPTION_SEGMENT) return true;
+  if (!g_transcription_segment_callback_obj || !g_transcription_on_segment) return true;
+
+  bool detach = false;
+  JNIEnv* env = conversation_attach_env(&detach);
+  if (!env) return true;
+
+  const ethervox_event_transcription_segment_t* seg = &event->transcription_segment;
+  jstring jText = create_jstring(env, seg->text ? seg->text : "");
+  (*env)->CallVoidMethod(env, g_transcription_segment_callback_obj, g_transcription_on_segment,
+                         (jint)seg->segment_id, (jint)seg->speaker_id, (jboolean)seg->is_final,
+                         jText);
+  if (jText) (*env)->DeleteLocalRef(env, jText);
+  conversation_detach_env(detach);
+  return true;
+}
+
 /**
  * Get Android-specific files directory (set from Kotlin)
  * Returns NULL if not on Android or not set
@@ -2919,6 +2954,16 @@ Java_com_droid_ethervox_1core_NativeLib_startVoiceTranscription(JNIEnv* env, job
   }
   LOGI("[Voice] [OK] Session verification passed");
 
+  // TASK-N7.8: (re-)wire the streaming-segment callback onto this session.
+  // ethervox_voice_tools_init() memset()s the whole struct including
+  // transcription_event_cb, so a callback registered via
+  // registerVoiceTranscriptionCallback() before the very first
+  // startVoiceTranscription() call (when g_voice_session was still NULL)
+  // needs to be re-applied here once the session actually exists.
+  if (g_transcription_segment_callback_obj) {
+    ethervox_voice_tools_set_event_callback(g_voice_session, jni_transcription_on_segment, NULL);
+  }
+
   // Start listening (recording + VAD)
   LOGI("[Voice] Starting voice recording...");
   int ret = ethervox_voice_tools_start_listen(g_voice_session);
@@ -2930,6 +2975,54 @@ Java_com_droid_ethervox_1core_NativeLib_startVoiceTranscription(JNIEnv* env, job
   LOGI("[Voice] [OK] Voice transcription started successfully!");
   LOGI("[Voice] ========================================");
   return 0;
+}
+
+/**
+ * TASK-N7.8: register/unregister a Kotlin listener for streaming
+ * transcription-segment events (TASK-C3.5's event, dispatched once per
+ * finalized chunk during recording - the transport already existed in the
+ * native backend; this is what makes it reachable from Kotlin at all).
+ * Pass null to unregister. Must be called after startVoiceTranscription()
+ * has initialized g_voice_session at least once (it registers on whatever
+ * session currently exists and re-registers on every start, since
+ * ethervox_voice_tools_init() doesn't reset transcription_event_cb - see
+ * that function's own memset(session, 0, ...) at the top, which does clear
+ * it, so re-registering after every startVoiceTranscription() call is
+ * required, not just defensive).
+ */
+JNIEXPORT void JNICALL
+Java_com_droid_ethervox_1core_NativeLib_registerVoiceTranscriptionCallback(
+    JNIEnv* env, jobject thiz, jobject callback) {
+  (void)thiz;
+
+  if (g_transcription_segment_callback_obj) {
+    (*env)->DeleteGlobalRef(env, g_transcription_segment_callback_obj);
+    g_transcription_segment_callback_obj = NULL;
+    g_transcription_on_segment = NULL;
+  }
+
+  if (!callback) {
+    if (g_voice_session) {
+      ethervox_voice_tools_set_event_callback(g_voice_session, NULL, NULL);
+    }
+    return;
+  }
+
+  if (!g_jvm) {
+    (*env)->GetJavaVM(env, &g_jvm);
+  }
+
+  g_transcription_segment_callback_obj = (*env)->NewGlobalRef(env, callback);
+  jclass callbackClass = (*env)->GetObjectClass(env, callback);
+  g_transcription_on_segment =
+      (*env)->GetMethodID(env, callbackClass, "onSegment", "(IIZLjava/lang/String;)V");
+  if ((*env)->ExceptionCheck(env)) {
+    (*env)->ExceptionClear(env);
+  }
+
+  if (g_voice_session) {
+    ethervox_voice_tools_set_event_callback(g_voice_session, jni_transcription_on_segment, NULL);
+  }
 }
 
 JNIEXPORT jstring JNICALL

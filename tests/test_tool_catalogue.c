@@ -116,6 +116,9 @@ static void test_golden_get_tool_info(void) {
     ethervox_tool_registry_cleanup(&registry);
 }
 
+// The startup-prompt and file tools write or read the file system, so they exist only in profiles
+// with ETHERVOX_FEATURE_FILE_TOOLS (not EDGE/WORKSPACE).
+#if ETHERVOX_FEATURE_FILE_TOOLS
 static void test_golden_startup_prompt_tools(void) {
     ethervox_tool_registry_t registry;
     CHECK(ethervox_is_success(ethervox_tool_registry_init(&registry, 4)));
@@ -133,6 +136,7 @@ static void test_golden_startup_prompt_tools(void) {
 
     ethervox_tool_registry_cleanup(&registry);
 }
+#endif
 
 static void test_golden_timer_tools(void) {
     const ethervox_tool_t* t = ethervox_tool_timer_create();
@@ -243,6 +247,7 @@ static void test_golden_memory_tools(void) {
     ethervox_tool_registry_cleanup(&registry);
 }
 
+#if ETHERVOX_FEATURE_FILE_TOOLS
 static void test_golden_file_tools(void) {
     ethervox_tool_registry_t registry;
     CHECK(ethervox_is_success(ethervox_tool_registry_init(&registry, 16)));
@@ -272,6 +277,7 @@ static void test_golden_file_tools(void) {
     ethervox_file_tools_cleanup(&config);
     ethervox_tool_registry_cleanup(&registry);
 }
+#endif
 
 static void test_golden_conversation_tools(void) {
     ethervox_tool_registry_t registry;
@@ -338,11 +344,15 @@ int main(void) {
     RUN_TEST(test_golden_system_info);
     RUN_TEST(test_golden_context_manage);
     RUN_TEST(test_golden_get_tool_info);
+#if ETHERVOX_FEATURE_FILE_TOOLS
     RUN_TEST(test_golden_startup_prompt_tools);
+#endif
     RUN_TEST(test_golden_timer_tools);
     RUN_TEST(test_golden_unit_conversion);
     RUN_TEST(test_golden_memory_tools);
+#if ETHERVOX_FEATURE_FILE_TOOLS
     RUN_TEST(test_golden_file_tools);
+#endif
     RUN_TEST(test_golden_conversation_tools);
     RUN_TEST(test_golden_workspace_tools_catalogue);
     RUN_TEST(test_loader_not_found);

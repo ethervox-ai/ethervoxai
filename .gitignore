@@ -209,3 +209,6 @@ examples/memory_example_memonly
 ethervox-test-emotions
 *.lldb
 build_validate/
+
+# Out-of-tree build directories (build_macos/, build_ios_device/, ...)
+build_*/

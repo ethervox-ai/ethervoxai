@@ -103,6 +103,15 @@ typedef struct {
     // thread. Allocated lazily on first event push; NULL until then.
     void* event_queue;
 
+    // TASK-N7.8: unbounded producer/consumer queue of raw captured audio
+    // (opaque, see voice_tools.c). audio_capture_thread() only reads
+    // hardware audio and pushes it here; a separate worker thread owns all
+    // STT interaction (ethervox_stt_process()/finalize()/start()), so a slow
+    // finalize() (measured up to ~60s per chunk - see N7.7) never blocks
+    // audio capture. Allocated lazily on first start_listen(); NULL until
+    // then.
+    void* audio_finalize_queue;
+
 } ethervox_voice_session_t;
 
 

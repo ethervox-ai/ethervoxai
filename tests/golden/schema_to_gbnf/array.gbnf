@@ -1,3 +1,3 @@
-root_item ::= "\"" ([^"\\\n] | "\\" ["\\/bfnrt])* "\""
-root ::= "[" ws (root_item (ws "," ws root_item)*)? ws "]"
-ws ::= [ \t\n]*
+root-item ::= "\"" ([^"\\\x7F\x00-\x1F] | "\\" ["\\/bfnrt])* "\"" ws
+root ::= "[" ws (root-item (ws "," ws root-item)*)? ws "]"
+ws ::= | " " | "\n" [ \t]{0,20}

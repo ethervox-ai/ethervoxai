@@ -60,6 +60,7 @@ jobs:
   build-desktop:
     name: Build Desktop Platforms
     strategy:
+      fail-fast: false  # each platform reports on its own; one failing must not hide the others
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         include:
@@ -109,6 +110,8 @@ jobs:
           build-essential \
           libasound2-dev \
           libcurl4-openssl-dev \
+          libncurses-dev \
+          libreadline-dev \
           libssl-dev \
           pkg-config \
           ninja-build
@@ -133,7 +136,8 @@ jobs:
       run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DTARGET_PLATFORM=${{ matrix.cmake_platform }}
 
     - name: Build C project
-      run: cmake --build build --config ${{ env.BUILD_TYPE }}
+      # -k 0 keeps going after a failure so one run lists every broken file, not just the first.
+      run: cmake --build build --config ${{ env.BUILD_TYPE }} -- -k 0
 
     - name: Run unit tests
       run: ctest --test-dir build --output-on-failure -C ${{ env.BUILD_TYPE }} || true
@@ -215,13 +219,16 @@ jobs:
   build-raspberry-pi:
     name: Build Raspberry Pi
     runs-on: ubuntu-latest
+    # QUARANTINED until ADR-0033 decides the Pi's role (end date 2026-12-15, BACKLOG-143): the job still
+    # runs and stays visible, but a failure does not block merges. If still undecided on that date, remove
+    # the job instead of leaving it red. `make configure-rpi` does not exist; replace it with the CMake
+    # presets when the role is decided.
+    continue-on-error: true
     strategy:
       matrix:
-        target: ['pi-zero', 'pi-4']
+        # Pi Zero is out of scope (ADR-0033); Pi 5 joins when its preset exists.
+        target: ['pi-4']
         include:
-          - target: 'pi-zero'
-            cmake_preset: 'rpi-zero-release'
-            arch: 'armhf'
           - target: 'pi-4'
             cmake_preset: 'rpi-4-release'
             arch: 'arm64'

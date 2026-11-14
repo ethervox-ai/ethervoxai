@@ -18,11 +18,27 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <time.h>
+
 #include "ggml.h"
 #include "mtmd-helper.h"
 #include "ethervox/logging.h"
 
 #define LOG_ERROR(...) ethervox_log(ETHERVOX_LOG_LEVEL_ERROR, __FILE__, __LINE__, __func__, __VA_ARGS__)
+
+// TASK-N7.7: temporary encode/prefill/decode split timing - measurement only, no
+// behaviour change, removed by N7.8. Off unless ETHERVOX_LATENCY_TRACE is defined.
+#ifdef ETHERVOX_LATENCY_TRACE
+static double n7_7_now_ms(void) {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1e6;
+}
+#define LOG_LATENCY(...) ethervox_log(ETHERVOX_LOG_LEVEL_INFO, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#else
+static inline double n7_7_now_ms(void) { return 0.0; }
+#define LOG_LATENCY(...) ((void)0)
+#endif
 
 // Fixed prompts, verbatim from IBM's granite-speech-4.1-2b-plus model card -
 // see granite_speech_backend.c's file header for the "why fixed prompts"
@@ -82,10 +98,13 @@ ethervox_result_t granite_speech_decode(
     return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
 
+  const double n7_7_encode_start_ms = n7_7_now_ms();
   mtmd_input_text input_text = {.text = prompt, .add_special = true, .parse_special = true};
   mtmd_input_chunks* chunks = mtmd_input_chunks_init();
   const mtmd_bitmap* bitmaps[1] = {bitmap};
   int32_t tok_rc = mtmd_tokenize(mctx, chunks, &input_text, bitmaps, 1);
+  LOG_LATENCY("N7.7 encode(tokenize): wall=%.1fms n_samples=%u",
+              n7_7_now_ms() - n7_7_encode_start_ms, n_samples);
   if (tok_rc != 0) {
     LOG_ERROR("Granite Speech: mtmd_tokenize failed (rc=%d)", tok_rc);
     mtmd_input_chunks_free(chunks);
@@ -93,9 +112,14 @@ ethervox_result_t granite_speech_decode(
     return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
 
+  // mtmd_helper_eval_chunks() runs the audio encoder and prefills the text prompt in
+  // one call - llama.cpp/mtmd does not expose a finer split than this.
+  const double n7_7_prefill_start_ms = n7_7_now_ms();
   llama_pos new_n_past = 0;
   int32_t eval_rc = mtmd_helper_eval_chunks(mctx, ctx, chunks, /*n_past=*/0, seq_id,
                                             /*n_batch=*/512, /*logits_last=*/true, &new_n_past);
+  LOG_LATENCY("N7.7 prefill(audio_encode+eval): wall=%.1fms new_n_past=%d",
+              n7_7_now_ms() - n7_7_prefill_start_ms, new_n_past);
   mtmd_input_chunks_free(chunks);
   mtmd_bitmap_free(bitmap);
   if (eval_rc != 0) {
@@ -116,8 +140,11 @@ ethervox_result_t granite_speech_decode(
   size_t transcript_len = 0;
   size_t transcript_cap = 8192;
   llama_pos pos = new_n_past;
+  const double n7_7_decode_start_ms = n7_7_now_ms();
+  uint32_t n7_7_tokens_generated = 0;
 
   for (uint32_t i = 0; i < max_tokens; i++) {
+    n7_7_tokens_generated = i + 1;
     llama_token next_token = llama_sampler_sample(sampler, ctx, -1);
     if (llama_vocab_is_eog(vocab, next_token)) {
       break;
@@ -161,6 +188,8 @@ ethervox_result_t granite_speech_decode(
   }
 
   llama_sampler_free(sampler);
+  LOG_LATENCY("N7.7 decode: wall=%.1fms tokens=%u",
+              n7_7_now_ms() - n7_7_decode_start_ms, n7_7_tokens_generated);
 
   // Strip any trailing stop-sequence text that leaked into the buffer before
   // the check above caught it (e.g. "<|end_of_text|>" itself is 1-3 tokens).

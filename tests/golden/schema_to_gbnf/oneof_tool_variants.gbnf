@@ -1,8 +1,8 @@
-root_variant0_tool_value ::= "\"calculator\""
-root_variant0_expression_value ::= "\"" ([^"\\\n] | "\\" ["\\/bfnrt])* "\""
-root_variant0 ::= "{" ws "\"tool\"" ws ":" ws root_variant0_tool_value ws "," ws "\"expression\"" ws ":" ws root_variant0_expression_value ws "}"
-root_variant1_tool_value ::= "\"weather\""
-root_variant1_location_value ::= "\"" ([^"\\\n] | "\\" ["\\/bfnrt])* "\""
-root_variant1 ::= "{" ws "\"tool\"" ws ":" ws root_variant1_tool_value ws "," ws "\"location\"" ws ":" ws root_variant1_location_value ws "}"
-root ::= root_variant0 | root_variant1
-ws ::= [ \t\n]*
+root-variant0-tool-value ::= "\"calculator\""
+root-variant0-expression-value ::= "\"" ([^"\\\x7F\x00-\x1F] | "\\" ["\\/bfnrt])* "\"" ws
+root-variant0 ::= "{" ws "\"tool\"" ws ":" ws root-variant0-tool-value ws "," ws "\"expression\"" ws ":" ws root-variant0-expression-value ws "}" ws
+root-variant1-tool-value ::= "\"weather\""
+root-variant1-location-value ::= "\"" ([^"\\\x7F\x00-\x1F] | "\\" ["\\/bfnrt])* "\"" ws
+root-variant1 ::= "{" ws "\"tool\"" ws ":" ws root-variant1-tool-value ws "," ws "\"location\"" ws ":" ws root-variant1-location-value ws "}" ws
+root ::= root-variant0 | root-variant1
+ws ::= | " " | "\n" [ \t]{0,20}

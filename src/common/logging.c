@@ -6,6 +6,16 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifdef _WIN32
+#include <io.h>
+#define ethervox_isatty _isatty
+#define ethervox_fileno _fileno
+#else
+#include <unistd.h>
+#define ethervox_isatty isatty
+#define ethervox_fileno fileno
+#endif
+
 #ifdef __ANDROID__
 #include <android/log.h>
 #endif
@@ -106,8 +116,16 @@ void ethervox_log(ethervox_log_level_t level, const char* file, int line,
 #endif
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &tm_info);
     
-    // Get color for this level
-    const char* color = log_level_color(level);
+    // Get color for this level -- only when stderr is a real terminal, never when piped or
+    // redirected into a log file / another process's captured output (callers like the
+    // ethervoxai-workspace model pool pipe this through structured logging and never want raw
+    // ANSI escapes embedded in it)
+    static int stderr_is_tty = -1;
+    if (stderr_is_tty == -1) {
+        stderr_is_tty = ethervox_isatty(ethervox_fileno(stderr)) ? 1 : 0;
+    }
+    const char* color = stderr_is_tty ? log_level_color(level) : "";
+    const char* color_reset = stderr_is_tty ? COLOR_RESET : "";
     
 #ifdef __ANDROID__
     // On Android, use Android logging system
@@ -148,7 +166,7 @@ void ethervox_log(ethervox_log_level_t level, const char* file, int line,
             func);
     
     // Print message in color
-    fprintf(stderr, "%s%s\n", message, COLOR_RESET);
+    fprintf(stderr, "%s%s\n", message, color_reset);
     fflush(stderr);
 #endif
     

@@ -257,12 +257,22 @@ ethervox_result_t ethervox_startup_prompt_tools_register(void* registry_ptr) {
         .execute = tool_startup_prompt_update,
         .is_deterministic = false
     };
-    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_STARTUP_PROMPT_TOOLS_JSON, "startup_prompt_update",
+    ethervox_result_t update_status = ethervox_tool_catalogue_load(
+        ETHERVOX_CATALOGUE_STARTUP_PROMPT_TOOLS_JSON, "startup_prompt_update",
         ethervox_tool_catalogue_build_profile(), &update_tool);
-    
-    if (ethervox_tool_registry_add(registry, &update_tool) != 0) {
-        STARTUP_ERROR("Failed to register startup_prompt_update tool");
-        return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    int registered = 0;
+    if (update_status == ETHERVOX_ERROR_NOT_SUPPORTED) {
+        // The contract excludes this build profile (WORKSPACE/EDGE: no built-in file writers).
+        STARTUP_LOG("startup_prompt_update not offered in this profile");
+    } else if (!ethervox_is_success(update_status)) {
+        STARTUP_ERROR("Failed to load startup_prompt_update contract");
+        return update_status;
+    } else {
+        if (ethervox_tool_registry_add(registry, &update_tool) != 0) {
+            STARTUP_ERROR("Failed to register startup_prompt_update tool");
+            return ETHERVOX_ERROR_INVALID_ARGUMENT;
+        }
+        registered++;
     }
     
     // Register startup_prompt_read tool
@@ -271,15 +281,23 @@ ethervox_result_t ethervox_startup_prompt_tools_register(void* registry_ptr) {
         .execute = tool_startup_prompt_read,
         .is_deterministic = true
     };
-    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_STARTUP_PROMPT_TOOLS_JSON, "startup_prompt_read",
+    ethervox_result_t read_status = ethervox_tool_catalogue_load(
+        ETHERVOX_CATALOGUE_STARTUP_PROMPT_TOOLS_JSON, "startup_prompt_read",
         ethervox_tool_catalogue_build_profile(), &read_tool);
-    
-    if (ethervox_tool_registry_add(registry, &read_tool) != 0) {
-        STARTUP_ERROR("Failed to register startup_prompt_read tool");
-        return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    if (read_status == ETHERVOX_ERROR_NOT_SUPPORTED) {
+        STARTUP_LOG("startup_prompt_read not offered in this profile");
+    } else if (!ethervox_is_success(read_status)) {
+        STARTUP_ERROR("Failed to load startup_prompt_read contract");
+        return read_status;
+    } else {
+        if (ethervox_tool_registry_add(registry, &read_tool) != 0) {
+            STARTUP_ERROR("Failed to register startup_prompt_read tool");
+            return ETHERVOX_ERROR_INVALID_ARGUMENT;
+        }
+        registered++;
     }
     
-    STARTUP_LOG("Registered 2 startup prompt tools");
+    STARTUP_LOG("Registered %d startup prompt tools", registered);
     
     return ETHERVOX_SUCCESS;
 }

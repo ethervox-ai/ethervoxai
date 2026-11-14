@@ -47,6 +47,22 @@ extern const char* ethervox_get_android_files_dir(void);
 #define LOG_DEBUG(...) \
   ethervox_log(ETHERVOX_LOG_LEVEL_DEBUG, __FILE__, __LINE__, __func__, __VA_ARGS__)
 
+// TASK-N7.7: temporary transcription-latency instrumentation - measurement only, no
+// behaviour change, removed by N7.8. Off unless ETHERVOX_LATENCY_TRACE is defined
+// (see CMakeLists.txt option of the same name) - never on in playRelease.
+#ifdef ETHERVOX_LATENCY_TRACE
+static double latency_trace_now_ms(void) {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1e6;
+}
+#define LOG_LATENCY(...) \
+  ethervox_log(ETHERVOX_LOG_LEVEL_INFO, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#else
+static inline double latency_trace_now_ms(void) { return 0.0; }
+#define LOG_LATENCY(...) ((void)0)
+#endif
+
 // Memory tag for path configurations
 #define PATH_CONFIG_TAG "user_path"
 #define PATH_CONFIG_PREFIX "USER_PATH:"
@@ -95,15 +111,21 @@ static ethervox_result_t download_granite_speech_plus_model(void) {
 // Global session pointer for tool wrappers
 static ethervox_voice_session_t* g_voice_session = NULL;
 
+// Defined below (needs the transcription-event queue machinery); called
+// from the audio-finalize worker thread (TASK-N7.8), declared here so that
+// worker doesn't need to be defined after it.
+static bool finalize_chunk_and_restart(ethervox_voice_session_t* session);
+
 // ============================================================================
 // TASK-C3.5 backpressure: bounded async transcription-event delivery queue
 //
-// finalize_chunk_and_restart() runs on the capture thread; if it called the
-// host's event callback directly and the host were slow (e.g. blocked on
-// UI), that delay would propagate straight into the capture thread's next
-// audio read, risking dropped/overrun audio (the "never stall capture"
-// design constraint). Pushing onto this queue instead is O(1); a dedicated
-// dispatch thread invokes the callback.
+// finalize_chunk_and_restart() runs on the audio-finalize worker thread (see
+// TASK-N7.8 below - it used to run on the capture thread itself, which N7.7
+// found could stall real-time audio capture for up to ~60s per chunk). If it
+// called the host's event callback directly and the host were slow (e.g.
+// blocked on UI), that delay would propagate straight into this queue's own
+// consumer, backing up finalizes. Pushing onto this queue instead is O(1); a
+// dedicated dispatch thread invokes the callback.
 //
 // Capacity is deliberately generous - 16 slots at one push per
 // GRANITE_SPEECH_CHUNK_SECONDS is >10 minutes of undelivered backlog -
@@ -258,6 +280,167 @@ static void destroy_event_queue(ethervox_voice_session_t* session) {
     session->event_queue = NULL;
 }
 
+// ============================================================================
+// TASK-N7.8: audio finalize queue. N7.7 measured finalize_chunk_and_restart()
+// taking up to ~60s for a single 45s chunk (fixed per-call cost dominates -
+// see docs/tasks/N7.7-measure-transcription-latency.md), longer than its own
+// window, while running synchronously on audio_capture_thread(). That thread
+// cannot read audio while blocked inside finalize(), so real-time audio
+// arriving during the stall was lost. This queue decouples the two: capture
+// only reads hardware audio and pushes it here; a dedicated worker thread
+// owns all STT interaction (process/finalize/start). The queue is an
+// unbounded linked list, not a fixed-capacity ring buffer like the
+// transcription-event queue above - capture must never block on it (see
+// this task's design constraint: grow, never drop, never stall capture).
+// ============================================================================
+
+typedef struct audio_queue_node {
+  float* samples;      // heap copy, owned by the node until the worker consumes it
+  uint32_t n_samples;
+  struct audio_queue_node* next;
+} audio_queue_node_t;
+
+typedef struct {
+  audio_queue_node_t* head;
+  audio_queue_node_t* tail;
+  size_t depth;         // node count, for diagnostics only
+  pthread_mutex_t lock;
+  pthread_cond_t not_empty;
+  pthread_t worker_thread;
+  bool worker_running;
+  bool shutdown_requested;
+  bool drain_only;      // set during shutdown: consume audio, do not finalize (see stop path)
+  ethervox_voice_session_t* session;
+} audio_finalize_queue_t;
+
+static void* audio_finalize_thread_main(void* arg) {
+  audio_finalize_queue_t* queue = (audio_finalize_queue_t*)arg;
+  ethervox_voice_session_t* session = queue->session;
+
+  for (;;) {
+    pthread_mutex_lock(&queue->lock);
+    while (queue->head == NULL && !queue->shutdown_requested) {
+      pthread_cond_wait(&queue->not_empty, &queue->lock);
+    }
+    if (queue->head == NULL && queue->shutdown_requested) {
+      pthread_mutex_unlock(&queue->lock);
+      break;
+    }
+
+    audio_queue_node_t* node = queue->head;
+    queue->head = node->next;
+    if (!queue->head) queue->tail = NULL;
+    queue->depth--;
+    bool drain_only = queue->drain_only;
+    pthread_mutex_unlock(&queue->lock);
+
+    ethervox_audio_buffer_t audio_buf;
+    audio_buf.data = node->samples;
+    audio_buf.size = node->n_samples;
+    audio_buf.channels = 1;
+    audio_buf.timestamp_us = 0;
+
+    ethervox_stt_result_t result;
+    ethervox_stt_process(&session->stt_runtime, &audio_buf, &result);
+
+    // During shutdown drain (see stop path below) we only fold queued audio
+    // into the STT accumulator - the caller does the one true tail finalize
+    // itself, synchronously, after this thread has joined, so the existing
+    // stop-path formatting/instrumentation stays exactly as it was.
+    if (!drain_only &&
+        difftime(time(NULL), session->chunk_start_time) >= GRANITE_SPEECH_CHUNK_SECONDS) {
+      finalize_chunk_and_restart(session);
+    }
+
+    free(node->samples);
+    free(node);
+  }
+
+  return NULL;
+}
+
+static audio_finalize_queue_t* get_or_create_audio_finalize_queue(ethervox_voice_session_t* session) {
+  if (session->audio_finalize_queue) {
+    return (audio_finalize_queue_t*)session->audio_finalize_queue;
+  }
+
+  audio_finalize_queue_t* queue =
+      (audio_finalize_queue_t*)calloc(1, sizeof(audio_finalize_queue_t));
+  if (!queue) return NULL;
+
+  queue->session = session;
+  pthread_mutex_init(&queue->lock, NULL);
+  pthread_cond_init(&queue->not_empty, NULL);
+
+  if (pthread_create(&queue->worker_thread, NULL, audio_finalize_thread_main, queue) == 0) {
+    queue->worker_running = true;
+  } else {
+    LOG_ERROR("Failed to start audio finalize worker thread");
+    pthread_mutex_destroy(&queue->lock);
+    pthread_cond_destroy(&queue->not_empty);
+    free(queue);
+    return NULL;
+  }
+
+  session->audio_finalize_queue = queue;
+  return queue;
+}
+
+// Copies `audio_buf`'s samples and hands them to the finalize worker thread.
+// Never blocks the caller (capture thread) beyond the brief lock hold to
+// append a node - the queue grows rather than applying backpressure, per
+// this task's "never stall capture" constraint.
+static void push_audio_for_finalize(ethervox_voice_session_t* session,
+                                     const ethervox_audio_buffer_t* audio_buf) {
+  audio_finalize_queue_t* queue = get_or_create_audio_finalize_queue(session);
+  if (!queue) return;
+
+  audio_queue_node_t* node = (audio_queue_node_t*)malloc(sizeof(audio_queue_node_t));
+  if (!node) return;
+  node->samples = (float*)malloc(audio_buf->size * sizeof(float));
+  if (!node->samples) {
+    free(node);
+    return;
+  }
+  memcpy(node->samples, audio_buf->data, audio_buf->size * sizeof(float));
+  node->n_samples = audio_buf->size;
+  node->next = NULL;
+
+  pthread_mutex_lock(&queue->lock);
+  if (queue->tail) {
+    queue->tail->next = node;
+  } else {
+    queue->head = node;
+  }
+  queue->tail = node;
+  queue->depth++;
+  pthread_cond_signal(&queue->not_empty);
+  pthread_mutex_unlock(&queue->lock);
+}
+
+// Signals the worker to drain any queued audio into the STT accumulator
+// (without finalizing) and joins it. Called from the stop path, after
+// capture has already stopped, so no more audio will ever be pushed.
+static void drain_and_join_audio_finalize_queue(ethervox_voice_session_t* session) {
+  if (!session->audio_finalize_queue) return;
+  audio_finalize_queue_t* queue = (audio_finalize_queue_t*)session->audio_finalize_queue;
+
+  pthread_mutex_lock(&queue->lock);
+  queue->drain_only = true;
+  queue->shutdown_requested = true;
+  pthread_cond_signal(&queue->not_empty);
+  pthread_mutex_unlock(&queue->lock);
+
+  if (queue->worker_running) {
+    pthread_join(queue->worker_thread, NULL);
+  }
+
+  pthread_mutex_destroy(&queue->lock);
+  pthread_cond_destroy(&queue->not_empty);
+  free(queue);
+  session->audio_finalize_queue = NULL;
+}
+
 /**
  * Extract the highest [Speaker N]: id referenced anywhere in `text` and
  * fold it into session->max_speaker_id. Native Granite Speech Plus SAA tags
@@ -337,7 +520,13 @@ static bool finalize_chunk_and_restart(ethervox_voice_session_t* session) {
   ethervox_stt_result_t result;
   bool produced_segment = false;
 
-  if (ethervox_is_success(ethervox_stt_finalize(&session->stt_runtime, &result))) {
+  const double chunk_audio_seconds = difftime(time(NULL), session->chunk_start_time);
+  const double finalize_start_ms = latency_trace_now_ms();
+  ethervox_result_t finalize_rc = ethervox_stt_finalize(&session->stt_runtime, &result);
+  LOG_LATENCY("N7.7 chunk_finalize: audio=%.1fs wall=%.1fms",
+              chunk_audio_seconds, latency_trace_now_ms() - finalize_start_ms);
+
+  if (ethervox_is_success(finalize_rc)) {
     if (result.text && strlen(result.text) > 0) {
       LOG_INFO("📥 Granite Speech Plus chunk finalized: %zu chars", strlen(result.text));
 
@@ -406,15 +595,17 @@ static bool finalize_chunk_and_restart(ethervox_voice_session_t* session) {
 }
 
 /**
- * Background thread that captures audio and feeds it to Granite Speech Plus.
+ * Background thread that captures audio and hands it off for Granite Speech
+ * Plus processing.
  *
- * Unlike Whisper, Granite Speech has no internal VAD/segment-boundary
- * signal: ethervox_stt_process() always accumulates and returns success
- * with is_final=false (see granite_speech_backend.c). Instead, this thread
- * accumulates audio for GRANITE_SPEECH_CHUNK_SECONDS, then explicitly calls
- * finalize() to transcribe that chunk and start() to begin the next one,
- * carrying a transcript tail forward via config.prefix_text so speaker
- * numbering stays consistent across chunk boundaries.
+ * TASK-N7.8: this thread does hardware audio reads only - it no longer calls
+ * ethervox_stt_process()/finalize()/start() itself. N7.7 measured
+ * finalize_chunk_and_restart() taking up to ~60s for a single 45s chunk,
+ * which - when run here, on the same thread that reads audio - stalled
+ * capture and lost real-time audio for the duration. All STT interaction now
+ * happens on a separate worker thread (see audio_finalize_thread_main()
+ * above); this thread's only job is to keep reading hardware audio and
+ * pushing it to that worker's queue, which can never block on it.
  */
 static void* audio_capture_thread(void* arg) {
   ethervox_voice_session_t* session = (ethervox_voice_session_t*)arg;
@@ -431,8 +622,17 @@ static void* audio_capture_thread(void* arg) {
     return NULL;
   }
 
-  LOG_INFO("Audio capture thread started - chunked Granite Speech Plus decoding (%ds chunks)",
+  LOG_INFO("Audio capture thread started - handing off to async finalize worker (%ds chunks)",
            GRANITE_SPEECH_CHUNK_SECONDS);
+
+  // TASK-N7.7: cumulative samples captured vs. wall-clock elapsed, to detect whether
+  // the finalize worker falls behind its 16kHz real-time input (see task doc,
+  // hypothesis B). Logged once per second of session wall time.
+#ifdef ETHERVOX_LATENCY_TRACE
+  uint64_t latency_trace_samples_captured = 0;
+  time_t latency_trace_session_start = time(NULL);
+  time_t latency_trace_last_log = latency_trace_session_start;
+#endif
 
   while (session->is_recording && !session->stop_requested) {
     // Read audio from platform driver
@@ -451,17 +651,22 @@ static void* audio_capture_thread(void* arg) {
       }
 
       audio_buf.size = (uint32_t)samples_read;
+#ifdef ETHERVOX_LATENCY_TRACE
+      latency_trace_samples_captured += (uint64_t)samples_read;
 
-      // Accumulate into Granite Speech Plus's buffer - never produces a
-      // result directly (see granite_speech_backend.c process()).
-      ethervox_stt_result_t result;
-      ethervox_stt_process(&session->stt_runtime, &audio_buf, &result);
-
-      // Time-based chunk boundary: finalize + restart once we've
-      // accumulated GRANITE_SPEECH_CHUNK_SECONDS of audio.
-      if (difftime(time(NULL), session->chunk_start_time) >= GRANITE_SPEECH_CHUNK_SECONDS) {
-        finalize_chunk_and_restart(session);
+      time_t latency_trace_now = time(NULL);
+      if (latency_trace_now > latency_trace_last_log) {
+        double elapsed_s = difftime(latency_trace_now, latency_trace_session_start);
+        double captured_s = (double)latency_trace_samples_captured / 16000.0;
+        LOG_LATENCY("N7.7 capture_backlog: elapsed=%.0fs captured=%.1fs backlog=%.1fs",
+                    elapsed_s, captured_s, captured_s - elapsed_s);
+        latency_trace_last_log = latency_trace_now;
       }
+#endif
+
+      // TASK-N7.8: hand off to the finalize worker thread; never touches
+      // stt_runtime or the chunk-boundary timer directly from here.
+      push_audio_for_finalize(session, &audio_buf);
     } else if (ethervox_is_success(read_result) && audio_buf.size == 0) {
       // No audio available yet, sleep briefly
 #ifdef _WIN32
@@ -875,6 +1080,16 @@ ethervox_result_t ethervox_voice_tools_start_listen(ethervox_voice_session_t* se
     session->last_transcript_file[0] = '\0';  // Clear the path since file creation failed
   }
 
+  // Start the async finalize worker (TASK-N7.8) before the capture thread,
+  // so it is ready before any audio is pushed to it.
+  if (!get_or_create_audio_finalize_queue(session)) {
+    LOG_ERROR("Failed to start audio finalize worker thread");
+    ethervox_audio_stop_capture(&session->audio_runtime);
+    ethervox_stt_stop(&session->stt_runtime);
+    session->is_recording = false;
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
+  }
+
   // Start background capture thread
   pthread_t* thread = (pthread_t*)malloc(sizeof(pthread_t));
   if (thread && pthread_create(thread, NULL, audio_capture_thread, session) == 0) {
@@ -883,6 +1098,7 @@ ethervox_result_t ethervox_voice_tools_start_listen(ethervox_voice_session_t* se
   } else {
     LOG_ERROR("Failed to create capture thread");
     free(thread);
+    drain_and_join_audio_finalize_queue(session);
     ethervox_audio_stop_capture(&session->audio_runtime);
     ethervox_stt_stop(&session->stt_runtime);
     session->is_recording = false;
@@ -897,6 +1113,8 @@ ethervox_result_t ethervox_voice_tools_start_listen(ethervox_voice_session_t* se
  */
 ethervox_result_t ethervox_voice_tools_stop_listen(ethervox_voice_session_t* session,
                                      const char** transcript_out) {
+  const double n7_7_stop_start_ms = latency_trace_now_ms();  // TASK-N7.7
+
   if (!session || !session->is_initialized) {
     LOG_ERROR("Session not initialized");
     return ETHERVOX_ERROR_INVALID_ARGUMENT;
@@ -920,7 +1138,7 @@ ethervox_result_t ethervox_voice_tools_stop_listen(ethervox_voice_session_t* ses
     pthread_join(*thread, NULL);
     free(thread);
     session->capture_thread = NULL;
-    LOG_INFO("Capture thread joined - all audio fed to STT");
+    LOG_INFO("Capture thread joined - all audio handed to the finalize worker");
   }
 
   // Stop audio capture
@@ -928,12 +1146,21 @@ ethervox_result_t ethervox_voice_tools_stop_listen(ethervox_voice_session_t* ses
     ethervox_audio_stop_capture(&session->audio_runtime);
   }
 
+  // TASK-N7.8: capture has stopped, so no more audio will ever be pushed.
+  // Drain whatever is still queued into the STT accumulator and join the
+  // finalize worker before touching stt_runtime from this thread - this is
+  // what makes the tail finalize below safe without a race.
+  drain_and_join_audio_finalize_queue(session);
+
   // CRITICAL: Finalize the last (possibly partial) chunk to transcribe
   // whatever audio remains buffered - handles the /stoptranscribe case
   // where the current GRANITE_SPEECH_CHUNK_SECONDS window hasn't elapsed yet.
   LOG_INFO("Finalizing Granite Speech Plus transcription for remaining audio...");
   ethervox_stt_result_t final_result;
-  if (ethervox_stt_finalize(&session->stt_runtime, &final_result) == 0) {
+  const double n7_7_tail_start_ms = latency_trace_now_ms();  // TASK-N7.7
+  ethervox_result_t n7_7_tail_rc = ethervox_stt_finalize(&session->stt_runtime, &final_result);
+  LOG_LATENCY("N7.7 stop_finalize: wall=%.1fms", latency_trace_now_ms() - n7_7_tail_start_ms);
+  if (n7_7_tail_rc == 0) {
     if (final_result.text && strlen(final_result.text) > 0) {
       LOG_INFO("Finalize produced %zu chars", strlen(final_result.text));
 
@@ -1042,6 +1269,8 @@ ethervox_result_t ethervox_voice_tools_stop_listen(ethervox_voice_session_t* ses
   // before returning (see transcription_dispatch_thread_main()'s loop).
   destroy_event_queue(session);
 
+  LOG_LATENCY("N7.7 stop_total: wall=%.1fms", latency_trace_now_ms() - n7_7_stop_start_ms);
+
   return ETHERVOX_SUCCESS;
 }
 
@@ -1079,6 +1308,9 @@ void ethervox_voice_tools_cleanup(ethervox_voice_session_t* session) {
   // a no-op if event_queue is already NULL (session never registered a
   // callback, or was already stopped).
   destroy_event_queue(session);
+
+  // Same safety net for the TASK-N7.8 audio finalize queue.
+  drain_and_join_audio_finalize_queue(session);
 
   ethervox_stt_cleanup(&session->stt_runtime);
 
