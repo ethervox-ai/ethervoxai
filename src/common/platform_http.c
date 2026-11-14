@@ -3,7 +3,7 @@
  * @brief Cross-platform HTTP download implementation using libcurl
  *
  * Copyright (c) 2025 EthervoxAI
- * Licensed under CC BY-NC-SA 4.0
+ * Proprietary and confidential. See LICENSE.
  */
 
 #include "ethervox/platform_http.h"

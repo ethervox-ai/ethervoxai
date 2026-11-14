@@ -5,7 +5,7 @@
  * Manages the catalog of available tools that can be invoked by the Governor.
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/governor.h"
@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 ethervox_result_t ethervox_tool_registry_init(ethervox_tool_registry_t* registry, uint32_t initial_capacity) {
     if (!registry) {
@@ -51,7 +52,9 @@ ethervox_result_t ethervox_tool_registry_add(ethervox_tool_registry_t* registry,
     
     // Expand capacity if needed
     if (registry->tool_count >= registry->capacity) {
-        uint32_t new_capacity = registry->capacity * 2;
+        // A zero-initialised registry has capacity 0; doubling that would realloc 0 bytes and the
+        // memcpy below would then write past the allocation.
+        uint32_t new_capacity = registry->capacity ? registry->capacity * 2 : 8;
         ethervox_tool_t* new_tools = (ethervox_tool_t*)realloc(
             registry->tools,
             new_capacity * sizeof(ethervox_tool_t)
@@ -100,7 +103,8 @@ ethervox_result_t ethervox_tool_registry_export_manifest(
     // Open output file
     FILE* fp = fopen(binary_path, "wb");
     if (!fp) {
-        fprintf(stderr, "Failed to create manifest: %s\n", binary_path);
+        fprintf(stderr, "Failed to create manifest: %s (errno=%d: %s)\n", 
+                binary_path, errno, strerror(errno));
         return ETHERVOX_ERROR_INVALID_ARGUMENT;
     }
     
@@ -402,7 +406,7 @@ ethervox_result_t ethervox_tool_registry_build_system_prompt(
             "You are a helpful assistant with access to tools. "
             "When generating stories or creative content, write complete narratives with proper endings. "
             "Respond in the language in which you are addressed. "
-            "For conversations: Only generate YOUR response, then STOP. DO NOT generate the user's next message.\n");
+            "For conversations: Complete your thought with proper punctuation, then stop. Never generate the user's next message.\n");
         
         if (written < 0 || (size_t)written >= remaining) return ETHERVOX_ERROR_INVALID_ARGUMENT;
         

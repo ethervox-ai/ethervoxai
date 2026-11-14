@@ -4,14 +4,14 @@
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
  *
- * This file is part of EthervoxAI, licensed under CC BY-NC-SA 4.0.
+ * This file is part of EthervoxAI. Proprietary and confidential. See LICENSE.
  * You are free to share and adapt this work under the following terms:
  * - Attribution: Credit the original authors
- * - NonCommercial: Not for commercial use
+ * - Proprietary: internal use only, see LICENSE
  * - ShareAlike: Distribute under same license
  *
- * For full license terms, see: https://creativecommons.org/licenses/by-nc-sa/4.0/
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * For full license terms, see: LICENSE
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -296,6 +296,26 @@ ethervox_result_t ethervox_audio_register_platform_driver(ethervox_audio_runtime
   runtime->driver.cleanup = linux_audio_cleanup;
 
   return ETHERVOX_SUCCESS;
+}
+
+#include <math.h>
+
+/**
+ * RMS energy of a block of normalized float samples. Android, macOS and Windows define the same
+ * function in their platform files; the Linux build was missing it, so voice_conversation.c did not link.
+ */
+float ethervox_audio_calculate_rms_energy(const float* samples, uint32_t count) {
+  if (!samples || count == 0) {
+    return 0.0f;
+  }
+
+  double sum_sq = 0.0;
+  for (uint32_t i = 0; i < count; i++) {
+    double sample = (double)samples[i];
+    sum_sq += sample * sample;
+  }
+
+  return (float)sqrt(sum_sq / (double)count);
 }
 
 #endif  // ETHERVOX_PLATFORM_LINUX

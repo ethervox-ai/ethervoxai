@@ -1,0 +1,9 @@
+{
+  "type": "array",
+  "items": {
+    "type": "integer",
+    "minimum": 61,
+    "maximum": 926
+  },
+  "maxItems": 26
+}

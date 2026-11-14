@@ -1,0 +1,37 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "field_0": {
+        "type": "object",
+        "properties": {
+          "field_0": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{8}$"
+          },
+          "field_1": {
+            "type": "object",
+            "properties": {
+              "field_0": {
+                "type": "string",
+                "pattern": "^[0-9]{3}-[0-9]{4}$"
+              }
+            },
+            "required": [
+              "field_0"
+            ]
+          }
+        },
+        "required": [
+          "field_0",
+          "field_1"
+        ]
+      }
+    },
+    "required": [
+      "field_0"
+    ]
+  },
+  "minItems": 2
+}

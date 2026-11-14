@@ -4,7 +4,7 @@
  * @brief Implementation of context management actions
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/context_tools.h"
@@ -237,7 +237,8 @@ static char* generate_summary_llm(
     
     // Create temporary context for summarization (don't pollute main KV cache)
     // We'll use sequence ID 1 for this temporary summarization
-    llama_batch batch = llama_batch_init(n_prompt_tokens, 0, 1);
+    int n_seq_max = llama_n_seq_max(gov->llm_ctx);
+    llama_batch batch = llama_batch_init(n_prompt_tokens, 0, n_seq_max);
     batch.n_tokens = n_prompt_tokens;
     for (int i = 0; i < n_prompt_tokens; i++) {
         batch.token[i] = prompt_tokens[i];
@@ -296,7 +297,7 @@ static char* generate_summary_llm(
         }
         
         // Feed token back for next prediction (sequence 1)
-        llama_batch next_batch = llama_batch_init(1, 0, 1);
+        llama_batch next_batch = llama_batch_init(1, 0, n_seq_max);
         next_batch.n_tokens = 1;
         next_batch.token[0] = next_token;
         next_batch.pos[0] = current_pos;

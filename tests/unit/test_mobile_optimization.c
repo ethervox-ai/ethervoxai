@@ -7,10 +7,10 @@
  */
 
 #include "ethervox/governor.h"
+#include "test_utils.h"
 #include "ethervox/error.h"
 #include "ethervox/memory_tools.h"
 #include "ethervox/logging.h"
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,12 +21,12 @@ static void test_minimal_mode_config(void) {
     
     // Test default config (should be FULL mode)
     ethervox_governor_config_t config = ethervox_governor_default_config();
-    assert(config.system_prompt_mode == ETHERVOX_GOVERNOR_MODE_FULL);
-    assert(config.disable_memory_logging == false);
+    CHECK(config.system_prompt_mode == ETHERVOX_GOVERNOR_MODE_FULL);
+    CHECK(config.disable_memory_logging == false);
     
     // Test minimal mode setting
     config.system_prompt_mode = ETHERVOX_GOVERNOR_MODE_MINIMAL;
-    assert(config.system_prompt_mode == ETHERVOX_GOVERNOR_MODE_MINIMAL);
+    CHECK(config.system_prompt_mode == ETHERVOX_GOVERNOR_MODE_MINIMAL);
     
     printf("  ✓ Default config has FULL mode\n");
     printf("  ✓ Can set MINIMAL mode\n");
@@ -40,11 +40,11 @@ static void test_secret_mode_config(void) {
     ethervox_governor_config_t config = ethervox_governor_default_config();
     
     // Test default (logging enabled)
-    assert(config.disable_memory_logging == false);
+    CHECK(config.disable_memory_logging == false);
     
     // Test secret mode
     config.disable_memory_logging = true;
-    assert(config.disable_memory_logging == true);
+    CHECK(config.disable_memory_logging == true);
     
     printf("  ✓ Default has logging enabled\n");
     printf("  ✓ Can enable secret mode\n");
@@ -85,9 +85,9 @@ static void test_minimal_mode_init(void) {
     int result = ethervox_governor_init(&governor, &config, &registry);
     
     if (result == 0) {
-        assert(governor != NULL);
+        CHECK(governor != NULL);
         // Note: config fields are internal to governor.c
-        // assert(governor->config.system_prompt_mode == ETHERVOX_GOVERNOR_MODE_MINIMAL);
+        // CHECK(governor->config.system_prompt_mode == ETHERVOX_GOVERNOR_MODE_MINIMAL);
         
         printf("  ✓ Governor initialized with MINIMAL mode\n");
         printf("  ✓ Config preserved correctly\n");
@@ -120,9 +120,9 @@ static void test_secret_mode_init(void) {
     int result = ethervox_governor_init(&governor, &config, &registry);
     
     if (result == 0) {
-        assert(governor != NULL);
+        CHECK(governor != NULL);
         // Note: config fields are internal to governor.c
-        // assert(governor->config.disable_memory_logging == true);
+        // CHECK(governor->config.disable_memory_logging == true);
         
         printf("  ✓ Governor initialized with secret mode\n");
         printf("  ✓ Privacy flag preserved correctly\n");
@@ -155,10 +155,10 @@ static void test_combined_modes(void) {
     int result = ethervox_governor_init(&governor, &config, &registry);
     
     if (result == 0) {
-        assert(governor != NULL);
+        CHECK(governor != NULL);
         // Note: config fields are internal to governor.c
-        // assert(governor->config.system_prompt_mode == ETHERVOX_GOVERNOR_MODE_MINIMAL);
-        // assert(governor->config.disable_memory_logging == true);
+        // CHECK(governor->config.system_prompt_mode == ETHERVOX_GOVERNOR_MODE_MINIMAL);
+        // CHECK(governor->config.disable_memory_logging == true);
         
         printf("  ✓ Both modes enabled simultaneously\n");
         printf("  ✓ Fast loading + privacy combined\n");
@@ -236,14 +236,14 @@ static void test_mode_enum_values(void) {
     printf("TEST: Mode enum values...\n");
     
     // Verify enum values are distinct
-    assert(ETHERVOX_GOVERNOR_MODE_FULL != ETHERVOX_GOVERNOR_MODE_MINIMAL);
+    CHECK(ETHERVOX_GOVERNOR_MODE_FULL != ETHERVOX_GOVERNOR_MODE_MINIMAL);
     
     // Verify they can be used in conditionals
     ethervox_governor_system_prompt_mode_t mode = ETHERVOX_GOVERNOR_MODE_FULL;
-    assert(mode == ETHERVOX_GOVERNOR_MODE_FULL);
+    CHECK(mode == ETHERVOX_GOVERNOR_MODE_FULL);
     
     mode = ETHERVOX_GOVERNOR_MODE_MINIMAL;
-    assert(mode == ETHERVOX_GOVERNOR_MODE_MINIMAL);
+    CHECK(mode == ETHERVOX_GOVERNOR_MODE_MINIMAL);
     
     printf("  ✓ Enum values are distinct\n");
     printf("  ✓ Can be used in comparisons\n");

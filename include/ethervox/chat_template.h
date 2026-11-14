@@ -6,7 +6,7 @@
  * Qwen, Granite, Phi, Llama, and others.
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #ifndef ETHERVOX_CHAT_TEMPLATE_H
@@ -35,12 +35,18 @@ typedef enum {
  * Supported chat template formats
  */
 typedef enum {
-    CHAT_TEMPLATE_QWEN,      // Qwen 2.5 format: <|im_start|>role\n...<|im_end|>
-    CHAT_TEMPLATE_GRANITE,   // IBM Granite format: <|system|>, <|user|>, <|assistant|>
+    CHAT_TEMPLATE_QWEN,      // Qwen 2.5 / ChatML format: <|im_start|>role\n...<|im_end|>
+    CHAT_TEMPLATE_GRANITE_3, // IBM Granite 3.x format: <|start_of_role|>role<|end_of_role|>...< tool|>
+    CHAT_TEMPLATE_GRANITE_4, // IBM Granite 4.x format: <|start_of_role|>role<|end_of_role|>...; tool calls are <tool_call>{json}</tool_call> (TOOL_FORMAT_JSON_IN_XML)
+    CHAT_TEMPLATE_GRANITE = CHAT_TEMPLATE_GRANITE_4,  // Alias for latest Granite (backward compat)
     CHAT_TEMPLATE_PHI,       // Microsoft Phi format: <|system|>...<|end|><|user|>...<|end|>
     CHAT_TEMPLATE_LLAMA3,    // Meta Llama 3 format: <|begin_of_text|><|start_header_id|>role<|end_header_id|>
     CHAT_TEMPLATE_LFM,       // Liquid AI LFM2.5 format: ChatML with tool calling tokens
-    CHAT_TEMPLATE_AUTO       // Auto-detect from model name/metadata
+    CHAT_TEMPLATE_CHATML = CHAT_TEMPLATE_QWEN,  // ChatML alias (same as Qwen)
+    CHAT_TEMPLATE_AUTO,      // Auto-detect from model name/metadata
+    // Explicit value: the aliases above (CHAT_TEMPLATE_GRANITE, CHAT_TEMPLATE_CHATML) restart the
+    // implicit numbering, so an implicit value here would collide with an earlier template.
+    CHAT_TEMPLATE_GRANITE_4_2 = 7  // IBM Granite 4.2+: ChatML roles (<|im_start|>), <think> reasoning, <function=...> tool calls
 } chat_template_type_t;
 
 /**
@@ -65,6 +71,13 @@ typedef struct {
     // Tool result wrapper
     const char* tool_result_start;
     const char* tool_result_end;
+
+    // Tool result wrapper as the model's own chat template renders it (Granite 4: a user turn
+    // holding <tool_response>...</tool_response>). NULL = fall back to tool_result_*; new
+    // role-structured callers use chat_template_format_tool_response, legacy callers (governor.c)
+    // keep tool_result_* unchanged.
+    const char* tool_response_start;
+    const char* tool_response_end;
     
     // Stop sequences for generation
     const char* stop_sequences[8];
@@ -77,7 +90,19 @@ typedef struct {
     bool requires_explicit_directives;      // If true, use MUST/ALWAYS/NEVER language
     bool prefers_tool_first_response;       // If true, examples show tool call before explanation
     
+    // End-of-generation (EOG) token handling
+    // Some models (e.g., for creative writing) may generate EOG prematurely;
+    // set ignore_eog=true to continue generation past EOG tokens.
+    // Most models should have ignore_eog=false (default) to respect the model's decision.
+    bool ignore_eog;                        // If true, ignore EOG tokens and continue generation
+    
 } chat_template_t;
+
+/**
+ * Whether `tmpl` belongs to a model with switchable reasoning ("thinking") modes -- Granite 4.2+
+ * (https://www.ibm.com/granite/docs/models/granite4-2).
+ */
+bool chat_template_supports_thinking(const chat_template_t* tmpl);
 
 /**
  * Get chat template for a specific model type
@@ -99,14 +124,14 @@ chat_template_type_t chat_template_detect(const char* model_path);
 /**
  * Format a system message
  * 
- * @param template Chat template to use
+ * @param tmpl Chat template to use
  * @param content System message content
  * @param output Output buffer
  * @param output_size Size of output buffer
  * @return ETHERVOX_SUCCESS on success, error code on failure
  */
 ethervox_result_t chat_template_format_system(
-    const chat_template_t* template,
+    const chat_template_t* tmpl,
     const char* content,
     char* output,
     size_t output_size
@@ -115,14 +140,14 @@ ethervox_result_t chat_template_format_system(
 /**
  * Format a user message
  * 
- * @param template Chat template to use
+ * @param tmpl Chat template to use
  * @param content User message content
  * @param output Output buffer
  * @param output_size Size of output buffer
  * @return ETHERVOX_SUCCESS on success, error code on failure
  */
 ethervox_result_t chat_template_format_user(
-    const chat_template_t* template,
+    const chat_template_t* tmpl,
     const char* content,
     char* output,
     size_t output_size
@@ -131,13 +156,13 @@ ethervox_result_t chat_template_format_user(
 /**
  * Format an assistant message start (for generation)
  * 
- * @param template Chat template to use
+ * @param tmpl Chat template to use
  * @param output Output buffer
  * @param output_size Size of output buffer
  * @return ETHERVOX_SUCCESS on success, error code on failure
  */
 ethervox_result_t chat_template_format_assistant_start(
-    const chat_template_t* template,
+    const chat_template_t* tmpl,
     char* output,
     size_t output_size
 );
@@ -145,14 +170,25 @@ ethervox_result_t chat_template_format_assistant_start(
 /**
  * Format a tool result message
  * 
- * @param template Chat template to use
+ * @param tmpl Chat template to use
  * @param result Tool result content
  * @param output Output buffer
  * @param output_size Size of output buffer
  * @return ETHERVOX_SUCCESS on success, error code on failure
  */
 ethervox_result_t chat_template_format_tool_result(
-    const chat_template_t* template,
+    const chat_template_t* tmpl,
+    const char* result,
+    char* output,
+    size_t output_size
+);
+
+/**
+ * Format a tool result the way the model's own template does (see tool_response_start); falls
+ * back to chat_template_format_tool_result's markers when the template defines none.
+ */
+ethervox_result_t chat_template_format_tool_response(
+    const chat_template_t* tmpl,
     const char* result,
     char* output,
     size_t output_size
@@ -161,23 +197,23 @@ ethervox_result_t chat_template_format_tool_result(
 /**
  * Check if text contains any stop sequence
  * 
- * @param template Chat template with stop sequences
+ * @param tmpl Chat template with stop sequences
  * @param text Text to check
  * @return true if stop sequence found, false otherwise
  */
 bool chat_template_has_stop_sequence(
-    const chat_template_t* template,
+    const chat_template_t* tmpl,
     const char* text
 );
 
 /**
  * Get the tool calling format for a chat template
  * 
- * @param template Chat template to query
+ * @param tmpl Chat template to query
  * @return Tool format type (TOOL_FORMAT_XML_ATTR, TOOL_FORMAT_JSON_IN_XML, etc.)
  */
 tool_format_type_t chat_template_get_tool_format(
-    const chat_template_t* template
+    const chat_template_t* tmpl
 );
 
 #ifdef __cplusplus

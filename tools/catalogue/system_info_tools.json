@@ -1,0 +1,16 @@
+[
+  {
+    "name": "system_version",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Get EthervoxAI version and build information including version number, git commit hash, build type, and platform.",
+    "is_mutating": false,
+    "schema": { "type": "object", "properties": {}, "required": [] }
+  },
+  {
+    "name": "system_capabilities",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Get system capabilities and configuration limits including max languages, plugins, audio settings, and platform type.",
+    "is_mutating": false,
+    "schema": { "type": "object", "properties": {}, "required": [] }
+  }
+]

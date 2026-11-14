@@ -1,0 +1,69 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 41
+    },
+    "field_1": {
+      "type": "boolean"
+    },
+    "field_2": {
+      "type": "boolean"
+    },
+    "field_3": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "string"
+        },
+        "field_1": {
+          "type": "boolean"
+        },
+        "field_2": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "field_0",
+        "field_2"
+      ]
+    },
+    "field_4": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "number"
+        },
+        "field_1": {
+          "type": "integer"
+        },
+        "field_2": {
+          "type": "integer"
+        },
+        "field_3": {
+          "type": "string"
+        },
+        "field_4": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "field_0",
+        "field_1",
+        "field_3"
+      ]
+    },
+    "field_5": {
+      "type": "string",
+      "maxLength": 80
+    }
+  },
+  "required": [
+    "field_0",
+    "field_4"
+  ]
+}

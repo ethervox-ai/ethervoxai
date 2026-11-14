@@ -1,0 +1,46 @@
+{
+  "type": "array",
+  "items": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "string",
+          "pattern": "^[0-9]{3}-[0-9]{4}$"
+        },
+        "field_1": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2
+        },
+        "field_2": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "field_3": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "field_0"
+          ]
+        }
+      },
+      "required": [
+        "field_0",
+        "field_1",
+        "field_2",
+        "field_3"
+      ]
+    },
+    "maxItems": 14
+  }
+}

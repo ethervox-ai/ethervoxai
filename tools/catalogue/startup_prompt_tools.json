@@ -1,0 +1,22 @@
+[
+  {
+    "name": "startup_prompt_update",
+    "profiles": ["MOBILE", "DESKTOP"],
+    "description": "Update the startup prompt that runs when the assistant starts. Use this to customize the initial greeting or behavior. The prompt will be saved and used on next restart.",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "prompt_text": { "type": "string", "description": "The new startup prompt text. Should be a natural greeting or instruction for the assistant." }
+      },
+      "required": ["prompt_text"]
+    }
+  },
+  {
+    "name": "startup_prompt_read",
+    "profiles": ["MOBILE", "DESKTOP"],
+    "description": "Read the current custom startup prompt. Returns the prompt text if a custom one exists, or indicates if using the default.",
+    "is_mutating": false,
+    "schema": { "type": "object", "properties": {} }
+  }
+]

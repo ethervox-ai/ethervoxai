@@ -14,7 +14,7 @@
  * SPDX-License-Identifier: CC-BY-NC-SA-4.0
  */
 
-#include <assert.h>
+#include "test_utils.h"
 #include "ethervox/error.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,15 +25,15 @@
 void test_plugin_type_to_string() {
   printf("Testing ethervox_plugin_type_to_string...\n");
 
-  assert(strcmp(ethervox_plugin_type_to_string(ETHERVOX_PLUGIN_LLM), "llm") == 0);
-  assert(strcmp(ethervox_plugin_type_to_string(ETHERVOX_PLUGIN_STT), "stt") == 0);
-  assert(strcmp(ethervox_plugin_type_to_string(ETHERVOX_PLUGIN_TTS), "tts") == 0);
-  assert(strcmp(ethervox_plugin_type_to_string(ETHERVOX_PLUGIN_INTENT), "intent") == 0);
-  assert(strcmp(ethervox_plugin_type_to_string(ETHERVOX_PLUGIN_ENTITY), "entity") == 0);
-  assert(strcmp(ethervox_plugin_type_to_string(ETHERVOX_PLUGIN_MIDDLEWARE), "middleware") == 0);
+  CHECK(strcmp(ethervox_plugin_type_to_string(ETHERVOX_PLUGIN_LLM), "llm") == 0);
+  CHECK(strcmp(ethervox_plugin_type_to_string(ETHERVOX_PLUGIN_STT), "stt") == 0);
+  CHECK(strcmp(ethervox_plugin_type_to_string(ETHERVOX_PLUGIN_TTS), "tts") == 0);
+  CHECK(strcmp(ethervox_plugin_type_to_string(ETHERVOX_PLUGIN_INTENT), "intent") == 0);
+  CHECK(strcmp(ethervox_plugin_type_to_string(ETHERVOX_PLUGIN_ENTITY), "entity") == 0);
+  CHECK(strcmp(ethervox_plugin_type_to_string(ETHERVOX_PLUGIN_MIDDLEWARE), "middleware") == 0);
 
   // Test unknown type
-  assert(strcmp(ethervox_plugin_type_to_string((ethervox_plugin_type_t)999), "unknown") == 0);
+  CHECK(strcmp(ethervox_plugin_type_to_string((ethervox_plugin_type_t)999), "unknown") == 0);
 
   printf("✓ Plugin type to string conversion test passed\n");
 }
@@ -41,12 +41,12 @@ void test_plugin_type_to_string() {
 void test_plugin_status_to_string() {
   printf("Testing ethervox_plugin_status_to_string...\n");
 
-  assert(strcmp(ethervox_plugin_status_to_string(ETHERVOX_PLUGIN_STATUS_UNLOADED), "unloaded") ==
+  CHECK(strcmp(ethervox_plugin_status_to_string(ETHERVOX_PLUGIN_STATUS_UNLOADED), "unloaded") ==
          0);
-  assert(strcmp(ethervox_plugin_status_to_string(ETHERVOX_PLUGIN_STATUS_LOADED), "loaded") == 0);
-  assert(strcmp(ethervox_plugin_status_to_string(ETHERVOX_PLUGIN_STATUS_ACTIVE), "active") == 0);
-  assert(strcmp(ethervox_plugin_status_to_string(ETHERVOX_PLUGIN_STATUS_ERROR), "error") == 0);
-  assert(strcmp(ethervox_plugin_status_to_string(ETHERVOX_PLUGIN_STATUS_DISABLED), "disabled") ==
+  CHECK(strcmp(ethervox_plugin_status_to_string(ETHERVOX_PLUGIN_STATUS_LOADED), "loaded") == 0);
+  CHECK(strcmp(ethervox_plugin_status_to_string(ETHERVOX_PLUGIN_STATUS_ACTIVE), "active") == 0);
+  CHECK(strcmp(ethervox_plugin_status_to_string(ETHERVOX_PLUGIN_STATUS_ERROR), "error") == 0);
+  CHECK(strcmp(ethervox_plugin_status_to_string(ETHERVOX_PLUGIN_STATUS_DISABLED), "disabled") ==
          0);
 
   printf("✓ Plugin status to string conversion test passed\n");
@@ -58,15 +58,15 @@ void test_plugin_manager_init() {
   ethervox_plugin_manager_t manager;
 
   // Initialize with default plugin directory
-  assert(ethervox_plugin_manager_init(&manager, NULL) == 0);
-  assert(manager.plugin_count == ETHERVOX_BUILTIN_PLUGIN_COUNT);
-  assert(manager.max_plugins == ETHERVOX_MAX_PLUGINS);
+  CHECK(ethervox_plugin_manager_init(&manager, NULL) == 0);
+  CHECK(manager.plugin_count == ETHERVOX_BUILTIN_PLUGIN_COUNT);
+  CHECK(manager.max_plugins == ETHERVOX_MAX_PLUGINS);
 
   // Cleanup
   ethervox_plugin_manager_cleanup(&manager);
 
   // Initialize with custom plugin directory
-  assert(ethervox_plugin_manager_init(&manager, "./test_plugins") == 0);
+  CHECK(ethervox_plugin_manager_init(&manager, "./test_plugins") == 0);
   ethervox_plugin_manager_cleanup(&manager);
 
   printf("✓ Plugin manager initialization test passed\n");
@@ -76,12 +76,12 @@ void test_plugin_manager_null_handling() {
   printf("Testing plugin manager null pointer handling...\n");
 
   // Test NULL manager
-  assert(ethervox_plugin_manager_init(NULL, NULL) == -1);
-  assert(ethervox_plugin_manager_init(NULL, "./plugins") == -1);
+  CHECK(ethervox_plugin_manager_init(NULL, NULL) == ETHERVOX_ERROR_INVALID_ARGUMENT);
+  CHECK(ethervox_plugin_manager_init(NULL, "./plugins") == ETHERVOX_ERROR_INVALID_ARGUMENT);
 
   // Test NULL plugin directory (should be allowed - uses default)
   ethervox_plugin_manager_t manager;
-  assert(ethervox_plugin_manager_init(&manager, NULL) == 0);
+  CHECK(ethervox_plugin_manager_init(&manager, NULL) == 0);
   ethervox_plugin_manager_cleanup(&manager);
 
   printf("✓ Plugin manager null pointer handling test passed\n");
@@ -91,11 +91,11 @@ void test_plugin_enums_ranges() {
   printf("Testing plugin enum value ranges...\n");
 
   // Test that enum values are in expected ranges
-  assert(ETHERVOX_PLUGIN_LLM >= 0);
-  assert(ETHERVOX_PLUGIN_MIDDLEWARE < 10);  // Reasonable upper bound
+  CHECK(ETHERVOX_PLUGIN_LLM >= 0);
+  CHECK(ETHERVOX_PLUGIN_MIDDLEWARE < 10);  // Reasonable upper bound
 
-  assert(ETHERVOX_PLUGIN_STATUS_UNLOADED >= 0);
-  assert(ETHERVOX_PLUGIN_STATUS_DISABLED < 10);  // Reasonable upper bound
+  CHECK(ETHERVOX_PLUGIN_STATUS_UNLOADED >= 0);
+  CHECK(ETHERVOX_PLUGIN_STATUS_DISABLED < 10);  // Reasonable upper bound
 
   printf("✓ Plugin enum ranges test passed\n");
 }

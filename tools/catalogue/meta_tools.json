@@ -1,0 +1,15 @@
+[
+  {
+    "name": "get_tool_info",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Get detailed schema and documentation for any tool. Use tool_name=\"*\" to list all available tools, or specify a tool name to get its parameters, types, and usage examples. Call this before using unfamiliar tools to understand their parameters.",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "tool_name": { "type": "string", "description": "Name of tool to get info for, or '*' for all tools" }
+      },
+      "required": ["tool_name"]
+    }
+  }
+]

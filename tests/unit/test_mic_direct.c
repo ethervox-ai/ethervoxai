@@ -1,7 +1,6 @@
 /**
  * Direct microphone test - bypasses conversation system
- * Tests: CoreAudio capture → Whisper STT
- * (Using Whisper instead of Vosk since Vosk requires complex build)
+ * Tests: CoreAudio capture → Granite Speech STT
  */
 
 #include <stdio.h>
@@ -16,7 +15,7 @@
 
 int main() {
     printf("========================================\n");
-    printf("Direct Microphone → Whisper STT Test\n");
+    printf("Direct Microphone → Granite Speech STT Test\n");
     printf("========================================\n\n");
     
     // Initialize audio
@@ -40,27 +39,33 @@ int main() {
     }
     printf("✓ CoreAudio initialized\n\n");
     
-    // Initialize Whisper STT (Vosk not available, using Whisper instead)
-    printf("2. Initializing Whisper STT...\n");
+    // Initialize Granite Speech STT (BASE variant - conversational ASR)
+    printf("2. Initializing Granite Speech STT...\n");
     ethervox_stt_runtime_t stt_runtime = {0};
     ethervox_stt_config_t stt_config = ethervox_stt_get_default_config();
-    stt_config.backend = ETHERVOX_STT_BACKEND_WHISPER;
+    stt_config.backend = ETHERVOX_STT_BACKEND_GRANITE_SPEECH;
     
-    // Use base.bin model
+    // Use the BASE model + its companion mmproj (audio projector) GGUF
     const char* home = getenv("HOME");
     static char model_path[512];
-    snprintf(model_path, sizeof(model_path), "%s/.ethervox/models/whisper/base.bin", home);
+    static char mmproj_path[512];
+    snprintf(model_path, sizeof(model_path),
+             "%s/.ethervox/models/granite-speech/granite-speech-4.1-2b.Q4_K_M.gguf", home);
+    snprintf(mmproj_path, sizeof(mmproj_path),
+             "%s/.ethervox/models/granite-speech/mmproj-granite-speech-4.1-2b-Q4_K_M.gguf", home);
     stt_config.model_path = model_path;
+    stt_config.mmproj_path = mmproj_path;
     
     stt_config.sample_rate = 16000;
     stt_config.enable_partial_results = 1; // Streaming mode
     
     if (ethervox_stt_init(&stt_runtime, &stt_config) != 0) {
-        fprintf(stderr, "❌ Failed to initialize Whisper\n");
+        fprintf(stderr, "❌ Failed to initialize Granite Speech\n");
         fprintf(stderr, "   Check if model exists: %s\n", model_path);
+        fprintf(stderr, "   Check if mmproj exists: %s\n", mmproj_path);
         return ETHERVOX_SUCCESS;
     }
-    printf("✓ Whisper STT initialized\n\n");
+    printf("✓ Granite Speech STT initialized\n\n");
     
     // Start STT session
     if (ethervox_stt_start(&stt_runtime) != 0) {
@@ -101,7 +106,7 @@ int main() {
         int samples = audio_runtime.driver.read_audio(&audio_runtime, &buffer);
         
         if (samples > 0) {
-            // Process with Vosk
+            // Process with Granite Speech
             ethervox_stt_result_t result;
             memset(&result, 0, sizeof(result));
             

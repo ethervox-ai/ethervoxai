@@ -64,6 +64,17 @@ typedef struct {
   char language[8];
   float audio_confidence;
   uint32_t processing_time_ms;
+  // ARCHITECTURE CHANGE (Granite Speech integration): this struct predates
+  // speaker-attributed ASR and has no field for it. Add something like
+  // `bool has_speaker_tags;` (or parse [Speaker N]: tags out of `text` at the
+  // call site) so SDK-level consumers of Mode 2 (transcription) results don't
+  // have to regex the native `[Speaker N]:` format themselves - see
+  // src/plugins/conversation_tools or the Android JNI layer, which currently
+  // does exactly that regex-parsing on the Kotlin side and will need the same
+  // fix independent of this struct (native output format changes from
+  // whatever Whisper/heuristic diarization currently emits to Granite Speech
+  // Plus's native, 1-indexed, colon-suffixed "[Speaker 1]: ..." format - no
+  // backward-compat parsing of the old format is required).
 } ethervox_stt_input_t;
 
 // Intent plugin callbacks

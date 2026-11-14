@@ -1,0 +1,128 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "maxLength": 12
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "field_1": {
+      "oneOf": [
+        {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "field_0": {
+                  "type": "array",
+                  "items": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "required": [
+                "field_0"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "field_0": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "field_0"
+                ]
+              },
+              "maxItems": 43
+            }
+          ]
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 82,
+            "maximum": 906
+          }
+        }
+      ]
+    },
+    "field_2": {
+      "oneOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "object",
+              "properties": {
+                "field_0": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "field_1": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "field_0",
+            "field_1"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{8}$"
+            },
+            "field_1": {
+              "type": "object",
+              "properties": {
+                "field_0": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "field_0"
+              ]
+            },
+            "field_2": {
+              "type": "string"
+            },
+            "field_3": {
+              "type": "string",
+              "maxLength": 35
+            }
+          },
+          "required": [
+            "field_0",
+            "field_1",
+            "field_2",
+            "field_3"
+          ]
+        }
+      ]
+    }
+  },
+  "required": [
+    "field_0",
+    "field_2"
+  ]
+}

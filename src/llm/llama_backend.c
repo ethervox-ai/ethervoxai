@@ -7,14 +7,14 @@
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
  *
- * This file is part of EthervoxAI, licensed under CC BY-NC-SA 4.0.
+ * This file is part of EthervoxAI. Proprietary and confidential. See LICENSE.
  * You are free to share and adapt this work under the following terms:
  * - Attribution: Credit the original authors
- * - NonCommercial: Not for commercial use
+ * - Proprietary: internal use only, see LICENSE
  * - ShareAlike: Distribute under same license
  *
- * For full license terms, see: https://creativecommons.org/licenses/by-nc-sa/4.0/
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * For full license terms, see: LICENSE
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 #include "ethervox/llm.h"
 #include "ethervox/error.h"
@@ -22,6 +22,7 @@
 #include "ethervox/config.h"
 #include "ethervox/device_profile.h"
 #include "ethervox/gguf_config_helper.h"
+#include "ethervox/grammar.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,9 +88,10 @@ typedef struct {
   
   // State
   char* loaded_model_path;
-  bool use_mlock;
-  bool use_mmap;
   volatile bool cancel_requested;  // Flag to cancel generation
+  
+  // Grammar (optional, for constrained decoding)
+  ethervox_grammar_t* grammar;      // Optional grammar constraint
   
 } llama_backend_context_t;
 
@@ -249,25 +251,10 @@ static ethervox_result_t ethervox_llama_backend_init(ethervox_llm_backend_t* bac
   ctx->n_threads = LLAMA_DEFAULT_THREADS;
   
   // Platform-specific memory settings for optimal performance
-#if defined(ETHERVOX_PLATFORM_MACOS) || defined(ETHERVOX_PLATFORM_LINUX) || defined(ETHERVOX_PLATFORM_WINDOWS)
-  // Desktop: Use mmap for fast startup, optional mlock if lots of RAM
-  ctx->use_mmap = true;    // Memory-map file for fast lazy loading
-  ctx->use_mlock = false;  // Don't lock (prevents swapping but needs lots of RAM)
-#elif defined(ETHERVOX_PLATFORM_IOS)
-  // iOS: mmap not supported, must preload model
-  ctx->use_mmap = false;   // iOS doesn't support mmap for model files
-  ctx->use_mlock = false;
-#elif defined(ETHERVOX_PLATFORM_ANDROID)
-  // Android: Use mmap for battery efficiency
-  ctx->use_mmap = true;
-  ctx->use_mlock = false;
-#else
-  // Embedded: Preload if enough RAM, otherwise use mmap
-  ctx->use_mmap = true;
-  ctx->use_mlock = false;
-#endif
+  // Note: llama.cpp removed load_mode from API - now uses default mmap behavior
   
   ctx->cancel_requested = false;
+  ctx->grammar = NULL;  // No grammar by default
   
   // Initialize device profiling for adaptive configuration
   ETHERVOX_LOG_INFO("[Adaptive Config] Initializing device profile...");
@@ -336,6 +323,25 @@ static void llama_backend_cleanup(ethervox_llm_backend_t* backend) {
 #endif
 }
 
+/**
+ * Set grammar constraint for next generation
+ * 
+ * @param backend Backend instance
+ * @param grammar Grammar to use (NULL to clear)
+ * @return ETHERVOX_SUCCESS or error code
+ */
+ethervox_result_t ethervox_llm_backend_set_grammar(ethervox_llm_backend_t* backend, 
+                                                    struct ethervox_grammar* grammar) {
+  if (!backend || !backend->handle) {
+    return ETHERVOX_ERROR_INVALID_ARGUMENT;
+  }
+  
+  llama_backend_context_t* ctx = (llama_backend_context_t*)backend->handle;
+  ctx->grammar = (ethervox_grammar_t*)grammar;
+  
+  return ETHERVOX_SUCCESS;
+}
+
 static ethervox_result_t llama_backend_load_model(ethervox_llm_backend_t* backend, const char* model_path) {
   if (!backend || !backend->handle || !model_path) {
     return ETHERVOX_ERROR_INVALID_ARGUMENT;
@@ -358,13 +364,9 @@ static ethervox_result_t llama_backend_load_model(ethervox_llm_backend_t* backen
   // Initialize model parameters
   ctx->model_params = llama_model_default_params();
   ctx->model_params.n_gpu_layers = ctx->n_gpu_layers;
-  ctx->model_params.use_mlock = ctx->use_mlock;
-  ctx->model_params.use_mmap = ctx->use_mmap;
   
-  ETHERVOX_LOG_INFO("Loading model with %d GPU layers requested (mmap=%s, mlock=%s)", 
-                    ctx->n_gpu_layers, 
-                    ctx->use_mmap ? "true" : "false",
-                    ctx->use_mlock ? "true" : "false");
+  ETHERVOX_LOG_INFO("Loading model with %d GPU layers requested", 
+                    ctx->n_gpu_layers);
   
   // Load model
   ctx->model = llama_model_load_from_file(model_path, ctx->model_params);
@@ -603,11 +605,68 @@ static ethervox_result_t llama_backend_generate(ethervox_llm_backend_t* backend,
     return ETHERVOX_ERROR_FAILED;
   }
   
-  // Add sampling strategies to the chain (same as streaming for consistency)
+  // Sampler chain order (following llama.cpp convention): penalties → temp → grammar → top_k → top_p → dist
+  // Grammar MUST come before truncating samplers to ensure at least one valid token survives
+  llama_sampler_chain_add(
+      sampler, llama_sampler_init_penalties(128, 1.2f, 0.0f, 0.0f));
+  llama_sampler_chain_add(sampler, llama_sampler_init_temp(ctx->temperature));
+  
+  // Grammar (if present) - constrain output format
+  if (ctx->grammar) {
+    struct llama_sampler* grammar_sampler = NULL;
+    
+    const char* grammar_source = ethervox_grammar_get_source(ctx->grammar);
+    const char* grammar_root = ethervox_grammar_get_root(ctx->grammar);
+    
+    LLAMA_LOG("Attempting to initialize grammar sampler:");
+    LLAMA_LOG("  Root: %s", grammar_root ? grammar_root : "(null)");
+    LLAMA_LOG("  Source length: %zu", grammar_source ? strlen(grammar_source) : 0);
+    if (!grammar_source || !grammar_root) {
+      LLAMA_ERROR("Grammar source or root is NULL");
+      llama_sampler_free(sampler);
+      free(response_text);
+      ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_INVALID_ARGUMENT, "Grammar source or root is NULL");
+    }
+    
+    size_t trigger_word_count = 0;
+    const char* const* trigger_words = ethervox_grammar_get_trigger_words(ctx->grammar, &trigger_word_count);
+    
+    if (ethervox_grammar_is_lazy(ctx->grammar) && trigger_words && trigger_word_count > 0) {
+      // Lazy mode: apply grammar only after trigger detected
+      LLAMA_LOG("Using lazy grammar with %zu trigger words", trigger_word_count);
+      grammar_sampler = llama_sampler_init_grammar_lazy_patterns(
+        vocab,
+        grammar_source,
+        grammar_root,
+        trigger_words,
+        trigger_word_count,
+        NULL, 0  // No trigger tokens for now
+      );
+    } else {
+      // Immediate mode: apply grammar from start
+      LLAMA_LOG("Using immediate grammar");
+      grammar_sampler = llama_sampler_init_grammar(
+        vocab,
+        grammar_source,
+        grammar_root
+      );
+    }
+    
+    if (!grammar_sampler) {
+      LLAMA_ERROR("Grammar compilation failed - llama_sampler_init_grammar returned NULL");
+      LLAMA_ERROR("Grammar root: %s", grammar_root);
+      LLAMA_ERROR("Grammar source (first 200 chars): %.200s", grammar_source);
+      llama_sampler_free(sampler);
+      free(response_text);
+      ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_INVALID_ARGUMENT, "Grammar compilation failed");
+    }
+    
+    LLAMA_LOG("Grammar sampler initialized successfully");
+    llama_sampler_chain_add(sampler, grammar_sampler);
+  }
+  
   llama_sampler_chain_add(sampler, llama_sampler_init_top_k(40));
   llama_sampler_chain_add(sampler, llama_sampler_init_top_p(ctx->top_p, 1));
-  llama_sampler_chain_add(sampler, llama_sampler_init_penalties(128, 1.2f, 0.0f, 0.0f));  // Stronger repeat penalty (128 lookback, 1.2 strength)
-  llama_sampler_chain_add(sampler, llama_sampler_init_temp(ctx->temperature));
   llama_sampler_chain_add(sampler, llama_sampler_init_dist(0));
   LLAMA_LOG("Sampler chain created, starting token generation (max %d tokens)", ctx->n_predict);
   
@@ -706,6 +765,7 @@ static ethervox_result_t llama_backend_generate_stream(ethervox_llm_backend_t* b
   // Note: We don't try to cancel mid-generation as it causes state corruption.
   // Instead, Kotlin layer uses processing IDs to ignore results from old generations.
   ctx->cancel_requested = false;
+  // Grammar is set separately via API if needed (not reset on each generation)
   
   // Synchronize to ensure any previous computation is complete
   llama_synchronize(ctx->ctx);
@@ -848,25 +908,52 @@ static ethervox_result_t llama_backend_generate_stream(ethervox_llm_backend_t* b
   // Create sampler chain with proper controls to prevent wild/repetitive outputs
   struct llama_sampler* sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
   
-  // Add sampling strategies in order:
-  // 1. top_k - limit to top 40 most probable tokens (prevents unlikely/random tokens)
-  llama_sampler_chain_add(sampler, llama_sampler_init_top_k(40));
-  
-  // 2. top_p - nucleus sampling with configured threshold (prevents low-probability tangents)
-  llama_sampler_chain_add(sampler, llama_sampler_init_top_p(ctx->top_p, 1));
-  
-  // 3. repetition penalty - discourage repeating patterns (prevents training-data-style repetition)
+  // Sampler chain order (following llama.cpp convention): penalties → temp → grammar → top_k → top_p → dist
+  // Grammar MUST come before truncating samplers to ensure at least one valid token survives
   llama_sampler_chain_add(sampler, llama_sampler_init_penalties(
-    128,    // penalty_last_n: look back 128 tokens (wider context)
+    128,    // penalty_last_n: look back 128 tokens
     1.2f,   // penalty_repeat: stronger penalty to break training patterns
     0.0f,   // penalty_freq: no frequency penalty
     0.0f    // penalty_present: no presence penalty
   ));
-  
-  // 4. temperature - controls randomness/creativity
   llama_sampler_chain_add(sampler, llama_sampler_init_temp(ctx->temperature));
   
-  // 5. dist - final sampling from the filtered distribution
+  if (ctx->grammar) {
+    struct llama_sampler* grammar_sampler = NULL;
+    
+    size_t trigger_word_count = 0;
+    const char* const* trigger_words = ethervox_grammar_get_trigger_words(ctx->grammar, &trigger_word_count);
+    
+    if (ethervox_grammar_is_lazy(ctx->grammar) && trigger_words && trigger_word_count > 0) {
+      grammar_sampler = llama_sampler_init_grammar_lazy_patterns(
+        vocab,
+        ethervox_grammar_get_source(ctx->grammar),
+        ethervox_grammar_get_root(ctx->grammar),
+        trigger_words,
+        trigger_word_count,
+        NULL, 0
+      );
+      LLAMA_LOG("Initialized lazy grammar sampler with %zu trigger words", trigger_word_count);
+    } else {
+      grammar_sampler = llama_sampler_init_grammar(
+        vocab,
+        ethervox_grammar_get_source(ctx->grammar),
+        ethervox_grammar_get_root(ctx->grammar)
+      );
+      LLAMA_LOG("Initialized immediate grammar sampler");
+    }
+    
+    if (!grammar_sampler) {
+      LLAMA_ERROR("Grammar compilation failed");
+      llama_sampler_free(sampler);
+      ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_INVALID_ARGUMENT, "Grammar compilation failed");
+    }
+    
+    llama_sampler_chain_add(sampler, grammar_sampler);
+  }
+  
+  llama_sampler_chain_add(sampler, llama_sampler_init_top_k(40));
+  llama_sampler_chain_add(sampler, llama_sampler_init_top_p(ctx->top_p, 1));
   llama_sampler_chain_add(sampler, llama_sampler_init_dist(0));
   
   LLAMA_LOG("Sampler chain created (temp=%.2f, top_p=%.2f, top_k=40, repeat_penalty=1.2), starting streaming token generation (max %u tokens)", 

@@ -1,0 +1,42 @@
+{
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "boolean"
+        },
+        "field_1": {
+          "type": "string"
+        },
+        "field_2": {
+          "type": "number"
+        },
+        "field_3": {
+          "type": "integer"
+        },
+        "field_4": {
+          "type": "boolean"
+        },
+        "field_5": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field_2",
+        "field_3",
+        "field_4",
+        "field_5"
+      ]
+    },
+    {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    {
+      "type": "string"
+    }
+  ]
+}

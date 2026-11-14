@@ -3,7 +3,7 @@
  * @brief Wake word detection for EthervoxAI
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * Licensed under CC BY-NC-SA 4.0
+ * Proprietary and confidential. See LICENSE.
  */
 
 #ifndef ETHERVOX_WAKE_WORD_H

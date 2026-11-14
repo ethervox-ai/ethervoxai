@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "string"
+    }
+  }
+}

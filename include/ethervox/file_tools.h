@@ -6,7 +6,7 @@
  * Write access is configurable and disabled by default for safety.
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #ifndef ETHERVOX_FILE_TOOLS_H
@@ -34,6 +34,13 @@ typedef enum {
     ETHERVOX_FILE_ACCESS_READ_ONLY = 0,
     ETHERVOX_FILE_ACCESS_READ_WRITE = 1
 } ethervox_file_access_mode_t;
+
+// TASK-C1.2: the WORKSPACE profile must not contain built-in file tools (AGENTS.md I2, ADR-0007: no
+// model output can mutate the file system). The access mode is a runtime enum, so a preprocessor test
+// on it can never fire; guard the build flag instead.
+#if defined(ETHERVOX_PROFILE_WORKSPACE) && ETHERVOX_FEATURE_FILE_TOOLS
+#error "ETHERVOX_FEATURE_FILE_TOOLS cannot be enabled under ETHERVOX_PROFILE=WORKSPACE. Workspace shells register their own read-only, vault-mediated file tools from the host."
+#endif
 
 /**
  * User-defined path configuration

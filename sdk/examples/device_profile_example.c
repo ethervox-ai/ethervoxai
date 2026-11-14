@@ -71,7 +71,7 @@ static void configure_rpi4_respeaker(ethervox_device_profile_t* profile) {
   // Processing capabilities
   profile->supports_edge_inference = true;
   profile->max_concurrent_streams = 4;
-  snprintf(profile->preferred_model, sizeof(profile->preferred_model), "%s", "whisper-base");
+  snprintf(profile->preferred_model, sizeof(profile->preferred_model), "%s", "granite-speech-base");
 }
 
 // Configure ESP32-S3 with built-in microphone
@@ -114,7 +114,7 @@ static void configure_esp32_s3_builtin(ethervox_device_profile_t* profile) {
   // Processing capabilities
   profile->supports_edge_inference = false;  // Limited memory
   profile->max_concurrent_streams = 1;
-  snprintf(profile->preferred_model, sizeof(profile->preferred_model), "%s", "whisper-tiny");
+  snprintf(profile->preferred_model, sizeof(profile->preferred_model), "%s", "granite-speech-base");
 }
 
 // Configure desktop development setup
@@ -148,7 +148,7 @@ static void configure_desktop_dev(ethervox_device_profile_t* profile) {
   // Processing capabilities
   profile->supports_edge_inference = true;
   profile->max_concurrent_streams = 8;
-  snprintf(profile->preferred_model, sizeof(profile->preferred_model), "%s", "whisper-large");
+  snprintf(profile->preferred_model, sizeof(profile->preferred_model), "%s", "granite-speech-plus");
 }
 
 // Available device templates

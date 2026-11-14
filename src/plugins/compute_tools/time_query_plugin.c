@@ -6,10 +6,12 @@
  * Provides tools to get current time, date, day of week, and week number
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/compute_tools.h"
+#include "ethervox/tool_catalogue.h"
+#include "compute_tools_catalogue.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -66,17 +68,22 @@ static int time_get_current_execute(const char* args_json, char** result, char**
 }
 
 static ethervox_tool_t time_get_current_tool = {
-    .name = "get_time",
-    .description = "Get current time. Use when user asks 'what time is it' or needs to know the current time.",
-    .parameters_json_schema = "{}",
-    .execute = time_get_current_execute,
+    .test_scenario = "What time is it?",
+        .execute = time_get_current_execute,
     .is_deterministic = false,
     .requires_confirmation = false,
     .is_stateful = false,
     .estimated_latency_ms = 1.0f
 };
+static bool time_get_current_tool_loaded = false;
 
 const ethervox_tool_t* ethervox_tool_time_get_current(void) {
+    if (!time_get_current_tool_loaded) {
+        ethervox_result_t r = ethervox_tool_catalogue_load(
+            ETHERVOX_CATALOGUE_COMPUTE_TOOLS_JSON, "get_time",
+            ethervox_tool_catalogue_build_profile(), &time_get_current_tool);
+        time_get_current_tool_loaded = ethervox_is_success(r);
+    }
     return &time_get_current_tool;
 }
 
@@ -119,17 +126,22 @@ static int time_get_date_execute(const char* args_json, char** result, char** er
 }
 
 static ethervox_tool_t time_get_date_tool = {
-    .name = "get_date",
-    .description = "Get current date (day/month/year). Use to get today's date. Use when user asks 'what's the date', needs today's date for calculations, or asks about days until/since an event.",
-    .parameters_json_schema = "{}",
-    .execute = time_get_date_execute,
+    .test_scenario = "What's today's date?",
+        .execute = time_get_date_execute,
     .is_deterministic = false,
     .requires_confirmation = false,
     .is_stateful = false,
     .estimated_latency_ms = 1.0f
 };
+static bool time_get_date_tool_loaded = false;
 
 const ethervox_tool_t* ethervox_tool_time_get_date(void) {
+    if (!time_get_date_tool_loaded) {
+        ethervox_result_t r = ethervox_tool_catalogue_load(
+            ETHERVOX_CATALOGUE_COMPUTE_TOOLS_JSON, "get_date",
+            ethervox_tool_catalogue_build_profile(), &time_get_date_tool);
+        time_get_date_tool_loaded = ethervox_is_success(r);
+    }
     return &time_get_date_tool;
 }
 
@@ -172,17 +184,22 @@ static int time_get_day_of_week_execute(const char* args_json, char** result, ch
 }
 
 static ethervox_tool_t time_get_day_of_week_tool = {
-    .name = "get_day",
-    .description = "Get the current day of the week. Use when user asks 'what day is it' or 'what day of the week'.",
-    .parameters_json_schema = "{}",
-    .execute = time_get_day_of_week_execute,
+    .test_scenario = "What day is it?",
+        .execute = time_get_day_of_week_execute,
     .is_deterministic = false,
     .requires_confirmation = false,
     .is_stateful = false,
     .estimated_latency_ms = 1.0f
 };
+static bool time_get_day_of_week_tool_loaded = false;
 
 const ethervox_tool_t* ethervox_tool_time_get_day_of_week(void) {
+    if (!time_get_day_of_week_tool_loaded) {
+        ethervox_result_t r = ethervox_tool_catalogue_load(
+            ETHERVOX_CATALOGUE_COMPUTE_TOOLS_JSON, "get_day",
+            ethervox_tool_catalogue_build_profile(), &time_get_day_of_week_tool);
+        time_get_day_of_week_tool_loaded = ethervox_is_success(r);
+    }
     return &time_get_day_of_week_tool;
 }
 
@@ -226,16 +243,21 @@ static int time_get_week_number_execute(const char* args_json, char** result, ch
 }
 
 static ethervox_tool_t time_get_week_number_tool = {
-    .name = "time_get_week_number",
-    .description = "Get the current week number of the year. Use when user asks 'what week is it' or 'what week number'.",
-    .parameters_json_schema = "{}",
-    .execute = time_get_week_number_execute,
+    .test_scenario = "What week of the year is it?",
+        .execute = time_get_week_number_execute,
     .is_deterministic = false,
     .requires_confirmation = false,
     .is_stateful = false,
     .estimated_latency_ms = 1.0f
 };
+static bool time_get_week_number_tool_loaded = false;
 
 const ethervox_tool_t* ethervox_tool_time_get_week_number(void) {
+    if (!time_get_week_number_tool_loaded) {
+        ethervox_result_t r = ethervox_tool_catalogue_load(
+            ETHERVOX_CATALOGUE_COMPUTE_TOOLS_JSON, "time_get_week_number",
+            ethervox_tool_catalogue_build_profile(), &time_get_week_number_tool);
+        time_get_week_number_tool_loaded = ethervox_is_success(r);
+    }
     return &time_get_week_number_tool;
 }

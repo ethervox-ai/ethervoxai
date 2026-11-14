@@ -1,0 +1,51 @@
+[
+  {
+    "name": "timer_create",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Create a timer with duration in seconds. Use for countdown timers (e.g., '5 minute timer', 'timer for 30 seconds')",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "duration_seconds": { "type": "integer", "description": "Duration in seconds" },
+        "label": { "type": "string", "description": "Optional label/name for the timer" }
+      },
+      "required": ["duration_seconds"]
+    }
+  },
+  {
+    "name": "timer_cancel",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Cancel an active timer by its ID",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "timer_id": { "type": "integer", "description": "ID of timer to cancel" }
+      },
+      "required": ["timer_id"]
+    }
+  },
+  {
+    "name": "timer_list",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "List all active timers and their remaining time",
+    "is_mutating": false,
+    "schema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "alarm_create",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Create an alarm for a specific time (24-hour format). Use for wake-up alarms or reminders at specific times (e.g., 'wake me at 7am', 'alarm for 2:30pm')",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "hour": { "type": "integer", "description": "Hour in 24-hour format (0-23)" },
+        "minute": { "type": "integer", "description": "Minute (0-59)" },
+        "label": { "type": "string", "description": "Optional label/name for the alarm" }
+      },
+      "required": ["hour", "minute"]
+    }
+  }
+]

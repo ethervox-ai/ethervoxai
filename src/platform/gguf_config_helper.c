@@ -5,7 +5,7 @@
  * Real implementation using llama.cpp APIs
  * 
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/gguf_config_helper.h"
@@ -25,8 +25,26 @@
 /**
  * Extract metadata from loaded GGUF model
  */
+/**
+ * Conservative values used when the real metadata cannot be read, so callers that compute memory
+ * budgets from it always get usable numbers.
+ */
+static void fill_safe_defaults(ethervox_model_metadata_t* metadata) {
+    metadata->context_length_train = 2048;
+    metadata->layer_count = 32;
+    metadata->embedding_dims = 3072;
+    metadata->vocab_size = 32000;
+    metadata->model_size_bytes = 2ULL * 1024 * 1024 * 1024;  // 2GB estimate
+    snprintf(metadata->architecture, sizeof(metadata->architecture), "unknown");
+}
+
 int ethervox_extract_model_metadata(void* model, ethervox_model_metadata_t* metadata) {
-    if (!model || !metadata) {
+    if (!metadata) {
+        return -1;
+    }
+    if (!model) {
+        // Report failure, but leave safe defaults behind rather than zeros.
+        fill_safe_defaults(metadata);
         return -1;
     }
     
@@ -68,12 +86,7 @@ int ethervox_extract_model_metadata(void* model, ethervox_model_metadata_t* meta
 #else
     // Stub: Return safe defaults when llama.cpp not available
     ETHERVOX_LOG_WARN("[GGUF Metadata] llama.cpp not available, using safe defaults");
-    metadata->context_length_train = 2048;
-    metadata->layer_count = 32;
-    metadata->embedding_dims = 3072;
-    metadata->vocab_size = 32000;
-    metadata->model_size_bytes = 2ULL * 1024 * 1024 * 1024;  // 2GB estimate
-    snprintf(metadata->architecture, sizeof(metadata->architecture), "unknown");
+    fill_safe_defaults(metadata);
     return -1;
 #endif
 }
@@ -91,7 +104,10 @@ size_t ethervox_estimate_kv_cache_mb(
     // For Phi-3.5 (32 layers, 8192 context, F16):
     // 32 layers * 2 heads * 8192 ctx * 2 bytes * 2 (K+V) = ~2GB
     
-    size_t bytes_per_token = metadata->layer_count * 2 * sizeof(uint16_t) * 2;
+    // Per token and layer, K and V each hold embedding_dims fp16 values. Without the dimension
+    // the estimate was ~1000x too small. Grouped-query models use less, so this is conservative.
+    size_t bytes_per_token = (size_t)metadata->layer_count * 2 * (size_t)metadata->embedding_dims *
+                             sizeof(uint16_t);
     size_t total_bytes = bytes_per_token * context_length;
     size_t mb = total_bytes / (1024 * 1024);
     

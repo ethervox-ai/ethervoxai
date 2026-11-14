@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        }
+      ]
+    }
+  }
+}

@@ -4,12 +4,14 @@
  * @brief Register file tools with Governor tool registry
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/file_tools.h"
 #include "ethervox/governor.h"
 #include "ethervox/logging.h"
+#include "ethervox/tool_catalogue.h"
+#include "file_tools_catalogue.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -771,94 +773,72 @@ ethervox_result_t ethervox_file_tools_register(
     
     // Register file_list tool
     ethervox_tool_t tool_list = {
-        .name = "file_list",
-        .description = "List files and directories in a given path. Use '.' for current directory, '..' for parent, or provide an absolute path.",
-        .parameters_json_schema =
-            "{\"type\":\"object\",\"properties\":{"
-            "\"directory\":{\"type\":\"string\",\"description\":\"Directory path to list (use '.' for current directory)\"},"
-            "\"path\":{\"type\":\"string\",\"description\":\"Directory path to list (alternative to 'directory')\"},"
-            "\"recursive\":{\"type\":\"boolean\",\"description\":\"Recurse into subdirectories\"}"
-            "}}",
+        .test_scenario = "Show me files in my downloads folder",
         .execute = tool_file_list_wrapper,
         .is_deterministic = true,
         .requires_confirmation = false,
         .is_stateful = false,
         .estimated_latency_ms = 50.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_FILE_TOOLS_JSON, "file_list",
+        ethervox_tool_catalogue_build_profile(), &tool_list);
     
     ret |= ethervox_tool_registry_add(registry, &tool_list);
     
     // Register file_read tool
     ethervox_tool_t tool_read = {
-        .name = "file_read",
-        .description = "Read contents of a text based file (.txt, .md, .org, .c, etc.). Maximum 10MB.",
-        .parameters_json_schema =
-            "{\"type\":\"object\",\"properties\":{"
-            "\"path\":{\"type\":\"string\",\"description\":\"Path to file to read\"},"
-            "\"file_path\":{\"type\":\"string\",\"description\":\"Path to file to read (alternative to 'path')\"}"
-            "}}",
+        .test_scenario = "Read the contents of notes.txt",
         .execute = tool_file_read_wrapper,
         .is_deterministic = true,
         .requires_confirmation = false,
         .is_stateful = false,
         .estimated_latency_ms = 100.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_FILE_TOOLS_JSON, "file_read",
+        ethervox_tool_catalogue_build_profile(), &tool_read);
     
     ret |= ethervox_tool_registry_add(registry, &tool_read);
     
     // Register file_search tool
     ethervox_tool_t tool_search = {
-        .name = "file_search",
-        .description = "Search for text pattern in all allowed files within a directory",
-        .parameters_json_schema =
-            "{\"type\":\"object\",\"properties\":{"
-            "\"directory\":{\"type\":\"string\",\"description\":\"Directory to search in\"},"
-            "\"pattern\":{\"type\":\"string\",\"description\":\"Text pattern to search for\"}"
-            "},\"required\":[\"directory\",\"pattern\"]}",
+        .test_scenario = "Find my resume file",
         .execute = tool_file_search_wrapper,
         .is_deterministic = true,
         .requires_confirmation = false,
         .is_stateful = false,
         .estimated_latency_ms = 500.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_FILE_TOOLS_JSON, "file_search",
+        ethervox_tool_catalogue_build_profile(), &tool_search);
     
     ret |= ethervox_tool_registry_add(registry, &tool_search);
     
     // Register file_write tool (only if write access enabled)
     if (config->access_mode == ETHERVOX_FILE_ACCESS_READ_WRITE) {
         ethervox_tool_t tool_write = {
-            .name = "file_write",
-            .description = "Create or overwrite a file with specified content. Useful for saving notes, documentation, or generated text. Always provide both file_path and content.",
-            .parameters_json_schema =
-                "{\"type\":\"object\",\"properties\":{"
-                "\"file_path\":{\"type\":\"string\",\"description\":\"Path to file to write. Use relative paths like './notes.md' or './output.txt'. File must have an allowed extension (.txt, .md, .org, .c, .cpp, .h, .sh)\"},"
-                "\"content\":{\"type\":\"string\",\"description\":\"The complete text content to write to the file. Can be markdown, code, plain text, or any supported format.\"}"
-                "},\"required\":[\"file_path\",\"content\"]}",
-            .execute = tool_file_write_wrapper,
+            .test_scenario = "Create a file called todo.txt with my tasks",
+        .execute = tool_file_write_wrapper,
             .is_deterministic = false,
             .requires_confirmation = true,
             .is_stateful = true,
             .estimated_latency_ms = 100.0f
         };
+        ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_FILE_TOOLS_JSON, "file_write",
+            ethervox_tool_catalogue_build_profile(), &tool_write);
         
         ret |= ethervox_tool_registry_add(registry, &tool_write);
         
         // Register file_append tool
         ethervox_tool_t tool_append = {
-            .name = "file_append",
-            .description = "Append content to the end of an existing file. Useful for adding to notes, logs, or summaries without overwriting. Always provide both path and content.",
-            .parameters_json_schema =
-                "{\"type\":\"object\",\"properties\":{"
-                "\"path\":{\"type\":\"string\",\"description\":\"Path to file to append to\"},"
-                "\"file_path\":{\"type\":\"string\",\"description\":\"Path to file to append to (alternative to 'path')\"},"
-                "\"content\":{\"type\":\"string\",\"description\":\"The text content to append to the file. Can include newlines.\"}"
-                "},\"required\":[\"content\"]}",
-            .execute = tool_file_append_wrapper,
+            .test_scenario = "Add this line to my todo list",
+        .execute = tool_file_append_wrapper,
             .is_deterministic = false,
             .requires_confirmation = false,
             .is_stateful = true,
             .estimated_latency_ms = 100.0f
         };
+        ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_FILE_TOOLS_JSON, "file_append",
+            ethervox_tool_catalogue_build_profile(), &tool_append);
         
         ret |= ethervox_tool_registry_add(registry, &tool_append);
         
@@ -888,82 +868,71 @@ ethervox_result_t ethervox_path_config_register(
     
     // Register path_list tool
     ethervox_tool_t tool_path_list = {
-        .name = "path_list",
-        .description = "List all configured user paths (Documents, Notes, etc.). Shows which paths are verified and accessible. Use this to discover where the user keeps important files.",
-        .parameters_json_schema = "{\"type\":\"object\",\"properties\":{}}",
+        .test_scenario = "What storage locations are available?",
         .execute = tool_path_list_wrapper,
         .is_deterministic = true,
         .requires_confirmation = false,
         .is_stateful = false,
         .estimated_latency_ms = 10.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_FILE_TOOLS_JSON, "path_list",
+        ethervox_tool_catalogue_build_profile(), &tool_path_list);
     
     ret |= ethervox_tool_registry_add(registry, &tool_path_list);
     
     // Register path_get tool
     ethervox_tool_t tool_path_get = {
-        .name = "path_get",
-        .description = "Get the absolute path for a specific label (e.g., 'Notes', 'Documents', 'Downloads'). Use this to get the exact path before reading or listing files.",
-        .parameters_json_schema =
-            "{\"type\":\"object\",\"properties\":{"
-            "\"label\":{\"type\":\"string\",\"description\":\"Path label to retrieve (e.g., 'Notes', 'Documents')\"}"
-            "},\"required\":[\"label\"]}",
+        .test_scenario = "Show details for the Downloads folder",
         .execute = tool_path_get_wrapper,
         .is_deterministic = true,
         .requires_confirmation = false,
         .is_stateful = false,
         .estimated_latency_ms = 5.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_FILE_TOOLS_JSON, "path_get",
+        ethervox_tool_catalogue_build_profile(), &tool_path_get);
     
     ret |= ethervox_tool_registry_add(registry, &tool_path_get);
     
     // Register path_set tool
     ethervox_tool_t tool_path_set = {
-        .name = "path_set",
-        .description = "Configure or update a user path. Use this to remember important directories the user mentions. Paths are persisted across sessions. Ask the user for the actual path if defaults don't exist.",
-        .parameters_json_schema =
-            "{\"type\":\"object\",\"properties\":{"
-            "\"label\":{\"type\":\"string\",\"description\":\"Human-friendly label (e.g., 'Notes', 'Projects', 'Documents')\"},"
-            "\"path\":{\"type\":\"string\",\"description\":\"Absolute directory path\"},"
-            "\"description\":{\"type\":\"string\",\"description\":\"Optional description of what this path contains\"}"
-            "},\"required\":[\"label\",\"path\"]}",
+        .test_scenario = "Set working directory to Documents",
         .execute = tool_path_set_wrapper,
         .is_deterministic = false,
         .requires_confirmation = false,
         .is_stateful = true,
         .estimated_latency_ms = 20.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_FILE_TOOLS_JSON, "path_set",
+        ethervox_tool_catalogue_build_profile(), &tool_path_set);
     
     ret |= ethervox_tool_registry_add(registry, &tool_path_set);
     
     // Register path_check_unverified tool
     ethervox_tool_t tool_path_check = {
-        .name = "path_check_unverified",
-        .description = "Check for unverified paths (default paths that don't exist on this system). Use this to discover which paths need configuration and proactively ask the user for the correct locations.",
-        .parameters_json_schema = "{\"type\":\"object\",\"properties\":{}}",
+        .test_scenario = "Check if this path exists",
         .execute = tool_path_check_unverified_wrapper,
         .is_deterministic = true,
         .requires_confirmation = false,
         .is_stateful = false,
         .estimated_latency_ms = 10.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_FILE_TOOLS_JSON, "path_check_unverified",
+        ethervox_tool_catalogue_build_profile(), &tool_path_check);
     
     ret |= ethervox_tool_registry_add(registry, &tool_path_check);
     
     // Register file_set_safe_mode tool (allows LLM to restrict itself)
     ethervox_tool_t tool_safe_mode = {
-        .name = "file_set_safe_mode",
-        .description = "Enable or disable safe mode to restrict file write access. Use this like 'plan mode' - enable safe mode before exploring user files, disable only when user explicitly asks to write/modify files. Returns current mode status.",
-        .parameters_json_schema =
-            "{\"type\":\"object\",\"properties\":{"
-            "\"enable\":{\"type\":\"boolean\",\"description\":\"true to enable read-only safe mode, false to allow writes\"}"
-            "},\"required\":[\"enable\"]}",
+        .test_scenario = "Enable safe mode for file operations",
         .execute = tool_file_set_safe_mode_wrapper,
         .is_deterministic = false,
         .requires_confirmation = false,
         .is_stateful = true,
         .estimated_latency_ms = 5.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_FILE_TOOLS_JSON, "file_set_safe_mode",
+        ethervox_tool_catalogue_build_profile(), &tool_safe_mode);
     
     ret |= ethervox_tool_registry_add(registry, &tool_safe_mode);
     

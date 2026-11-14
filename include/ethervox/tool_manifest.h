@@ -6,7 +6,7 @@
  * Reduces KV cache bloat by storing tools externally and loading on-demand.
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #ifndef ETHERVOX_TOOL_MANIFEST_H
@@ -162,6 +162,10 @@ typedef struct tool_manifest_registry {
     bool tools_detected;              // True if tools.bin was found (tools exist)
     bool optimization_loaded;         // True if optimized JSON prompts loaded
     uint16_t tools_loaded_count;      // Number of tools actually loaded into system prompt
+    
+    // Host-registered tools (C2.2 - ADR-0007 enforcement)
+    void* host_tools;                 // Opaque pointer to host_tool_entry_t linked list
+    uint32_t host_tool_timeout_ms;    // Timeout for host tool invocations (0 = no timeout)
 } tool_manifest_registry_t;
 
 // ============================================================================

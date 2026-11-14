@@ -3,14 +3,14 @@
  * @brief Simple heuristic-based language detection for TTS
  * 
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/language_detector.h"
 #include "ethervox/settings.h"
 #include "ethervox/logging.h"
 #include "ethervox/dialogue.h"
-#include "ethervox/tts.h"
+// TASK-C1.0: TTS removed, language switching no longer updates TTS
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -391,18 +391,9 @@ const char* ethervox_detect_and_switch_voice(const char* text,
         
         ETHERVOX_LOG_DEBUG("[Language Switch] New model path: %s", settings.tts.piper_model_path);
         
-        // Reload TTS with new voice
-        if (ethervox_reload_global_tts(&settings.tts, NULL, NULL) == 0) {
-            ETHERVOX_LOG_INFO("[Language Switch] ✅ TTS reloaded with %s voice", detected_language);
-            
-            // Update caller's TTS context pointer if provided
-            if (tts_context) {
-                extern ethervox_tts_context_t* g_global_tts;
-                *tts_context = g_global_tts;
-            }
-        } else {
-            ETHERVOX_LOG_ERROR("[Language Switch] ❌ Failed to reload TTS");
-        }
+        // TASK-C1.0: TTS reload removed - platform handles TTS via host interface
+        ETHERVOX_LOG_INFO("[Language Switch] ℹ️  Detected language %s (TTS managed by platform)", detected_language);
+        (void)tts_context; // Unused
     } else {
         ETHERVOX_LOG_DEBUG("[Language Switch] Voice already correct for language %s: %s",
                           detected_language, target_voice);
@@ -479,18 +470,9 @@ const char* ethervox_switch_to_language(const char* language, void** tts_context
         
         ETHERVOX_LOG_DEBUG("[Language Switch] New model path: %s", settings.tts.piper_model_path);
         
-        // Reload TTS with new voice
-        if (ethervox_reload_global_tts(&settings.tts, NULL, NULL) == 0) {
-            ETHERVOX_LOG_INFO("[Language Switch] ✅ TTS reloaded with %s voice", language);
-            
-            // Update caller's TTS context pointer if provided
-            if (tts_context) {
-                extern ethervox_tts_context_t* g_global_tts;
-                *tts_context = g_global_tts;
-            }
-        } else {
-            ETHERVOX_LOG_ERROR("[Language Switch] ❌ Failed to reload TTS");
-        }
+        // TASK-C1.0: TTS reload removed - platform handles TTS via host interface
+        ETHERVOX_LOG_INFO("[Language Switch] ℹ️  Switched to language %s (TTS managed by platform)", language);
+        (void)tts_context; // Unused
     } else {
         ETHERVOX_LOG_DEBUG("[Language Switch] Voice already correct for language %s: %s",
                           language, target_voice);

@@ -4,12 +4,14 @@
  * @brief Register memory tools with Governor tool registry
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/memory_tools.h"
 #include "ethervox/governor.h"
 #include "ethervox/logging.h"
+#include "ethervox/tool_catalogue.h"
+#include "memory_tools_catalogue.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -715,87 +717,54 @@ ethervox_result_t ethervox_memory_tools_register(
 
     // Register memory_complete_reminder tool
     ethervox_tool_t tool_complete_reminder = {
-        .name = "memory_complete_reminder",
-        .description = "Mark a reminder as completed/done by its memory_id. Use the memory_id from memory_reminder_list to complete specific reminders.",
-        .parameters_json_schema =
-            "{"
-            "  \"type\": \"object\","
-            "  \"properties\": {"
-            "    \"memory_id\": {\"type\": \"string\", \"description\": \"The unique ID of the reminder to mark complete (from memory_reminder_list)\"}"
-            "  },"
-            "  \"required\": [\"memory_id\"]"
-            "}",
+        .test_scenario = "Mark my grocery reminder as done",
         .execute = tool_memory_complete_reminder_wrapper,
         .is_deterministic = false,
         .requires_confirmation = false,
         .is_stateful = true,
         .estimated_latency_ms = 5.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_MEMORY_TOOLS_JSON, "memory_complete_reminder",
+        ethervox_tool_catalogue_build_profile(), &tool_complete_reminder);
     ret |= ethervox_tool_registry_add(registry, &tool_complete_reminder);
     
     // Register memory_update_reminder tool
     ethervox_tool_t tool_update_reminder = {
-        .name = "memory_update_reminder",
-        .description = "Update a reminder's text (e.g., change due date, modify description). Use memory_id from memory_reminder_list. Updates the full text - include all details like deadline.",
-        .parameters_json_schema =
-            "{"
-            "  \"type\": \"object\","
-            "  \"properties\": {"
-            "    \"memory_id\": {\"type\": \"string\", \"description\": \"The unique ID of the reminder to update (from memory_reminder_list)\"},"
-            "    \"new_text\": {\"type\": \"string\", \"description\": \"New reminder text with updated deadline/description (e.g., 'Call John at 3:00 PM today')\"}"
-            "  },"
-            "  \"required\": [\"memory_id\", \"new_text\"]"
-            "}",
+        .test_scenario = "Change my meeting reminder to 5pm",
         .execute = tool_memory_update_reminder_wrapper,
         .is_deterministic = false,
         .requires_confirmation = false,
         .is_stateful = true,
         .estimated_latency_ms = 5.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_MEMORY_TOOLS_JSON, "memory_update_reminder",
+        ethervox_tool_catalogue_build_profile(), &tool_update_reminder);
     ret |= ethervox_tool_registry_add(registry, &tool_update_reminder);
     
     // Register memory_store tool (single definition)
     ethervox_tool_t tool_store = {
-        .name = "memory_store",
-        .description = "Save facts, reminders, or events to memory. For reminders, use 'reminder' tag and include time/deadline in text. Importance: 0.9+ for reminders, 0.95 for personal facts, 0.8 for preferences.",
-        .parameters_json_schema =
-            "{"
-            "  \"type\": \"object\","
-            "  \"properties\": {"
-            "    \"text\": {\"type\": \"string\", \"description\": \"Content to remember. For reminders, include deadline/time info in the text. (Aliases: 'key' or 'value' also work)\"},"
-            "    \"key\": {\"type\": \"string\", \"description\": \"Alternative to 'text': content to remember.\"},"
-            "    \"value\": {\"type\": \"string\", \"description\": \"Alternative to 'text': content to remember.\"},"
-            "    \"tags\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"description\": \"Labels like 'reminder', 'important', 'urgent', etc.\"},"
-            "    \"importance\": {\"type\": \"number\", \"minimum\": 0, \"maximum\": 1, \"description\": \"0.0=low to 1.0=critical. Use 0.9+ for urgent reminders.\"},"
-            "    \"is_user\": {\"type\": \"boolean\", \"description\": \"True if this is user input, false if assistant generated\"}"
-            "  },"
-            "  \"required\": []"
-            "}",
+        .test_scenario = "Remember my favorite color is blue",
         .execute = tool_memory_store_wrapper,
         .is_deterministic = false,
         .requires_confirmation = false,
         .is_stateful = true,
         .estimated_latency_ms = 5.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_MEMORY_TOOLS_JSON, "memory_store",
+        ethervox_tool_catalogue_build_profile(), &tool_store);
     ret |= ethervox_tool_registry_add(registry, &tool_store);
     
     // Register memory_search tool
     ethervox_tool_t tool_search = {
-        .name = "memory_search",
-        .description = "Search conversation memory by text similarity and tags. Results are sorted by relevance and importance. Use min_importance to filter for important memories (0.9+ for critical info, 0.8+ for important context).",
-        .parameters_json_schema =
-            "{\"type\":\"object\",\"properties\":{"
-            "\"query\":{\"type\":\"string\",\"description\":\"Search query\"},"
-            "\"tag_filter\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},"
-            "\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":100},"
-            "\"min_importance\":{\"type\":\"number\",\"minimum\":0.0,\"maximum\":1.0,\"description\":\"Minimum importance threshold (0.0-1.0). Use 0.8+ for important context, 0.9+ for critical info.\"}"
-            "}}",
+        .test_scenario = "What's my favorite color?",
         .execute = tool_memory_search_wrapper,
         .is_deterministic = true,
         .requires_confirmation = false,
         .is_stateful = false,
         .estimated_latency_ms = 10.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_MEMORY_TOOLS_JSON, "memory_search",
+        ethervox_tool_catalogue_build_profile(), &tool_search);
     
     ret |= ethervox_tool_registry_add(registry, &tool_search);
     
@@ -803,101 +772,82 @@ ethervox_result_t ethervox_memory_tools_register(
 
     // Register memory_reminder_list tool
     ethervox_tool_t tool_reminder_list = {
-        .name = "memory_reminder_list",
-        .description = "List all active reminders (entries tagged with 'reminder'). Returns reminder text, deadlines, importance, and memory_id for completing reminders.",
-        .parameters_json_schema = "{\"type\":\"object\",\"properties\":{}}",
+        .test_scenario = "What reminders do I have?",
         .execute = tool_memory_reminder_list_wrapper,
         .is_deterministic = true,
         .requires_confirmation = false,
         .is_stateful = false,
         .estimated_latency_ms = 10.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_MEMORY_TOOLS_JSON, "memory_reminder_list",
+        ethervox_tool_catalogue_build_profile(), &tool_reminder_list);
     ret |= ethervox_tool_registry_add(registry, &tool_reminder_list);
     ethervox_tool_t tool_export = {
-        .name = "memory_export",
-        .description = "Export the entire conversation history to a file. Requires both filepath and format. Example: export to './notes.md' as markdown",
-        .parameters_json_schema =
-            "{\"type\":\"object\",\"properties\":{"
-            "\"filepath\":{\"type\":\"string\",\"description\":\"Path where to save the file (required). Example: './conversation.md' or './notes.json'\"},"
-            "\"format\":{\"type\":\"string\",\"enum\":[\"json\",\"markdown\"],\"description\":\"File format: 'json' or 'markdown' (required)\"}"
-            "},\"required\":[\"filepath\",\"format\"]}",
+        .test_scenario = "Export all my memories",
         .execute = tool_memory_export_wrapper,
         .is_deterministic = true,
         .requires_confirmation = true,
         .is_stateful = true,
         .estimated_latency_ms = 50.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_MEMORY_TOOLS_JSON, "memory_export",
+        ethervox_tool_catalogue_build_profile(), &tool_export);
     
     ret |= ethervox_tool_registry_add(registry, &tool_export);
     
     // Register memory_forget tool
     ethervox_tool_t tool_forget = {
-        .name = "memory_forget",
-        .description = "Prune old or low-importance memories",
-        .parameters_json_schema =
-            "{\"type\":\"object\",\"properties\":{"
-            "\"older_than_seconds\":{\"type\":\"integer\",\"minimum\":0},"
-            "\"importance_threshold\":{\"type\":\"number\",\"minimum\":0,\"maximum\":1}"
-            "}}",
+        .test_scenario = "Forget my birthday",
         .execute = tool_memory_forget_wrapper,
         .is_deterministic = false,
         .requires_confirmation = true,
         .is_stateful = true,
         .estimated_latency_ms = 15.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_MEMORY_TOOLS_JSON, "memory_forget",
+        ethervox_tool_catalogue_build_profile(), &tool_forget);
     
     ret |= ethervox_tool_registry_add(registry, &tool_forget);
     
     // Register memory_delete tool
     ethervox_tool_t tool_delete = {
-        .name = "memory_delete",
-        .description = "Delete specific memories by their IDs. Use memory_ids array for multiple, or memory_id for single deletion.",
-        .parameters_json_schema =
-            "{\"type\":\"object\",\"properties\":{"
-            "\"memory_ids\":{\"type\":\"array\",\"items\":{\"type\":\"integer\"}},"
-            "\"memory_id\":{\"type\":\"string\"}"
-            "}}",
+        .test_scenario = "Delete that reminder",
         .execute = tool_memory_delete_wrapper,
         .is_deterministic = false,
         .requires_confirmation = true,
         .is_stateful = true,
         .estimated_latency_ms = 10.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_MEMORY_TOOLS_JSON, "memory_delete",
+        ethervox_tool_catalogue_build_profile(), &tool_delete);
     
     ret |= ethervox_tool_registry_add(registry, &tool_delete);
     
     // Register memory_store_correction tool
     ethervox_tool_t tool_correction = {
-        .name = "memory_store_correction",
-        .description = "Store user corrections as high-priority learning. Use when the user corrects your understanding, preferences, or mistakes. These corrections will be prioritized in future responses to 'teach' the model.",
-        .parameters_json_schema =
-            "{\"type\":\"object\",\"properties\":{"
-            "\"correction\":{\"type\":\"string\",\"description\":\"What the user corrected (required)\"},"
-            "\"context\":{\"type\":\"string\",\"description\":\"Optional: What was wrong or what this relates to\"}"
-            "},\"required\":[\"correction\"]}",
+        .test_scenario = "Actually, my name is John, not Jon",
         .execute = tool_memory_store_correction_wrapper,
         .is_deterministic = false,
         .requires_confirmation = false,
         .is_stateful = true,
         .estimated_latency_ms = 10.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_MEMORY_TOOLS_JSON, "memory_store_correction",
+        ethervox_tool_catalogue_build_profile(), &tool_correction);
     
     ret |= ethervox_tool_registry_add(registry, &tool_correction);
     
     // Register memory_store_pattern tool
     ethervox_tool_t tool_pattern = {
-        .name = "memory_store_pattern",
-        .description = "Store successful interaction patterns. Use when an approach works well or the user explicitly approves a method. These patterns reinforce successful behaviors.",
-        .parameters_json_schema =
-            "{\"type\":\"object\",\"properties\":{"
-            "\"pattern\":{\"type\":\"string\",\"description\":\"Description of what worked well (required)\"}"
-            "},\"required\":[\"pattern\"]}",
+        .test_scenario = "I always drink coffee in the morning",
         .execute = tool_memory_store_pattern_wrapper,
         .is_deterministic = false,
         .requires_confirmation = false,
         .is_stateful = true,
         .estimated_latency_ms = 10.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_MEMORY_TOOLS_JSON, "memory_store_pattern",
+        ethervox_tool_catalogue_build_profile(), &tool_pattern);
     
     ret |= ethervox_tool_registry_add(registry, &tool_pattern);
     

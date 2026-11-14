@@ -1,5 +1,5 @@
 // Copyright (C) 2025 Tim Königl. All rights reserved.
-// Licensed under CC BY-NC-SA 4.0
+// Proprietary and confidential. See LICENSE.
 
 #ifndef ETHERVOX_PRONUNCIATION_TRAINER_H
 #define ETHERVOX_PRONUNCIATION_TRAINER_H

@@ -4,7 +4,7 @@
  * @brief Memory search and retrieval with tag filtering and text similarity
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/memory_tools.h"
@@ -108,9 +108,9 @@ static int compare_results(const void* a, const void* b) {
     const ethervox_memory_search_result_t* r1 = a;
     const ethervox_memory_search_result_t* r2 = b;
     
-    if (r1->relevance > r2->relevance) return ETHERVOX_ERROR_INVALID_ARGUMENT;
-    if (r1->relevance < r2->relevance) return ETHERVOX_SUCCESS;
-    return ETHERVOX_SUCCESS;
+    if (r1->relevance > r2->relevance) return -1;
+    if (r1->relevance < r2->relevance) return 1;
+    return 0;
 }
 
 ethervox_result_t ethervox_memory_search(

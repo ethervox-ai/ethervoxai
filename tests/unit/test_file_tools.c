@@ -13,8 +13,8 @@
  */
 
 #include "ethervox/file_tools.h"
+#include "test_utils.h"
 #include "ethervox/error.h"
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,8 +48,8 @@ static void cleanup_test_dir(void) {
 static void create_text_file(const char* filename, const char* content) {
     char path[512];
     snprintf(path, sizeof(path), "%s/%s", TEST_DIR, filename);
-    FILE* f = fopen(path, "w");
-    assert(f != NULL);
+    FILE* f = fopen(path, "wb");
+    CHECK(f != NULL);
     fputs(content, f);
     fclose(f);
 }
@@ -59,7 +59,7 @@ static void create_binary_file(const char* filename, const unsigned char* data, 
     char path[512];
     snprintf(path, sizeof(path), "%s/%s", TEST_DIR, filename);
     FILE* f = fopen(path, "wb");
-    assert(f != NULL);
+    CHECK(f != NULL);
     fwrite(data, 1, size, f);
     fclose(f);
 }
@@ -68,8 +68,8 @@ static void create_binary_file(const char* filename, const unsigned char* data, 
 static void create_large_text_file(const char* filename, size_t size_kb) {
     char path[512];
     snprintf(path, sizeof(path), "%s/%s", TEST_DIR, filename);
-    FILE* f = fopen(path, "w");
-    assert(f != NULL);
+    FILE* f = fopen(path, "wb");
+    CHECK(f != NULL);
     
     // Write repeated content to reach desired size
     const char* line = "This is line %d with some content to fill space.\n";
@@ -100,7 +100,7 @@ void test_binary_detection_null_bytes(void) {
     // Initialize file tools
     ethervox_file_tools_config_t config = {0};
     const char* base_paths[] = {TEST_DIR, NULL};
-    assert(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
+    CHECK(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
     
     // Add filter for .bin extension
     ethervox_file_tools_add_filter(&config, ".bin");
@@ -114,8 +114,8 @@ void test_binary_detection_null_bytes(void) {
     int result = ethervox_file_read(&config, path, &content, &size);
     
     // Should return -2 (binary detected)
-    assert(result == -2);
-    assert(content == NULL);
+    CHECK(result == -2);
+    CHECK(content == NULL);
     
     ethervox_file_tools_cleanup(&config);
     cleanup_test_dir();
@@ -139,7 +139,7 @@ void test_binary_detection_control_chars(void) {
     
     ethervox_file_tools_config_t config = {0};
     const char* base_paths[] = {TEST_DIR, NULL};
-    assert(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
+    CHECK(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
     ethervox_file_tools_add_filter(&config, ".dat");
     
     char* content = NULL;
@@ -150,7 +150,7 @@ void test_binary_detection_control_chars(void) {
     int result = ethervox_file_read(&config, path, &content, &size);
     
     // Should detect as binary due to high control char ratio (>30%)
-    assert(result == -2);
+    CHECK(result == -2);
     
     ethervox_file_tools_cleanup(&config);
     cleanup_test_dir();
@@ -174,7 +174,7 @@ void test_text_file_not_binary(void) {
     
     ethervox_file_tools_config_t config = {0};
     const char* base_paths[] = {TEST_DIR, NULL};
-    assert(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
+    CHECK(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
     ethervox_file_tools_add_filter(&config, ".txt");
     
     char* content = NULL;
@@ -185,9 +185,9 @@ void test_text_file_not_binary(void) {
     int result = ethervox_file_read(&config, path, &content, &size);
     
     // Should succeed (not binary)
-    assert(result == 0);
-    assert(content != NULL);
-    assert(strcmp(content, text_content) == 0);
+    CHECK(result == 0);
+    CHECK(content != NULL);
+    CHECK(strcmp(content, text_content) == 0);
     
     free(content);
     ethervox_file_tools_cleanup(&config);
@@ -213,7 +213,7 @@ void test_code_file_not_binary(void) {
     
     ethervox_file_tools_config_t config = {0};
     const char* base_paths[] = {TEST_DIR, NULL};
-    assert(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
+    CHECK(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
     ethervox_file_tools_add_filter(&config, ".c");
     
     char* content = NULL;
@@ -223,8 +223,8 @@ void test_code_file_not_binary(void) {
     
     int result = ethervox_file_read(&config, path, &content, &size);
     
-    assert(result == 0);
-    assert(content != NULL);
+    CHECK(result == 0);
+    CHECK(content != NULL);
     
     free(content);
     ethervox_file_tools_cleanup(&config);
@@ -244,7 +244,7 @@ void test_large_file_rejected(void) {
     
     ethervox_file_tools_config_t config = {0};
     const char* base_paths[] = {TEST_DIR, NULL};
-    assert(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
+    CHECK(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
     ethervox_file_tools_add_filter(&config, ".txt");
     
     char* content = NULL;
@@ -255,8 +255,8 @@ void test_large_file_rejected(void) {
     int result = ethervox_file_read(&config, path, &content, &size);
     
     // Should be rejected due to size
-    assert(result == -1);
-    assert(content == NULL);
+    CHECK(result == ETHERVOX_ERROR_INVALID_ARGUMENT);
+    CHECK(content == NULL);
     
     ethervox_file_tools_cleanup(&config);
     cleanup_test_dir();
@@ -275,7 +275,7 @@ void test_medium_file_reads(void) {
     
     ethervox_file_tools_config_t config = {0};
     const char* base_paths[] = {TEST_DIR, NULL};
-    assert(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
+    CHECK(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
     ethervox_file_tools_add_filter(&config, ".txt");
     
     char* content = NULL;
@@ -286,9 +286,9 @@ void test_medium_file_reads(void) {
     int result = ethervox_file_read(&config, path, &content, &size);
     
     // Should succeed
-    assert(result == 0);
-    assert(content != NULL);
-    assert(size >= 6 * 1024);  // At least 6KB
+    CHECK(result == 0);
+    CHECK(content != NULL);
+    CHECK(size >= 6 * 1024);  // At least 6KB
     
     free(content);
     ethervox_file_tools_cleanup(&config);
@@ -307,7 +307,7 @@ void test_empty_file(void) {
     
     ethervox_file_tools_config_t config = {0};
     const char* base_paths[] = {TEST_DIR, NULL};
-    assert(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
+    CHECK(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
     ethervox_file_tools_add_filter(&config, ".txt");
     
     char* content = NULL;
@@ -318,10 +318,10 @@ void test_empty_file(void) {
     int result = ethervox_file_read(&config, path, &content, &size);
     
     // Empty file should succeed (not binary)
-    assert(result == 0);
-    assert(content != NULL);
-    assert(size == 0);
-    assert(strlen(content) == 0);
+    CHECK(result == 0);
+    CHECK(content != NULL);
+    CHECK(size == 0);
+    CHECK(strlen(content) == 0);
     
     free(content);
     ethervox_file_tools_cleanup(&config);
@@ -349,7 +349,7 @@ void test_utf8_file(void) {
     
     ethervox_file_tools_config_t config = {0};
     const char* base_paths[] = {TEST_DIR, NULL};
-    assert(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
+    CHECK(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
     ethervox_file_tools_add_filter(&config, ".txt");
     
     char* content = NULL;
@@ -360,10 +360,10 @@ void test_utf8_file(void) {
     int result = ethervox_file_read(&config, path, &content, &size);
     
     // UTF-8 text should be readable
-    assert(result == 0);
-    assert(content != NULL);
-    assert(strstr(content, "Hello") != NULL);
-    assert(strstr(content, "🎉") != NULL);  // Emoji should be preserved
+    CHECK(result == 0);
+    CHECK(content != NULL);
+    CHECK(strstr(content, "Hello") != NULL);
+    CHECK(strstr(content, "🎉") != NULL);  // Emoji should be preserved
     
     free(content);
     ethervox_file_tools_cleanup(&config);
@@ -383,7 +383,7 @@ void test_extension_filtering(void) {
     
     ethervox_file_tools_config_t config = {0};
     const char* base_paths[] = {TEST_DIR, NULL};
-    assert(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
+    CHECK(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
     
     // Only allow .txt files
     ethervox_file_tools_add_filter(&config, ".txt");
@@ -394,14 +394,14 @@ void test_extension_filtering(void) {
     // Should succeed for .txt
     char path1[512];
     snprintf(path1, sizeof(path1), "%s/allowed.txt", TEST_DIR);
-    assert(ethervox_file_read(&config, path1, &content, &size) == 0);
+    CHECK(ethervox_file_read(&config, path1, &content, &size) == 0);
     free(content);
     content = NULL;
     
     // Should fail for .xyz
     char path2[512];
     snprintf(path2, sizeof(path2), "%s/not_allowed.xyz", TEST_DIR);
-    assert(ethervox_file_read(&config, path2, &content, &size) == -1);
+    CHECK(ethervox_file_read(&config, path2, &content, &size) == ETHERVOX_ERROR_INVALID_ARGUMENT);
     
     ethervox_file_tools_cleanup(&config);
     cleanup_test_dir();
@@ -424,7 +424,7 @@ void test_path_validation(void) {
     
     ethervox_file_tools_config_t config = {0};
     const char* base_paths[] = {TEST_DIR, NULL};  // Only allow TEST_DIR
-    assert(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
+    CHECK(ethervox_file_tools_init(&config, base_paths, ETHERVOX_FILE_ACCESS_READ_ONLY) == 0);
     ethervox_file_tools_add_filter(&config, ".txt");
     
     char* content = NULL;
@@ -434,8 +434,8 @@ void test_path_validation(void) {
     int result = ethervox_file_read(&config, "/tmp/outside.txt", &content, &size);
     
     // Should be rejected
-    assert(result == -1);
-    assert(content == NULL);
+    CHECK(result == ETHERVOX_ERROR_INVALID_ARGUMENT);
+    CHECK(content == NULL);
     
     ethervox_file_tools_cleanup(&config);
     cleanup_test_dir();

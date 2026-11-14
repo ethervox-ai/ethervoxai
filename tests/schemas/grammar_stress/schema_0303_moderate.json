@@ -1,0 +1,50 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        }
+      ]
+    },
+    "field_1": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "field_2": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 37
+    },
+    "field_3": {
+      "type": "string",
+      "maxLength": 77
+    },
+    "field_4": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "maxItems": 48
+    }
+  },
+  "required": [
+    "field_2",
+    "field_3"
+  ]
+}

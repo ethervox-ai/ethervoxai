@@ -1,0 +1,26 @@
+{
+  "oneOf": [
+    {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "type": "boolean"
+    },
+    {
+      "type": "array",
+      "items": {
+        "type": "boolean"
+      }
+    }
+  ]
+}

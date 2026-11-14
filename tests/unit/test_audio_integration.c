@@ -7,10 +7,10 @@
  */
 
 #include <stdio.h>
+#include "test_utils.h"
 #include "ethervox/error.h"
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <unistd.h>
 
 #include "ethervox/audio.h"
@@ -27,9 +27,9 @@ static int test_audio_config(void) {
     config.bits_per_sample = 16;
     config.buffer_size = 4096;
     
-    assert(config.sample_rate == 16000);
-    assert(config.channels == 1);
-    assert(config.bits_per_sample == 16);
+    CHECK(config.sample_rate == 16000);
+    CHECK(config.channels == 1);
+    CHECK(config.bits_per_sample == 16);
     
     printf("PASS\n");
     return ETHERVOX_SUCCESS;
@@ -45,12 +45,12 @@ static int test_audio_init(void) {
     
     // Register platform driver
     int result = ethervox_audio_register_platform_driver(&runtime);
-    assert(result == 0);
-    assert(runtime.driver.init != NULL);
-    assert(runtime.driver.start_capture != NULL);
-    assert(runtime.driver.stop_capture != NULL);
-    assert(runtime.driver.read_audio != NULL);
-    assert(runtime.driver.cleanup != NULL);
+    CHECK(result == 0);
+    CHECK(runtime.driver.init != NULL);
+    CHECK(runtime.driver.start_capture != NULL);
+    CHECK(runtime.driver.stop_capture != NULL);
+    CHECK(runtime.driver.read_audio != NULL);
+    CHECK(runtime.driver.cleanup != NULL);
     
     // Initialize audio
     ethervox_audio_config_t config = {0};
@@ -60,7 +60,7 @@ static int test_audio_init(void) {
     config.buffer_size = 4096;
     
     result = runtime.driver.init(&runtime, &config);
-    assert(result == 0);
+    CHECK(result == 0);
     
     // Cleanup
     runtime.driver.cleanup(&runtime);
@@ -78,7 +78,7 @@ static int test_audio_capture(void) {
     ethervox_audio_runtime_t runtime = {0};
     
     int result = ethervox_audio_register_platform_driver(&runtime);
-    assert(result == 0);
+    CHECK(result == 0);
     
     ethervox_audio_config_t config = {0};
     config.sample_rate = 16000;
@@ -87,11 +87,17 @@ static int test_audio_capture(void) {
     config.buffer_size = 4096;
     
     result = runtime.driver.init(&runtime, &config);
-    assert(result == 0);
+    CHECK(result == 0);
     
     // Start capture
     result = runtime.driver.start_capture(&runtime);
-    assert(result == 0);
+    if (result == ETHERVOX_ERROR_AUDIO_DEVICE_NOT_FOUND) {
+        // CI runners (notably Windows) have no input device; this test needs real hardware.
+        runtime.driver.cleanup(&runtime);
+        printf("SKIP (no audio input device)\n");
+        return ETHERVOX_SUCCESS;
+    }
+    CHECK(result == 0);
     
     // Let some audio accumulate
     usleep(200000); // 200ms
@@ -101,16 +107,16 @@ static int test_audio_capture(void) {
     buffer.size = 1600; // 100ms at 16kHz
     buffer.channels = 1;
     buffer.data = (float*)calloc(buffer.size, sizeof(float));
-    assert(buffer.data != NULL);
+    CHECK(buffer.data != NULL);
     
     int samples_read = runtime.driver.read_audio(&runtime, &buffer);
-    assert(samples_read >= 0); // Should read some samples or 0 if buffer empty
+    CHECK(samples_read >= 0); // Should read some samples or 0 if buffer empty
     
     free(buffer.data);
     
     // Stop capture
     result = runtime.driver.stop_capture(&runtime);
-    assert(result == 0);
+    CHECK(result == 0);
     
     // Cleanup
     runtime.driver.cleanup(&runtime);
@@ -131,9 +137,9 @@ static int test_audio_buffer(void) {
     buffer.data = (float*)calloc(buffer.size, sizeof(float));
     buffer.timestamp_us = 0;
     
-    assert(buffer.data != NULL);
-    assert(buffer.size == 1600);
-    assert(buffer.channels == 1);
+    CHECK(buffer.data != NULL);
+    CHECK(buffer.size == 1600);
+    CHECK(buffer.channels == 1);
     
     // Write some data
     for (size_t i = 0; i < buffer.size; i++) {
@@ -141,8 +147,8 @@ static int test_audio_buffer(void) {
     }
     
     // Verify data
-    assert(buffer.data[0] == 0.0f);
-    assert(buffer.data[buffer.size - 1] > 0.99f);
+    CHECK(buffer.data[0] == 0.0f);
+    CHECK(buffer.data[buffer.size - 1] > 0.99f);
     
     free(buffer.data);
     
@@ -159,7 +165,7 @@ static int test_audio_multiple_reads(void) {
     ethervox_audio_runtime_t runtime = {0};
     
     int result = ethervox_audio_register_platform_driver(&runtime);
-    assert(result == 0);
+    CHECK(result == 0);
     
     ethervox_audio_config_t config = {0};
     config.sample_rate = 16000;
@@ -168,10 +174,10 @@ static int test_audio_multiple_reads(void) {
     config.buffer_size = 4096;
     
     result = runtime.driver.init(&runtime, &config);
-    assert(result == 0);
+    CHECK(result == 0);
     
     result = runtime.driver.start_capture(&runtime);
-    assert(result == 0);
+    CHECK(result == 0);
     
     usleep(100000); // 100ms
     
@@ -191,7 +197,7 @@ static int test_audio_multiple_reads(void) {
     }
     
     // Should have read some audio over 10 reads
-    assert(total_samples >= 0);
+    CHECK(total_samples >= 0);
     
     free(buffer.data);
     runtime.driver.stop_capture(&runtime);
@@ -217,10 +223,10 @@ static int test_audio_errors(void) {
     
     // Initialize with NULL config should fail
     int result = ethervox_audio_register_platform_driver(&runtime);
-    assert(result == 0);
+    CHECK(result == 0);
     
     result = runtime.driver.init(&runtime, NULL);
-    assert(result != 0);
+    CHECK(result != 0);
     
     // Cleanup first runtime
     if (runtime.driver.cleanup) {
@@ -231,7 +237,7 @@ static int test_audio_errors(void) {
     ethervox_audio_runtime_t runtime2 = {0};
     result = ethervox_audio_register_platform_driver(&runtime2);
     result = runtime2.driver.start_capture(&runtime2);
-    assert(result != 0);
+    CHECK(result != 0);
     
     // Cleanup second runtime
     if (runtime2.driver.cleanup) {
@@ -254,7 +260,7 @@ static int test_audio_device_busy(void) {
     ethervox_audio_runtime_t runtime2 = {0};
     
     int result = ethervox_audio_register_platform_driver(&runtime1);
-    assert(result == 0);
+    CHECK(result == 0);
     
     ethervox_audio_config_t config = ethervox_audio_get_default_config();
     result = runtime1.driver.init(&runtime1, &config);
@@ -275,7 +281,7 @@ static int test_audio_device_busy(void) {
     
     // Try to initialize a second runtime while first is active
     result = ethervox_audio_register_platform_driver(&runtime2);
-    assert(result == 0);
+    CHECK(result == 0);
     
     result = runtime2.driver.init(&runtime2, &config);
     

@@ -9,9 +9,9 @@
  */
 
 #include "ethervox/gguf_config_helper.h"
+#include "test_utils.h"
 #include "ethervox/device_profile.h"
 #include "ethervox/logging.h"
-#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -28,13 +28,13 @@ static void test_metadata_extraction_stub(void) {
     int result = ethervox_extract_model_metadata(NULL, &metadata);
     
     // Should fail gracefully (stub returns -1)
-    assert(result == -1);
+    CHECK(result == -1);
     
     // But should still populate safe defaults
-    assert(metadata.context_length_train == 2048);
-    assert(metadata.layer_count == 32);
-    assert(metadata.model_size_bytes > 0);
-    assert(strcmp(metadata.architecture, "unknown") == 0);
+    CHECK(metadata.context_length_train == 2048);
+    CHECK(metadata.layer_count == 32);
+    CHECK(metadata.model_size_bytes > 0);
+    CHECK(strcmp(metadata.architecture, "unknown") == 0);
     
     printf("  ✓ Stub mode returns safe defaults\n");
 }
@@ -58,13 +58,13 @@ static void test_kv_cache_estimation(void) {
     size_t kv_8k = ethervox_estimate_kv_cache_mb(&metadata, 8192);
     
     // KV cache should scale linearly with context
-    assert(kv_4k > kv_2k);
-    assert(kv_8k > kv_4k);
-    assert(kv_8k == kv_4k * 2);  // Should be exactly 2x
+    CHECK(kv_4k > kv_2k);
+    CHECK(kv_8k > kv_4k);
+    CHECK(kv_8k == kv_4k * 2);  // Should be exactly 2x
     
-    // For Phi-3.5 (32 layers), 8K context should be ~2GB
-    assert(kv_8k > 1500);  // At least 1.5GB
-    assert(kv_8k < 3000);  // Less than 3GB
+    // 32 layers x 3072 dims x K+V x fp16 x 8192 tokens = exactly 3 GiB
+    CHECK(kv_8k > 1500);  // At least 1.5GB
+    CHECK(kv_8k < 4000);  // Less than 4GB
     
     printf("  ✓ KV cache estimation: 2K=%zu MB, 4K=%zu MB, 8K=%zu MB\n",
            kv_2k, kv_4k, kv_8k);
@@ -79,14 +79,15 @@ static void test_context_support(void) {
     // Initialize device profiling
     ethervox_device_profile_init();
     
-    ethervox_model_metadata_t metadata;
+    ethervox_model_metadata_t metadata = {0};
     metadata.context_length_train = 8192;
     metadata.layer_count = 32;
+    metadata.embedding_dims = 3072;
     metadata.model_size_bytes = 2ULL * 1024 * 1024 * 1024;  // 2GB
     
     // Small context should always be supported
     bool can_support_2k = ethervox_can_support_context(&metadata, 2048);
-    assert(can_support_2k == true);
+    CHECK(can_support_2k == true);
     
     // Very large context might not be supported on low-RAM devices
     bool can_support_32k = ethervox_can_support_context(&metadata, 32768);
@@ -119,21 +120,21 @@ static void test_optimal_config_calculation(void) {
     memset(&config, 0, sizeof(config));
     
     int result = ethervox_calculate_optimal_config(&metadata, &config);
-    assert(result == 0);
+    CHECK(result == 0);
     
     // Context should be reasonable
-    assert(config.context_length >= 2048);
-    assert(config.context_length <= metadata.context_length_train);
+    CHECK(config.context_length >= 2048);
+    CHECK(config.context_length <= metadata.context_length_train);
     
     // Batch size should be valid
-    assert(config.batch_size == 256 || config.batch_size == 512 || config.batch_size == 1024);
+    CHECK(config.batch_size == 256 || config.batch_size == 512 || config.batch_size == 1024);
     
     // Threads should be reasonable
-    assert(config.threads >= 2);
-    assert(config.threads <= 6);
+    CHECK(config.threads >= 2);
+    CHECK(config.threads <= 6);
     
     // KV cache type should be valid
-    assert(config.kv_cache_type == 1 || config.kv_cache_type == 7 || config.kv_cache_type == 8);
+    CHECK(config.kv_cache_type == 1 || config.kv_cache_type == 7 || config.kv_cache_type == 8);
     
     printf("  ✓ Calculated config: context=%d, batch=%d, threads=%d, kv_type=%d\n",
            config.context_length, config.batch_size, config.threads, config.kv_cache_type);
@@ -147,9 +148,10 @@ static void test_tier_based_scaling(void) {
     
     ethervox_device_profile_init();
     
-    ethervox_model_metadata_t metadata;
+    ethervox_model_metadata_t metadata = {0};
     metadata.context_length_train = 16384;  // Large context model
     metadata.layer_count = 32;
+    metadata.embedding_dims = 3072;
     metadata.model_size_bytes = 2ULL * 1024 * 1024 * 1024;
     
     ethervox_runtime_config_t config;
@@ -159,7 +161,7 @@ static void test_tier_based_scaling(void) {
     
     // Context should be capped based on tier
     int tier_max_contexts[] = {2048, 4096, 8192, 16384};
-    assert(config.context_length <= tier_max_contexts[tier]);
+    CHECK(config.context_length <= tier_max_contexts[tier]);
     
     printf("  ✓ Context capped at %d for tier %d\n", config.context_length, tier);
 }
@@ -172,9 +174,10 @@ static void test_config_consistency(void) {
     
     ethervox_device_profile_init();
     
-    ethervox_model_metadata_t metadata;
+    ethervox_model_metadata_t metadata = {0};
     metadata.context_length_train = 8192;
     metadata.layer_count = 32;
+    metadata.embedding_dims = 3072;
     metadata.model_size_bytes = 2ULL * 1024 * 1024 * 1024;
     
     ethervox_runtime_config_t config;
@@ -186,10 +189,10 @@ static void test_config_consistency(void) {
     int profile_kv = ethervox_device_profile_get_optimal_kv_cache_type();
     bool profile_flash = ethervox_device_profile_should_use_flash_attention();
     
-    assert(config.threads == profile_threads);
-    assert(config.batch_size == profile_batch);
-    assert(config.kv_cache_type == profile_kv);
-    assert(config.use_flash_attention == profile_flash);
+    CHECK(config.threads == profile_threads);
+    CHECK(config.batch_size == profile_batch);
+    CHECK(config.kv_cache_type == profile_kv);
+    CHECK(config.use_flash_attention == profile_flash);
     
     printf("  ✓ Config matches device profile recommendations\n");
 }
@@ -205,8 +208,10 @@ static void test_memory_constraints(void) {
     
     // Simulate large model (4GB)
     ethervox_model_metadata_t large_model;
+    memset(&large_model, 0, sizeof(large_model));
     large_model.context_length_train = 32768;
     large_model.layer_count = 32;
+    large_model.embedding_dims = 3072;
     large_model.model_size_bytes = 4ULL * 1024 * 1024 * 1024;
     
     ethervox_runtime_config_t config;
@@ -218,7 +223,7 @@ static void test_memory_constraints(void) {
     size_t total_needed = model_mb + kv_cache_mb + 1024;  // +1GB reserved
     
     // Should fit in available RAM (with some tolerance for overheads)
-    assert(total_needed <= (size_t)(total_ram_mb * 1.2));  // 20% tolerance
+    CHECK(total_needed <= (size_t)(total_ram_mb * 1.2));  // 20% tolerance
     
     printf("  ✓ Config respects memory constraints: %zu MB needed, %ld MB available\n",
            total_needed, total_ram_mb);
@@ -234,12 +239,12 @@ static void test_null_handling(void) {
     ethervox_runtime_config_t config;
     
     // NULL inputs should be handled gracefully
-    assert(ethervox_extract_model_metadata(NULL, NULL) == -1);
-    assert(ethervox_extract_model_metadata(NULL, &metadata) == -1);
+    CHECK(ethervox_extract_model_metadata(NULL, NULL) == -1);
+    CHECK(ethervox_extract_model_metadata(NULL, &metadata) == -1);
     
-    assert(ethervox_calculate_optimal_config(NULL, &config) == -1);
-    assert(ethervox_calculate_optimal_config(&metadata, NULL) == -1);
-    assert(ethervox_calculate_optimal_config(NULL, NULL) == -1);
+    CHECK(ethervox_calculate_optimal_config(NULL, &config) == -1);
+    CHECK(ethervox_calculate_optimal_config(&metadata, NULL) == -1);
+    CHECK(ethervox_calculate_optimal_config(NULL, NULL) == -1);
     
     printf("  ✓ NULL pointers handled safely\n");
 }
@@ -262,7 +267,7 @@ static void test_small_model_optimization(void) {
     ethervox_calculate_optimal_config(&small_model, &config);
     
     // Should use model's full context (it's small)
-    assert(config.context_length == small_model.context_length_train);
+    CHECK(config.context_length == small_model.context_length_train);
     
     printf("  ✓ Small model uses full context: %d\n", config.context_length);
 }

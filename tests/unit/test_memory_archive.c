@@ -24,7 +24,17 @@
 
 static void cleanup_test_dir(void) {
     char cmd[512];
+#ifdef _WIN32
+    // cmd.exe has no rm and needs backslashes
+    char dir[256];
+    snprintf(dir, sizeof(dir), "%s", TEST_DIR);
+    for (char* p = dir; *p; p++) {
+        if (*p == '/') *p = '\\';
+    }
+    snprintf(cmd, sizeof(cmd), "rmdir /s /q \"%s\" 2>nul", dir);
+#else
     snprintf(cmd, sizeof(cmd), "rm -rf %s", TEST_DIR);
+#endif
     system(cmd);
 }
 

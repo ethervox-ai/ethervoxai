@@ -1,0 +1,31 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "integer",
+      "minimum": 62,
+      "maximum": 936
+    },
+    "field_1": {
+      "type": "string"
+    },
+    "field_2": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "maxItems": 43
+    },
+    "field_3": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    }
+  },
+  "required": [
+    "field_0",
+    "field_1",
+    "field_2"
+  ]
+}

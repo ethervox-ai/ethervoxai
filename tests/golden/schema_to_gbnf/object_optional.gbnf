@@ -1,0 +1,3 @@
+root-age-value ::= ("-")? [0-9]+
+root ::= "{" ws ("\"age\"" ws ":" ws root-age-value)? ws "}" ws
+ws ::= | " " | "\n" [ \t]{0,20}

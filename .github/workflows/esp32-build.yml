@@ -26,6 +26,11 @@ jobs:
   build-esp32:
     name: Build ESP32 Firmware
     runs-on: ubuntu-latest
+    # QUARANTINED until ADR-0033 decides the ESP32's role (end date 2026-12-15, BACKLOG-143): the job
+    # still runs and stays visible, but a failure does not block merges. esp32-project/ carries drifted
+    # copies of core headers and sources (C8.3); it must consume the core instead. If still undecided on
+    # that date, remove the job instead of leaving it red.
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:

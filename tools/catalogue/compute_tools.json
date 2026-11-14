@@ -1,0 +1,60 @@
+[
+  {
+    "name": "calculator_compute",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Compute ANY math calculation - use for all arithmetic, don't calculate mentally. Supports +, -, *, /, ^, sqrt, abs, parentheses.",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "expression": { "type": "string", "description": "Mathematical expression to evaluate" },
+        "decimal_places": { "type": "integer", "description": "Number of decimal places (0-15, default: 2)", "default": 2 }
+      },
+      "required": ["expression"]
+    }
+  },
+  {
+    "name": "percentage_calculate",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Calculate percentages for tips, tax, discounts (operations: of, increase, decrease, is_what_percent)",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "value": { "type": "number", "description": "The value to calculate percentage on" },
+        "percentage": { "type": "number", "description": "The percentage amount" },
+        "operation": { "type": "string", "enum": ["of", "increase", "decrease", "is_what_percent"], "description": "Operation to perform" },
+        "decimal_places": { "type": "integer", "description": "Number of decimal places (0-15, default: 2)", "default": 2 }
+      },
+      "required": ["value", "percentage", "operation"]
+    }
+  },
+  {
+    "name": "get_time",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Get current time. Use when user asks 'what time is it' or needs to know the current time.",
+    "is_mutating": false,
+    "schema": {}
+  },
+  {
+    "name": "get_date",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Get current date (day/month/year). Use to get today's date. Use when user asks 'what's the date', needs today's date for calculations, or asks about days until/since an event.",
+    "is_mutating": false,
+    "schema": {}
+  },
+  {
+    "name": "get_day",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Get the current day of the week. Use when user asks 'what day is it' or 'what day of the week'.",
+    "is_mutating": false,
+    "schema": {}
+  },
+  {
+    "name": "time_get_week_number",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Get the current week number of the year. Use when user asks 'what week is it' or 'what week number'.",
+    "is_mutating": false,
+    "schema": {}
+  }
+]

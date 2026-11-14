@@ -1,0 +1,15 @@
+{
+  "oneOf": [
+    {
+      "type": "number"
+    },
+    {
+      "type": "string"
+    },
+    {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 232
+    }
+  ]
+}

@@ -1,0 +1,223 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "string"
+        },
+        "field_1": {
+          "type": "string"
+        },
+        "field_2": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "integer"
+            },
+            "field_1": {
+              "type": "string"
+            },
+            "field_2": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "field_2"
+          ]
+        },
+        "field_3": {
+          "type": "integer"
+        },
+        "field_4": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "boolean"
+            },
+            "field_1": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "field_0"
+          ]
+        },
+        "field_5": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        }
+      },
+      "required": [
+        "field_0",
+        "field_1",
+        "field_2",
+        "field_3",
+        "field_4",
+        "field_5"
+      ]
+    },
+    "field_1": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "boolean"
+            },
+            "field_1": {
+              "type": "integer"
+            },
+            "field_2": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "field_2"
+          ]
+        },
+        "field_1": {
+          "type": "integer"
+        }
+      }
+    },
+    "field_2": {
+      "oneOf": [
+        {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        }
+      ]
+    },
+    "field_3": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "number"
+            },
+            "field_1": {
+              "type": "number"
+            },
+            "field_2": {
+              "type": "integer"
+            },
+            "field_3": {
+              "type": "boolean"
+            }
+          }
+        },
+        "field_1": {
+          "type": "string"
+        },
+        "field_2": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "boolean"
+            },
+            "field_1": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "field_0",
+            "field_1"
+          ]
+        },
+        "field_3": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          }
+        }
+      },
+      "required": [
+        "field_1",
+        "field_2",
+        "field_3"
+      ]
+    },
+    "field_4": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "number"
+        },
+        "field_1": {
+          "type": "integer"
+        },
+        "field_2": {
+          "type": "boolean"
+        },
+        "field_3": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "string"
+            }
+          }
+        },
+        "field_4": {
+          "type": "string"
+        },
+        "field_5": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field_0",
+        "field_1",
+        "field_3",
+        "field_5"
+      ]
+    },
+    "field_5": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "number"
+        },
+        "field_1": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "field_0",
+        "field_1"
+      ]
+    }
+  },
+  "required": [
+    "field_0",
+    "field_1",
+    "field_2",
+    "field_3",
+    "field_4"
+  ]
+}

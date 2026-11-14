@@ -1,0 +1,27 @@
+{
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "minItems": 3
+    },
+    {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "integer"
+        }
+      }
+    }
+  ]
+}

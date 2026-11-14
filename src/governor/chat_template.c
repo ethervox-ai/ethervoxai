@@ -3,11 +3,12 @@
  * @brief Chat template implementation for various LLM models
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/chat_template.h"
 #include "ethervox/error.h"
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -17,7 +18,7 @@
 // Template Definitions
 // ============================================================================
 
-// Qwen 2.5 template
+// Qwen 2.5 / ChatML template
 static const chat_template_t qwen_template = {
     .type = CHAT_TEMPLATE_QWEN,
     .system_start = "<|im_start|>system\n",
@@ -36,12 +37,13 @@ static const chat_template_t qwen_template = {
         NULL
     },
     .stop_sequence_count = 4,
-    .tool_format = TOOL_FORMAT_XML_ATTR  // Uses XML with attributes
+    .tool_format = TOOL_FORMAT_XML_ATTR,
+    .ignore_eog = false
 };
 
-// IBM Granite 4.0/4.1 template (uses official GGUF markers)
-static const chat_template_t granite_template = {
-    .type = CHAT_TEMPLATE_GRANITE,
+// IBM Granite 3.x template
+static const chat_template_t granite3_template = {
+    .type = CHAT_TEMPLATE_GRANITE_3,
     .system_start = "<|start_of_role|>system<|end_of_role|>",
     .system_end = "<|end_of_text|>\n",
     .user_start = "<|start_of_role|>user<|end_of_role|>",
@@ -51,14 +53,65 @@ static const chat_template_t granite_template = {
     .tool_result_start = "<|start_of_role|>user<|end_of_role|><tool_result>",
     .tool_result_end = "</tool_result><|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>",
     .stop_sequences = {
-        "<|end_of_text|>",              // Official Granite stop token
-        "<|start_of_role|>",            // Catch role markers
+        "<|end_of_text|>",
+        "<|start_of_role|>",
         "<|end_of_role|>",
-        "<tool_result",                 // Prevent fake tool results
+        "<tool_result",
         NULL
     },
     .stop_sequence_count = 4,
-    .tool_format = TOOL_FORMAT_JSON_IN_XML  // Granite uses JSON inside <tool_call> tags
+    .tool_format = TOOL_FORMAT_JSON_IN_XML,
+    .ignore_eog = false
+};
+
+// IBM Granite 4.0/4.1 template
+static const chat_template_t granite4_template = {
+    .type = CHAT_TEMPLATE_GRANITE_4,
+    .system_start = "<|start_of_role|>system<|end_of_role|>",
+    .system_end = "<|end_of_text|>\n",
+    .user_start = "<|start_of_role|>user<|end_of_role|>",
+    .user_end = "<|end_of_text|>\n",
+    .assistant_start = "<|start_of_role|>assistant<|end_of_role|>",
+    .assistant_end = "<|end_of_text|>\n",
+    .tool_result_start = "<|start_of_role|>user<|end_of_role|><tool_result>",
+    .tool_result_end = "</tool_result><|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>",
+    .tool_response_start = "<|start_of_role|>user<|end_of_role|>\n<tool_response>\n",
+    .tool_response_end = "\n</tool_response><|end_of_text|>\n",
+    .stop_sequences = {
+        "<|end_of_text|>",
+        "<|start_of_role|>",
+        "<|end_of_role|>",
+        "<tool_result",
+        NULL
+    },
+    .stop_sequence_count = 4,
+    .tool_format = TOOL_FORMAT_JSON_IN_XML,
+    .ignore_eog = false
+};
+
+// IBM Granite 4.2+ template (chat_template.jinja of ibm-granite/granite-4.2-*): ChatML roles,
+// <think>...</think> reasoning, and tool calls as <tool_call><function=NAME><parameter=K>V.
+// Tool results are a user turn holding <tool_response>.
+static const chat_template_t granite42_template = {
+    .type = CHAT_TEMPLATE_GRANITE_4_2,
+    .system_start = "<|im_start|>system\n",
+    .system_end = "<|im_end|>\n",
+    .user_start = "<|im_start|>user\n",
+    .user_end = "<|im_end|>\n",
+    .assistant_start = "<|im_start|>assistant\n",
+    .assistant_end = "<|im_end|>\n",
+    .tool_result_start = "<|im_start|>user\n<tool_response>\n",
+    .tool_result_end = "\n</tool_response>\n<|im_end|>\n<|im_start|>assistant\n",
+    .tool_response_start = "<|im_start|>user\n<tool_response>\n",
+    .tool_response_end = "\n</tool_response>\n<|im_end|>\n",
+    .stop_sequences = {
+        "<|im_end|>",
+        "<|im_start|>",
+        NULL
+    },
+    .stop_sequence_count = 2,
+    .tool_format = TOOL_FORMAT_JSON_IN_XML,
+    .ignore_eog = false
 };
 
 // Microsoft Phi template
@@ -80,7 +133,8 @@ static const chat_template_t phi_template = {
         NULL
     },
     .stop_sequence_count = 4,
-    .tool_format = TOOL_FORMAT_XML_ATTR  // Uses XML with attributes
+    .tool_format = TOOL_FORMAT_XML_ATTR,  // Uses XML with attributes
+    .ignore_eog = false  // Respect model's EOG decision
 };
 
 // Meta Llama 3 template
@@ -100,7 +154,8 @@ static const chat_template_t llama3_template = {
         NULL
     },
     .stop_sequence_count = 2,
-    .tool_format = TOOL_FORMAT_XML_ATTR  // Uses XML with attributes
+    .tool_format = TOOL_FORMAT_XML_ATTR,  // Uses XML with attributes
+    .ignore_eog = false  // Respect model's EOG decision
 };
 
 // Liquid AI LFM2.5 template (ChatML with native tool calling)
@@ -123,7 +178,8 @@ static const chat_template_t lfm_template = {
         NULL
     },
     .stop_sequence_count = 5,
-    .tool_format = TOOL_FORMAT_JSON_ONLY  // LFM2.5 uses pure Pythonic function calls between special tokens
+    .tool_format = TOOL_FORMAT_JSON_ONLY,  // LFM2.5 uses pure Pythonic function calls between special tokens
+    .ignore_eog = false  // Respect model's EOG decision
 };
 
 // ============================================================================
@@ -158,7 +214,18 @@ chat_template_type_t chat_template_detect(const char* model_path) {
     
     // Check for Granite
     if (strstr(lower_path, "granite")) {
-        return CHAT_TEMPLATE_GRANITE;
+        // Granite 4.2 and later: reasoning models with their own (ChatML) format.
+        const char* four = strstr(lower_path, "granite-4.");
+        if (!four) four = strstr(lower_path, "granite_4.");
+        if (four && atoi(four + strlen("granite-4.")) >= 2) {
+            return CHAT_TEMPLATE_GRANITE_4_2;
+        }
+        // Check for version 3
+        if (strstr(lower_path, "granite-3") || strstr(lower_path, "granite_3")) {
+            return CHAT_TEMPLATE_GRANITE_3;
+        }
+        // Default to Granite 4 for unversioned or version 4+
+        return CHAT_TEMPLATE_GRANITE_4;
     }
     
     // Check for Qwen
@@ -180,6 +247,10 @@ chat_template_type_t chat_template_detect(const char* model_path) {
     return CHAT_TEMPLATE_QWEN;
 }
 
+bool chat_template_supports_thinking(const chat_template_t* tmpl) {
+    return tmpl && tmpl->type == CHAT_TEMPLATE_GRANITE_4_2;
+}
+
 const chat_template_t* chat_template_get(chat_template_type_t type, const char* model_path) {
     // Auto-detect if requested
     if (type == CHAT_TEMPLATE_AUTO && model_path) {
@@ -189,79 +260,105 @@ const chat_template_t* chat_template_get(chat_template_type_t type, const char* 
     switch (type) {
         case CHAT_TEMPLATE_LFM:
             return &lfm_template;
-        case CHAT_TEMPLATE_GRANITE:
-            return &granite_template;
+        case CHAT_TEMPLATE_GRANITE_3:
+            return &granite3_template;
+        case CHAT_TEMPLATE_GRANITE_4:  // CHAT_TEMPLATE_GRANITE is an alias for this
+            return &granite4_template;
+        case CHAT_TEMPLATE_GRANITE_4_2:
+            return &granite42_template;
         case CHAT_TEMPLATE_PHI:
             return &phi_template;
         case CHAT_TEMPLATE_LLAMA3:
             return &llama3_template;
-        case CHAT_TEMPLATE_QWEN:
+        case CHAT_TEMPLATE_QWEN:  // CHAT_TEMPLATE_CHATML is an alias for this
         default:
             return &qwen_template;
     }
 }
 
 ethervox_result_t chat_template_format_system(
-    const chat_template_t* template,
+    const chat_template_t* tmpl,
     const char* content,
     char* output,
     size_t output_size
 ) {
-    if (!template || !content || !output || output_size == 0) return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    if (!tmpl || !content || !output || output_size == 0) return ETHERVOX_ERROR_INVALID_ARGUMENT;
     
-    return snprintf(output, output_size, "%s%s%s",
-                   template->system_start,
-                   content,
-                   template->system_end);
+    int written = snprintf(output, output_size, "%s%s%s",
+                           tmpl->system_start,
+                           content,
+                           tmpl->system_end);
+    return (written >= 0 && (size_t)written < output_size) ? ETHERVOX_SUCCESS : ETHERVOX_ERROR_BUFFER_TOO_SMALL;
 }
 
 ethervox_result_t chat_template_format_user(
-    const chat_template_t* template,
+    const chat_template_t* tmpl,
     const char* content,
     char* output,
     size_t output_size
 ) {
-    if (!template || !content || !output || output_size == 0) return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    if (!tmpl || !content || !output || output_size == 0) return ETHERVOX_ERROR_INVALID_ARGUMENT;
     
-    return snprintf(output, output_size, "%s%s%s",
-                   template->user_start,
-                   content,
-                   template->user_end);
+    int written = snprintf(output, output_size, "%s%s%s",
+                           tmpl->user_start,
+                           content,
+                           tmpl->user_end);
+    return (written >= 0 && (size_t)written < output_size) ? ETHERVOX_SUCCESS : ETHERVOX_ERROR_BUFFER_TOO_SMALL;
 }
 
 ethervox_result_t chat_template_format_assistant_start(
-    const chat_template_t* template,
+    const chat_template_t* tmpl,
     char* output,
     size_t output_size
 ) {
-    if (!template || !output || output_size == 0) return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    if (!tmpl || !output || output_size == 0) return ETHERVOX_ERROR_INVALID_ARGUMENT;
     
-    return snprintf(output, output_size, "%s", template->assistant_start);
+    int written = snprintf(output, output_size, "%s", tmpl->assistant_start);
+    return (written >= 0 && (size_t)written < output_size) ? ETHERVOX_SUCCESS : ETHERVOX_ERROR_BUFFER_TOO_SMALL;
 }
 
 ethervox_result_t chat_template_format_tool_result(
-    const chat_template_t* template,
+    const chat_template_t* tmpl,
     const char* result,
     char* output,
     size_t output_size
 ) {
-    if (!template || !result || !output || output_size == 0) return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    if (!tmpl || !result || !output || output_size == 0) return ETHERVOX_ERROR_INVALID_ARGUMENT;
     
-    return snprintf(output, output_size, "%s%s%s",
-                   template->tool_result_start,
-                   result,
-                   template->tool_result_end);
+    int written = snprintf(output, output_size, "%s%s%s",
+                           tmpl->tool_result_start,
+                           result,
+                           tmpl->tool_result_end);
+    return (written >= 0 && (size_t)written < output_size) ? ETHERVOX_SUCCESS : ETHERVOX_ERROR_BUFFER_TOO_SMALL;
+}
+
+ethervox_result_t chat_template_format_tool_response(
+    const chat_template_t* tmpl,
+    const char* result,
+    char* output,
+    size_t output_size
+) {
+    if (!tmpl || !result || !output || output_size == 0) return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    if (!tmpl->tool_response_start || !tmpl->tool_response_end) {
+        return chat_template_format_tool_result(tmpl, result, output, output_size);
+    }
+
+    int written = snprintf(output, output_size, "%s%s%s",
+                           tmpl->tool_response_start,
+                           result,
+                           tmpl->tool_response_end);
+    return (written >= 0 && (size_t)written < output_size) ? ETHERVOX_SUCCESS : ETHERVOX_ERROR_BUFFER_TOO_SMALL;
 }
 
 bool chat_template_has_stop_sequence(
-    const chat_template_t* template,
+    const chat_template_t* tmpl,
     const char* text
 ) {
-    if (!template || !text) return false;
+    if (!tmpl || !text) return false;
     
     // Use the template's stop sequences directly
-    for (int i = 0; i < template->stop_sequence_count && template->stop_sequences[i] != NULL; i++) {
-        if (strstr(text, template->stop_sequences[i])) {
+    for (int i = 0; i < tmpl->stop_sequence_count && tmpl->stop_sequences[i] != NULL; i++) {
+        if (strstr(text, tmpl->stop_sequences[i])) {
             return true;
         }
     }
@@ -270,10 +367,10 @@ bool chat_template_has_stop_sequence(
 }
 
 tool_format_type_t chat_template_get_tool_format(
-    const chat_template_t* template
+    const chat_template_t* tmpl
 ) {
-    if (!template) {
+    if (!tmpl) {
         return TOOL_FORMAT_XML_ATTR;  // Default fallback
     }
-    return template->tool_format;
+    return tmpl->tool_format;
 }

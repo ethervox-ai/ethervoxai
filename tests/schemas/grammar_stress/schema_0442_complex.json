@@ -1,0 +1,12 @@
+{
+  "type": "array",
+  "items": {
+    "type": "array",
+    "items": {
+      "type": "integer"
+    },
+    "maxItems": 42
+  },
+  "maxItems": 15,
+  "minItems": 3
+}

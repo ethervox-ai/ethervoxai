@@ -5,7 +5,7 @@
  * Implements the 4-level fallback chain and minimal system prompt generation.
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/governor.h"
@@ -17,6 +17,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <errno.h>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -74,6 +76,17 @@ ethervox_result_t ethervox_governor_init_with_manifest(
     snprintf(manifest_path, sizeof(manifest_path),
             "%s/tools/tools.bin", android_files_dir);
     snprintf(tools_dir, sizeof(tools_dir), "%s/tools", android_files_dir);
+#elif defined(ETHERVOX_PLATFORM_IOS)
+    // On iOS and macOS, use app's Documents directory
+    extern const char* ethervox_ios_get_files_dir(void);
+    const char* ios_files_dir = ethervox_ios_get_files_dir();
+    if (!ios_files_dir || ios_files_dir[0] == '\0') {
+        ETHERVOX_LOGE("iOS/macOS files directory not available");
+        return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    }
+    snprintf(manifest_path, sizeof(manifest_path),
+            "%s/.ethervox/tools/tools.bin", ios_files_dir);
+    snprintf(tools_dir, sizeof(tools_dir), "%s/.ethervox/tools", ios_files_dir);
 #else
     // On desktop, use HOME environment variable
     const char* home = getenv("HOME");
@@ -90,6 +103,24 @@ ethervox_result_t ethervox_governor_init_with_manifest(
     
 #ifdef _WIN32
     _mkdir(tools_dir);
+#elif defined(ETHERVOX_PLATFORM_IOS)
+    // On iOS and macOS, directories should already be created by Swift/ObjC code
+    // Just verify they exist
+    struct stat st;
+    if (stat(tools_dir, &st) != 0) {
+        ETHERVOX_LOGW("Tools directory doesn't exist, attempting to create: %s", tools_dir);
+        // Create parent directory first
+        char parent_dir[512];
+        const char* files_dir = ethervox_ios_get_files_dir();
+        snprintf(parent_dir, sizeof(parent_dir), "%s/.ethervox", files_dir ? files_dir : ".");
+        mkdir(parent_dir, 0755);
+        // Then create tools directory
+        if (mkdir(tools_dir, 0755) != 0 && errno != EEXIST) {
+            ETHERVOX_LOGE("Failed to create tools directory: %s (errno=%d)", tools_dir, errno);
+        }
+    } else {
+        ETHERVOX_LOGI("Tools directory exists: %s", tools_dir);
+    }
 #else
     mkdir(tools_dir, 0755);
 #endif
@@ -154,19 +185,57 @@ ethervox_result_t ethervox_governor_init_with_manifest(
     
     // === STEP 4: Load optimized JSON prompts ===
     char optimized_path[512];
+    bool optimized_found = false;
     
 #ifdef ETHERVOX_PLATFORM_ANDROID
     // On Android, use app files directory (already retrieved and validated at function start)
     snprintf(optimized_path, sizeof(optimized_path),
              "%s/tools/optimized/%s.json", 
              android_files_dir, model_name);
+    optimized_found = (access(optimized_path, R_OK) == 0);
+    
+#elif defined(ETHERVOX_PLATFORM_IOS)
+    // On iOS and macOS, check TWO locations:
+    // 1. App bundle (pre-shipped optimized files in Resources/tools/optimized/)
+    // 2. Documents directory (user-generated via optimization tool)
+    
+    extern const char* ethervox_ios_get_bundle_resource_path(const char* filename, const char* type, const char* subdir);
+    extern const char* ethervox_ios_get_files_dir(void);
+    
+    // Try app bundle first (read-only assets)
+    char bundle_filename[256];
+    snprintf(bundle_filename, sizeof(bundle_filename), "%s", model_name);
+    const char* bundle_path = ethervox_ios_get_bundle_resource_path(bundle_filename, "json", "tools/optimized");
+    
+    if (bundle_path) {
+        strncpy(optimized_path, bundle_path, sizeof(optimized_path) - 1);
+        optimized_path[sizeof(optimized_path) - 1] = '\0';
+        optimized_found = true;
+        ETHERVOX_LOGI("Found optimized prompts in app bundle: %s", optimized_path);
+    } else {
+        // Fall back to Documents directory (writable, for user-generated files)
+        const char* apple_files_dir = ethervox_ios_get_files_dir();
+        if (apple_files_dir) {
+            snprintf(optimized_path, sizeof(optimized_path),
+                     "%s/.ethervox/tools/optimized/%s.json", 
+                     apple_files_dir, model_name);
+            optimized_found = (access(optimized_path, R_OK) == 0);
+            if (optimized_found) {
+                ETHERVOX_LOGI("Found optimized prompts in Documents: %s", optimized_path);
+            }
+        }
+    }
+    
 #else
+    // Desktop: use ~/.ethervox/tools/optimized/
+    const char* optimized_home = getenv("HOME");
     snprintf(optimized_path, sizeof(optimized_path),
              "%s/.ethervox/tools/optimized/%s.json", 
-             home ? home : ".", model_name);
+             optimized_home ? optimized_home : ".", model_name);
+    optimized_found = (access(optimized_path, R_OK) == 0);
 #endif
     
-    if (ethervox_tool_manifest_load_optimized(manifest_registry, optimized_path) == 0) {
+    if (optimized_found && ethervox_tool_manifest_load_optimized(manifest_registry, optimized_path) == 0) {
         // Level 0: Optimal - using optimized JSON prompts
         manifest_registry->optimization_loaded = true;
         manifest_registry->fallback_level = 0;
@@ -179,19 +248,21 @@ ethervox_result_t ethervox_governor_init_with_manifest(
         ETHERVOX_LOGI("  DEBUG: Set tools_loaded_count=%u from header.tool_count=%u",
                       manifest_registry->tools_loaded_count, manifest_registry->header.tool_count);
     } else {
-        // GUARD: Optimization file missing - do NOT load tools
+        // Fallback to Level 1: Binary one-liners from manifest
+        // The manifest binary was loaded successfully, so we have one-liner descriptions
         manifest_registry->optimization_loaded = false;
-        manifest_registry->fallback_level = 3;  // Emergency mode - no tools loaded
+        manifest_registry->fallback_level = 1;  // Binary one-liners are available
+        manifest_registry->tools_loaded_count = manifest_registry->header.tool_count;
         
         ETHERVOX_LOGW("═══════════════════════════════════════════════════════");
         ETHERVOX_LOGW("⚠️  OPTIMIZATION FILE NOT FOUND");
-        ETHERVOX_LOGW("Tools detected but NOT loaded into system prompt");
-        ETHERVOX_LOGW("Run optimization to enable %u tools", runtime_registry->tool_count);
-        ETHERVOX_LOGW("Path: %s", optimized_path);
+        ETHERVOX_LOGW("Falling back to Level 1: Binary one-liners");
+        ETHERVOX_LOGW("Tools available: %u (using compact descriptions)", runtime_registry->tool_count);
+        ETHERVOX_LOGW("Path attempted: %s", optimized_path);
         ETHERVOX_LOGW("═══════════════════════════════════════════════════════");
         
-        // Mark tools as unavailable for system prompt generation
-        manifest_registry->tools_available = false;
+        // Keep tools_available = true (already set by ethervox_tool_manifest_init)
+        // Binary one-liners from manifest are sufficient for system prompt
     }
     
     // === STEP 5: Validate manifest ===
@@ -240,14 +311,23 @@ ethervox_result_t ethervox_governor_build_system_prompt_with_manifest(
     
     // Start with chat template system marker (e.g., "<|system|>\n")
     if (chat_template && chat_template->system_start) {
+        ETHERVOX_LOGI("Adding system_start: '%s'", chat_template->system_start);
         offset = snprintf(output, output_size, "%s", chat_template->system_start);
         if (offset < 0 || (size_t)offset >= output_size) {
+            ETHERVOX_LOGE("system_start snprintf failed: offset=%d, size=%zu", offset, output_size);
             return ETHERVOX_ERROR_INVALID_ARGUMENT;
         }
+        ETHERVOX_LOGI("After system_start: offset=%d", offset);
+    } else {
+        ETHERVOX_LOGW("No chat_template or system_start (template=%p, system_start=%p)", 
+                     (void*)chat_template, 
+                     chat_template ? (void*)chat_template->system_start : NULL);
     }
     
     // Add tool section - the manifest builder will add the Granite-formatted tools
     if (manifest_registry && manifest_registry->tools_available) {
+        ETHERVOX_LOGI("Calling ethervox_tool_build_minimal_system_prompt with offset=%d, size=%zu", 
+                     offset, output_size - offset);
         int tool_prompt_len = ethervox_tool_build_minimal_system_prompt(
             manifest_registry,
             output + offset,
@@ -255,10 +335,24 @@ ethervox_result_t ethervox_governor_build_system_prompt_with_manifest(
             255  // Include all tools
         );
         
+        ETHERVOX_LOGI("ethervox_tool_build_minimal_system_prompt returned: %d", tool_prompt_len);
+        
         if (tool_prompt_len > 0) {
             offset += tool_prompt_len;
+        } else {
+            ETHERVOX_LOGW("Tool prompt generation returned %d - using fallback", tool_prompt_len);
+            // Fallback to simple prompt
+            int written = snprintf(output + offset, output_size - offset,
+                "You are Ethervox, a helpful AI assistant with %u tools. Respond naturally.\n",
+                manifest_registry->header.tool_count);
+            if (written > 0) {
+                offset += written;
+            }
         }
     } else {
+        ETHERVOX_LOGW("Manifest registry not available or tools_available=false (registry=%p, tools_available=%d)",
+                     (void*)manifest_registry, 
+                     manifest_registry ? manifest_registry->tools_available : 0);
         // Level 2/3: No dynamic tools - simple assistant prompt
         int written = snprintf(output + offset, output_size - offset,
             "You are Ethervox, a helpful AI assistant. Respond naturally and conversationally.\n");
@@ -270,14 +364,27 @@ ethervox_result_t ethervox_governor_build_system_prompt_with_manifest(
     
     // End with chat template system end marker (e.g., "<|end|>\n")
     if (chat_template && chat_template->system_end) {
+        ETHERVOX_LOGI("Adding system_end: '%s'", chat_template->system_end);
         int written = snprintf(output + offset, output_size - offset, "%s", chat_template->system_end);
         if (written < 0 || (size_t)(offset + written) >= output_size) {
+            ETHERVOX_LOGE("system_end snprintf failed: written=%d, offset=%d, size=%zu", 
+                         written, offset, output_size);
             return ETHERVOX_ERROR_INVALID_ARGUMENT;
         }
         offset += written;
+        ETHERVOX_LOGI("After system_end: offset=%d", offset);
+    } else {
+        ETHERVOX_LOGW("No system_end (template=%p, system_end=%p)", 
+                     (void*)chat_template, 
+                     chat_template ? (void*)chat_template->system_end : NULL);
     }
     
     ETHERVOX_LOGI("System prompt generated: %d bytes (with chat template markers)", offset);
+    
+    // Log the actual content if it's suspiciously small
+    if (offset < 100) {
+        ETHERVOX_LOGW("⚠️  System prompt is very small (%d bytes): '%s'", offset, output);
+    }
     
     return offset;
 }

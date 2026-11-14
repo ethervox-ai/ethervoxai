@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "string"
+    },
+    "field_1": {
+      "type": "number",
+      "minimum": 17,
+      "maximum": 386
+    }
+  },
+  "required": [
+    "field_0"
+  ]
+}

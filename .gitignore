@@ -115,9 +115,8 @@ examples/*_demo
 !examples/*.cpp
 
 # External dependencies (cloned at build time)
+# Note: llama.cpp and whisper.cpp are git submodules - don't track their contents
 external/*
-!external/llama.cpp
-!external/whisper.cpp
 
 # OS generated files
 .DS_Store
@@ -134,6 +133,11 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Build cruft (C1.0 hygiene)
+main.c.bak
+tmp.txt
+src/tmp.txt
 
 # Debug scripts (personal/temporary)
 *.lldb
@@ -204,3 +208,7 @@ _deps/
 examples/memory_example_memonly
 ethervox-test-emotions
 *.lldb
+build_validate/
+
+# Out-of-tree build directories (build_macos/, build_ios_device/, ...)
+build_*/

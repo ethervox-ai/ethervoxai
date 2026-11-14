@@ -3,7 +3,7 @@
  * @brief Android-specific HTTP implementation for weather tools using JNI
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * Licensed under CC BY-NC-SA 4.0
+ * Proprietary and confidential. See LICENSE.
  */
 
 #include "ethervox/weather_tools.h"

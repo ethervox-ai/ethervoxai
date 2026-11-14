@@ -1,0 +1,64 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field_0"
+      ]
+    },
+    "field_1": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "boolean"
+        }
+      ]
+    },
+    "field_2": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "integer"
+        },
+        "field_1": {
+          "type": "number"
+        },
+        "field_2": {
+          "type": "number"
+        },
+        "field_3": {
+          "type": "boolean"
+        },
+        "field_4": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field_1",
+        "field_2",
+        "field_3",
+        "field_4"
+      ]
+    },
+    "field_3": {
+      "type": "boolean"
+    },
+    "field_4": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "field_1",
+    "field_2",
+    "field_3",
+    "field_4"
+  ]
+}

@@ -7,10 +7,10 @@
  */
 
 #include "ethervox/governor.h"
+#include "test_utils.h"
 #include "ethervox/error.h"
 #include "ethervox/context_tools.h"
 #include "ethervox/memory_tools.h"
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,7 +48,7 @@ void test_turn_tracking(void) {
     // Initialize with small capacity
     history.capacity = 4;
     history.turns = malloc(history.capacity * sizeof(conversation_turn_t));
-    assert(history.turns != NULL);
+    CHECK(history.turns != NULL);
     
     // Test appending turns
     conversation_turn_t turn1 = {
@@ -78,13 +78,13 @@ void test_turn_tracking(void) {
     history.turn_count = 2;
     
     // Verify turns
-    assert(history.turn_count == 2);
-    assert(history.turns[0].is_user == true);
-    assert(history.turns[0].kv_start == 0);
-    assert(history.turns[0].kv_end == 100);
-    assert(history.turns[1].is_user == false);
-    assert(history.turns[1].kv_start == 101);
-    assert(history.turns[1].kv_end == 250);
+    CHECK(history.turn_count == 2);
+    CHECK(history.turns[0].is_user == true);
+    CHECK(history.turns[0].kv_start == 0);
+    CHECK(history.turns[0].kv_end == 100);
+    CHECK(history.turns[1].is_user == false);
+    CHECK(history.turns[1].kv_start == 101);
+    CHECK(history.turns[1].kv_end == 250);
     
     // Cleanup
     free(history.turns);
@@ -139,8 +139,8 @@ void test_context_tools_registration(void) {
     
     // Register context_manage tool
     int result = register_context_manage_tool(&registry, &memory_store);
-    assert(result == 0);
-    assert(registry.tool_count == 1);
+    CHECK(result == 0);
+    CHECK(registry.tool_count == 1);
     
     // Verify tool is registered
     bool found = false;
@@ -150,7 +150,7 @@ void test_context_tools_registration(void) {
             break;
         }
     }
-    assert(found == true);
+    CHECK(found == true);
     
     // Cleanup registry properly
     ethervox_tool_registry_cleanup(&registry);
@@ -195,17 +195,17 @@ void test_kv_position_tracking(void) {
     history.turns[history.turn_count++] = assistant_turn1;
     
     // Verify positions
-    assert(history.turns[0].kv_start == 100);
-    assert(history.turns[0].kv_end == 149);
-    assert(history.turns[1].kv_start == 150);
-    assert(history.turns[1].kv_end == 249);
+    CHECK(history.turns[0].kv_start == 100);
+    CHECK(history.turns[0].kv_end == 149);
+    CHECK(history.turns[1].kv_start == 150);
+    CHECK(history.turns[1].kv_end == 249);
     
     // Calculate total tokens used
     int total_tokens = 0;
     for (uint32_t i = 0; i < history.turn_count; i++) {
         total_tokens += (history.turns[i].kv_end - history.turns[i].kv_start + 1);
     }
-    assert(total_tokens == 150);  // 50 + 100
+    CHECK(total_tokens == 150);  // 50 + 100
     
     free(history.turns);
     

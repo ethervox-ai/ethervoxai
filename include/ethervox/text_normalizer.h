@@ -3,7 +3,7 @@
  * @brief Text normalization for TTS (numbers, times, abbreviations)
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #ifndef ETHERVOX_TEXT_NORMALIZER_H

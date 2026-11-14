@@ -105,6 +105,23 @@ ethervox_result_t ethervox_tts_synthesize_ipa(ethervox_tts_context_t* ctx,
 bool ethervox_tts_is_ready(const ethervox_tts_context_t* ctx);
 
 /**
+ * Set the active speaker_id on an existing context (desktop/Piper only).
+ *
+ * Lets the Governor's "speak" tool select an emotional voice per-utterance
+ * (see src/plugins/conversation_tools/speak.c's emotion->speaker_id mapping)
+ * without recreating the whole TTS context. Only meaningful for
+ * ETHERVOX_TTS_BACKEND_PIPER - platform-native TTS (Android TextToSpeech /
+ * iOS AVSpeechSynthesizer, ETHERVOX_TTS_BACKEND_SYSTEM) has no per-utterance
+ * speaker/emotion concept, so this is a documented no-op there, not a bug.
+ *
+ * @param ctx TTS context
+ * @param speaker_id Multi-speaker voice/emotion selector (see tts config)
+ * @return ETHERVOX_SUCCESS if applied, ETHERVOX_ERROR_NOT_SUPPORTED if the
+ *         active backend has no speaker concept
+ */
+ethervox_result_t ethervox_tts_set_speaker_id(ethervox_tts_context_t* ctx, int speaker_id);
+
+/**
  * Get current backend type
  */
 ethervox_tts_backend_t ethervox_tts_get_backend(const ethervox_tts_context_t* ctx);

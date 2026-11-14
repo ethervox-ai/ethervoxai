@@ -14,6 +14,8 @@
 
 #include "ethervox/governor.h"
 #include "ethervox/logging.h"
+#include "ethervox/tool_catalogue.h"
+#include "workspace_tools_catalogue.h"
 #include "workspace_operations.h"
 
 // Global workspace operations (set during registration)
@@ -353,7 +355,11 @@ static int tool_workspace_highlight_nodes_wrapper(const char* args_json, char** 
   
   // Extract the array substring
   size_t array_len = p - array_start;
-  char* node_ids_json = strndup(array_start, array_len);
+  char* node_ids_json = (char*)malloc(array_len + 1);
+  if (node_ids_json) {
+    memcpy(node_ids_json, array_start, array_len);
+    node_ids_json[array_len] = '\0';
+  }
   
   ethervox_log(ETHERVOX_LOG_LEVEL_INFO, __FILE__, __LINE__, __func__,
                "Highlighting nodes: %s", node_ids_json);
@@ -389,16 +395,11 @@ ethervox_result_t ethervox_workspace_tools_register(ethervox_tool_registry_t* re
 
   // Register: workspace_list_objects
   ethervox_tool_t list_tool = {
-      .name = "workspace_list_objects",
-      .description =
-          "List all objects in the workspace (notes, files, folders). Use when user asks to list, "
-          "show, or see objects. Returns JSON array of objects with id, title, type, tags.",
-      .parameters_json_schema =
-          "{\"type\":{\"type\":\"string\",\"description\":\"Object type filter: markdown-note, "
-          "folder, file, code-snippet, web-link, conversation, image, or "
-          "all\",\"default\":\"all\"}}",
-      .execute = tool_workspace_list_objects_wrapper,
+      .test_scenario = "List all objects in workspace",
+        .execute = tool_workspace_list_objects_wrapper,
       .requires_confirmation = 0};
+  ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_WORKSPACE_TOOLS_JSON, "workspace_list_objects",
+      ethervox_tool_catalogue_build_profile(), &list_tool);
   result = ethervox_tool_registry_add(registry, &list_tool);
   if (result != ETHERVOX_SUCCESS) {
     ethervox_log(ETHERVOX_LOG_LEVEL_ERROR, __FILE__, __LINE__, __func__,
@@ -408,15 +409,11 @@ ethervox_result_t ethervox_workspace_tools_register(ethervox_tool_registry_t* re
 
   // Register: workspace_search_objects
   ethervox_tool_t search_tool = {
-      .name = "workspace_search_objects",
-      .description =
-          "Search workspace for objects by title, content, or tags. Use when user asks to find, "
-          "search for, or locate objects. Returns matching objects with similarity ranking.",
-      .parameters_json_schema =
-          "{\"query\":{\"type\":\"string\",\"description\":\"Search query "
-          "text\",\"required\":true}}",
-      .execute = tool_workspace_search_objects_wrapper,
+      .test_scenario = "Search for documents about AI",
+        .execute = tool_workspace_search_objects_wrapper,
       .requires_confirmation = 0};
+  ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_WORKSPACE_TOOLS_JSON, "workspace_search_objects",
+      ethervox_tool_catalogue_build_profile(), &search_tool);
   result = ethervox_tool_registry_add(registry, &search_tool);
   if (result != ETHERVOX_SUCCESS) {
     ethervox_log(ETHERVOX_LOG_LEVEL_ERROR, __FILE__, __LINE__, __func__,
@@ -426,14 +423,11 @@ ethervox_result_t ethervox_workspace_tools_register(ethervox_tool_registry_t* re
 
   // Register: workspace_get_object
   ethervox_tool_t get_tool = {
-      .name = "workspace_get_object",
-      .description =
-          "Get complete details of a specific object including content, metadata, connections, and "
-          "files. Requires object_id.",
-      .parameters_json_schema =
-          "{\"object_id\":{\"type\":\"string\",\"description\":\"Object UUID\",\"required\":true}}",
-      .execute = tool_workspace_get_object_wrapper,
+      .test_scenario = "Get details about note 123",
+        .execute = tool_workspace_get_object_wrapper,
       .requires_confirmation = 0};
+  ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_WORKSPACE_TOOLS_JSON, "workspace_get_object",
+      ethervox_tool_catalogue_build_profile(), &get_tool);
   result = ethervox_tool_registry_add(registry, &get_tool);
   if (result != ETHERVOX_SUCCESS) {
     ethervox_log(ETHERVOX_LOG_LEVEL_ERROR, __FILE__, __LINE__, __func__,
@@ -443,21 +437,11 @@ ethervox_result_t ethervox_workspace_tools_register(ethervox_tool_registry_t* re
 
   // Register: workspace_create_note
   ethervox_tool_t create_note_tool = {
-      .name = "workspace_create_note",
-      .description =
-          "CREATE a new graph node/object in the workspace (stored as a markdown note). Use this "
-          "when the user asks to create/add a new 'node', 'object', 'note', or 'item' in the graph. "
-          "Parameters: 'title' (string, required) - the node name/title, and 'content' (string, "
-          "required) - node content in markdown format. Returns the newly created node's UUID. "
-          "IMPORTANT: This creates a NEW standalone graph node. To add info to an EXISTING node, "
-          "first search for it with workspace_search_objects, then use workspace_update_object.",
-      .parameters_json_schema =
-          "{\"title\":{\"type\":\"string\",\"description\":\"Node/object title/name\",\"required\":true},"
-          "\"content\":{\"type\":\"string\",\"description\":\"Node content in markdown "
-          "format\",\"required\":true},\"tags\":{\"type\":\"array\",\"description\":\"Optional "
-          "tags list\",\"required\":false}}",
-      .execute = tool_workspace_create_note_wrapper,
+      .test_scenario = "Create a note about meeting",
+        .execute = tool_workspace_create_note_wrapper,
       .requires_confirmation = 0};
+  ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_WORKSPACE_TOOLS_JSON, "workspace_create_note",
+      ethervox_tool_catalogue_build_profile(), &create_note_tool);
   result = ethervox_tool_registry_add(registry, &create_note_tool);
   if (result != ETHERVOX_SUCCESS) {
     ethervox_log(ETHERVOX_LOG_LEVEL_ERROR, __FILE__, __LINE__, __func__,
@@ -467,18 +451,11 @@ ethervox_result_t ethervox_workspace_tools_register(ethervox_tool_registry_t* re
 
   // Register: workspace_create_connection
   ethervox_tool_t create_connection_tool = {
-      .name = "workspace_create_connection",
-      .description =
-          "Create a connection (edge) between two objects in the graph. Requires from_id and "
-          "to_id. Optional label.",
-      .parameters_json_schema =
-          "{\"from_id\":{\"type\":\"string\",\"description\":\"Source object "
-          "UUID\",\"required\":true},\"to_id\":{\"type\":\"string\",\"description\":\"Target "
-          "object "
-          "UUID\",\"required\":true},\"label\":{\"type\":\"string\",\"description\":\"Connection "
-          "label\"}}",
-      .execute = tool_workspace_create_connection_wrapper,
+      .test_scenario = "Connect note A to note B",
+        .execute = tool_workspace_create_connection_wrapper,
       .requires_confirmation = 0};
+  ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_WORKSPACE_TOOLS_JSON, "workspace_create_connection",
+      ethervox_tool_catalogue_build_profile(), &create_connection_tool);
   result = ethervox_tool_registry_add(registry, &create_connection_tool);
   if (result != ETHERVOX_SUCCESS) {
     ethervox_log(ETHERVOX_LOG_LEVEL_ERROR, __FILE__, __LINE__, __func__,
@@ -488,23 +465,11 @@ ethervox_result_t ethervox_workspace_tools_register(ethervox_tool_registry_t* re
 
   // Register: workspace_update_object
   ethervox_tool_t update_object_tool = {
-      .name = "workspace_update_object",
-      .description =
-          "Update or append content to an EXISTING object in the workspace. Use when user wants "
-          "to add information to an existing note, person, or object. First use "
-          "workspace_search_objects to find the object_id, then call this to update its content. "
-          "Parameters: 'object_id' (string, required), 'content' (string, required), 'append' "
-          "(string, optional, 'true' or 'false', defaults to 'true'). When append=true, adds new "
-          "content after existing content. When append=false, replaces entire content. Returns "
-          "updated object details.",
-      .parameters_json_schema =
-          "{\"object_id\":{\"type\":\"string\",\"description\":\"UUID of object to "
-          "update\",\"required\":true},\"content\":{\"type\":\"string\",\"description\":\"New "
-          "content to add or replace\",\"required\":true},\"append\":{\"type\":\"string\","
-          "\"description\":\"Append (true) or replace (false) "
-          "content\",\"default\":\"true\"}}",
-      .execute = tool_workspace_update_object_wrapper,
+      .test_scenario = "Update note 456 with new content",
+        .execute = tool_workspace_update_object_wrapper,
       .requires_confirmation = 0};
+  ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_WORKSPACE_TOOLS_JSON, "workspace_update_object",
+      ethervox_tool_catalogue_build_profile(), &update_object_tool);
   result = ethervox_tool_registry_add(registry, &update_object_tool);
   if (result != ETHERVOX_SUCCESS) {
     ethervox_log(ETHERVOX_LOG_LEVEL_ERROR, __FILE__, __LINE__, __func__,
@@ -514,18 +479,11 @@ ethervox_result_t ethervox_workspace_tools_register(ethervox_tool_registry_t* re
 
   // Register: workspace_export_to_docx
   ethervox_tool_t export_docx_tool = {
-      .name = "workspace_export_to_docx",
-      .description =
-          "Export a markdown note to Microsoft Word (.docx) format. Use this when the user asks "
-          "to create a Word document, export to Word, or wants a .docx file. The system stores "
-          "everything as markdown internally, but can export to Word format on demand. "
-          "Parameters: 'object_id' (string, required). Returns the path to the generated .docx "
-          "file. Requires pandoc to be installed on the system.",
-      .parameters_json_schema =
-          "{\"object_id\":{\"type\":\"string\",\"description\":\"UUID of the markdown note to "
-          "export\",\"required\":true}}",
-      .execute = tool_workspace_export_to_docx_wrapper,
+      .test_scenario = "Export workspace to Word document",
+        .execute = tool_workspace_export_to_docx_wrapper,
       .requires_confirmation = 0};
+  ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_WORKSPACE_TOOLS_JSON, "workspace_export_to_docx",
+      ethervox_tool_catalogue_build_profile(), &export_docx_tool);
   result = ethervox_tool_registry_add(registry, &export_docx_tool);
   if (result != ETHERVOX_SUCCESS) {
     ethervox_log(ETHERVOX_LOG_LEVEL_ERROR, __FILE__, __LINE__, __func__,
@@ -535,19 +493,11 @@ ethervox_result_t ethervox_workspace_tools_register(ethervox_tool_registry_t* re
 
   // Register: workspace_highlight_nodes
   ethervox_tool_t highlight_tool = {
-      .name = "workspace_highlight_nodes",
-      .description =
-          "Highlight specific nodes in the graph visualization. Use this when the user searches "
-          "for objects, asks to find or show specific items, or wants visual emphasis on certain "
-          "nodes. This tool takes an array of node IDs and highlights them in the UI so the user "
-          "can see them clearly. Combine with workspace_search_objects to first find nodes, then "
-          "highlight the results. Parameters: 'node_ids' (array of strings, required). Returns "
-          "success status and the count of highlighted nodes.",
-      .parameters_json_schema =
-          "{\"node_ids\":{\"type\":\"array\",\"description\":\"Array of node UUIDs to highlight "
-          "in the graph\",\"items\":{\"type\":\"string\"},\"required\":true}}",
-      .execute = tool_workspace_highlight_nodes_wrapper,
+      .test_scenario = "Highlight important nodes in graph",
+        .execute = tool_workspace_highlight_nodes_wrapper,
       .requires_confirmation = 0};
+  ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_WORKSPACE_TOOLS_JSON, "workspace_highlight_nodes",
+      ethervox_tool_catalogue_build_profile(), &highlight_tool);
   result = ethervox_tool_registry_add(registry, &highlight_tool);
   if (result != ETHERVOX_SUCCESS) {
     ethervox_log(ETHERVOX_LOG_LEVEL_ERROR, __FILE__, __LINE__, __func__,

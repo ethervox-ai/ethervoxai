@@ -6,10 +6,12 @@
  * Handles percentage calculations for tips, tax, discounts, etc.
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/compute_tools.h"
+#include "ethervox/tool_catalogue.h"
+#include "compute_tools_catalogue.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -128,24 +130,21 @@ static int percentage_execute(const char* args_json, char** result, char** error
 }
 
 static ethervox_tool_t percentage_tool = {
-    .name = "percentage_calculate",
-    .description = "Calculate percentages for tips, tax, discounts (operations: of, increase, decrease, is_what_percent)",
-    .parameters_json_schema =
-        "{\"type\":\"object\","
-        "\"properties\":{"
-        "\"value\":{\"type\":\"number\",\"description\":\"The value to calculate percentage on\"},"
-        "\"percentage\":{\"type\":\"number\",\"description\":\"The percentage amount\"},"
-        "\"operation\":{\"type\":\"string\",\"enum\":[\"of\",\"increase\",\"decrease\",\"is_what_percent\"],\"description\":\"Operation to perform\"},"
-        "\"decimal_places\":{\"type\":\"integer\",\"description\":\"Number of decimal places (0-15, default: 2)\",\"default\":2}"
-        "},"
-        "\"required\":[\"value\",\"percentage\",\"operation\"]}",
-    .execute = percentage_execute,
+    .test_scenario = "What's 15% of 200?",
+        .execute = percentage_execute,
     .is_deterministic = true,
     .requires_confirmation = false,
     .is_stateful = false,
     .estimated_latency_ms = 0.3f
 };
+static bool percentage_tool_loaded = false;
 
 const ethervox_tool_t* ethervox_tool_percentage(void) {
+    if (!percentage_tool_loaded) {
+        ethervox_result_t r = ethervox_tool_catalogue_load(
+            ETHERVOX_CATALOGUE_COMPUTE_TOOLS_JSON, "percentage_calculate",
+            ethervox_tool_catalogue_build_profile(), &percentage_tool);
+        percentage_tool_loaded = ethervox_is_success(r);
+    }
     return &percentage_tool;
 }

@@ -6,13 +6,16 @@
  * settings for batch size, threads, KV cache type, etc.
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/device_profile.h"
 #include "ethervox/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #ifdef __ANDROID__
 #include <sys/system_properties.h>
@@ -78,6 +81,28 @@ static void detect_memory(long* total_mb, long* available_mb) {
   }
 #endif
   
+#ifdef _WIN32
+  {
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    if (GlobalMemoryStatusEx(&status)) {
+      *total_mb = (long)(status.ullTotalPhys / (1024 * 1024));
+      *available_mb = (*total_mb) / 2;  // same conservative estimate as elsewhere
+      return;
+    }
+  }
+#elif defined(_SC_PHYS_PAGES) && defined(_SC_PAGESIZE)
+  {
+    long pages = sysconf(_SC_PHYS_PAGES);
+    long page_size = sysconf(_SC_PAGESIZE);
+    if (pages > 0 && page_size > 0) {
+      *total_mb = (long)(((long long)pages * page_size) / (1024 * 1024));
+      *available_mb = (*total_mb) / 2;  // same conservative estimate as Android
+      return;
+    }
+  }
+#endif
+
   // Fallback
   *total_mb = 4096;  // Assume 4GB
   *available_mb = 2048;

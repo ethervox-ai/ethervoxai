@@ -4,14 +4,14 @@
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
  *
- * This file is part of EthervoxAI, licensed under CC BY-NC-SA 4.0.
+ * This file is part of EthervoxAI. Proprietary and confidential. See LICENSE.
  * You are free to share and adapt this work under the following terms:
  * - Attribution: Credit the original authors
- * - NonCommercial: Not for commercial use
+ * - Proprietary: internal use only, see LICENSE
  * - ShareAlike: Distribute under same license
  *
- * For full license terms, see: https://creativecommons.org/licenses/by-nc-sa/4.0/
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * For full license terms, see: LICENSE
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 #include "ethervox/model_manager.h"
 #include "ethervox/error.h"
@@ -38,15 +38,17 @@
 #ifdef _WIN32
 #include <wininet.h>
 #pragma comment(lib, "wininet.lib")
+#if ETHERVOX_FEATURE_DOWNLOADER
 #define USE_WININET
+#endif
 #elif defined(__linux__) || defined(__APPLE__)
 /* Check if curl/curl.h is available (may not be present in cross-compilation environments) */
-#if __has_include(<curl/curl.h>)
+#if __has_include(<curl/curl.h>) && ETHERVOX_FEATURE_DOWNLOADER
 #include <curl/curl.h>
 #define USE_LIBCURL
 #define CURL_AVAILABLE 1
 #else
-/* curl not available - HTTP download functionality will be disabled */
+/* curl not available, or ETHERVOX_FEATURE_DOWNLOADER=OFF - HTTP download functionality disabled */
 #ifdef _MSC_VER
 #pragma message("curl/curl.h not found - HTTP download functionality disabled")
 #else

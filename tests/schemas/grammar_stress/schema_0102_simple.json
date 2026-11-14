@@ -1,0 +1,18 @@
+{
+  "oneOf": [
+    {
+      "type": "string"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "field_0"
+      ]
+    }
+  ]
+}

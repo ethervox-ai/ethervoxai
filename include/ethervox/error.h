@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+// SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
 #ifndef ETHERVOX_ERROR_H
 #define ETHERVOX_ERROR_H
 
@@ -32,6 +32,12 @@ typedef enum {
     ETHERVOX_ERROR_FAILED = -11,
     ETHERVOX_ERROR_NOT_FOUND = -12,
     ETHERVOX_ERROR_INTERRUPTED = -13,  // Operation interrupted by user (e.g., Ctrl+C)
+    ETHERVOX_ERROR_FEATURE_DISABLED = -14,  // Feature compiled out (ETHERVOX_FEATURE_* == 0)
+    ETHERVOX_ERROR_NO_TTS_HOST = -15,  // No ethervox_tts_host_t registered (ethervox_tts_set_host)
+    ETHERVOX_ERROR_ALREADY_EXISTS = -16,  // Resource already exists (e.g., duplicate tool name)
+    ETHERVOX_ERROR_PERMISSION_DENIED = -17,  // Operation not permitted (e.g., mutating tool auto-invoke)
+    ETHERVOX_ERROR_INVALID_STATE = -18,  // Invalid state for operation
+    ETHERVOX_ERROR_REENTRANT = -19,  // Reentrancy detected (e.g., tool callback calling back into same model)
     
     // Platform/HAL errors (-100 to -199)
     ETHERVOX_ERROR_PLATFORM_INIT = -100,

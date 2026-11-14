@@ -4,14 +4,14 @@
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
  *
- * This file is part of EthervoxAI, licensed under CC BY-NC-SA 4.0.
+ * This file is part of EthervoxAI. Proprietary and confidential. See LICENSE.
  * You are free to share and adapt this work under the following terms:
  * - Attribution: Credit the original authors
- * - NonCommercial: Not for commercial use
+ * - Proprietary: internal use only, see LICENSE
  * - ShareAlike: Distribute under same license
  *
- * For full license terms, see: https://creativecommons.org/licenses/by-nc-sa/4.0/
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * For full license terms, see: LICENSE
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 #include <ctype.h>
 #include <stdio.h>
@@ -723,7 +723,7 @@ ethervox_result_t ethervox_dialogue_init(ethervox_dialogue_engine_t* engine,
 #endif
     }
     
-#if HAVE_LIBCURL
+#if HAVE_LIBCURL && ETHERVOX_FEATURE_WEATHER
     // Register weather forecast tool (requires libcurl)
 #ifdef ETHERVOX_PLATFORM_ANDROID
     ETHERVOX_LOGI("Attempting to register weather tools...");
@@ -1646,11 +1646,11 @@ ethervox_result_t ethervox_dialogue_process_llm(ethervox_dialogue_engine_t* engi
     
     ethervox_governor_status_t status = ethervox_governor_execute(
         (ethervox_governor_t*)engine->governor,
-        intent->raw_text,
-        &gov_response,
+        intent->raw_text, NULL, &gov_response,
         &gov_error,
         &metrics,
         NULL,  // Progress callback
+        NULL,  // Event callback
         NULL,  // Token callback (not streaming)
         NULL   // User data
     );
@@ -1721,11 +1721,11 @@ ethervox_result_t ethervox_dialogue_process_llm(ethervox_dialogue_engine_t* engi
         
         ethervox_governor_status_t status = ethervox_governor_execute(
             (ethervox_governor_t*)engine->governor,
-            intent->raw_text,
-            &gov_response,
+            intent->raw_text, NULL, &gov_response,
             &gov_error,
             &metrics,
             NULL,  // TODO: Add progress callback for UI updates
+            NULL,  // Event callback
             NULL,  // Token callback (not streaming)
             NULL   // User data
         );
@@ -1963,11 +1963,11 @@ ethervox_result_t ethervox_dialogue_process_llm_stream(ethervox_dialogue_engine_
     // Use the provided governor progress callback (from JNI layer)
     ethervox_governor_status_t status = ethervox_governor_execute(
         (ethervox_governor_t*)engine->governor,
-        intent->raw_text,
-        &gov_response,
+        intent->raw_text, NULL, &gov_response,
         &gov_error,
         &metrics,
         governor_progress_callback,  // Now properly wired from JNI!
+        NULL,  // Event callback (not used yet)
         token_callback,  // Token callback for streaming
         user_data
     );

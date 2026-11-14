@@ -1,8 +1,20 @@
-// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+// SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
 #include "ethervox/logging.h"
+#include "ethervox/platform_thread.h"
+#include "ethervox/platform_time.h"
 #include <time.h>
 #include <string.h>
 #include <stdio.h>
+
+#ifdef _WIN32
+#include <io.h>
+#define ethervox_isatty _isatty
+#define ethervox_fileno _fileno
+#else
+#include <unistd.h>
+#define ethervox_isatty isatty
+#define ethervox_fileno fileno
+#endif
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -12,6 +24,20 @@
 int g_ethervox_debug_enabled = 1;
 
 static ethervox_log_level_t g_log_level = ETHERVOX_LOG_LEVEL_INFO;
+
+// Structured logging callback (C4.3)
+static ethervox_log_callback_t g_log_callback = NULL;
+static void* g_log_callback_user_data = NULL;
+static ethervox_mutex_t g_callback_mutex;
+static bool g_callback_mutex_init = false;
+
+// Metrics (C4.3)
+static ethervox_metrics_t g_metrics = {0};
+static ethervox_mutex_t g_metrics_mutex;
+static bool g_metrics_mutex_init = false;
+
+// Forward declarations
+static void invoke_callback(const ethervox_log_entry_t* entry);
 
 void ethervox_log_set_level(ethervox_log_level_t level) {
     g_log_level = level;
@@ -72,6 +98,13 @@ void ethervox_log(ethervox_log_level_t level, const char* file, int line,
         return;
     }
     
+    // Format message for both console and callback
+    char message[1024];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(message, sizeof(message), fmt, args);
+    va_end(args);
+    
     // Get timestamp
     time_t now = time(NULL);
     struct tm tm_info;
@@ -83,8 +116,16 @@ void ethervox_log(ethervox_log_level_t level, const char* file, int line,
 #endif
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &tm_info);
     
-    // Get color for this level
-    const char* color = log_level_color(level);
+    // Get color for this level -- only when stderr is a real terminal, never when piped or
+    // redirected into a log file / another process's captured output (callers like the
+    // ethervoxai-workspace model pool pipe this through structured logging and never want raw
+    // ANSI escapes embedded in it)
+    static int stderr_is_tty = -1;
+    if (stderr_is_tty == -1) {
+        stderr_is_tty = ethervox_isatty(ethervox_fileno(stderr)) ? 1 : 0;
+    }
+    const char* color = stderr_is_tty ? log_level_color(level) : "";
+    const char* color_reset = stderr_is_tty ? COLOR_RESET : "";
     
 #ifdef __ANDROID__
     // On Android, use Android logging system
@@ -110,16 +151,9 @@ void ethervox_log(ethervox_log_level_t level, const char* file, int line,
             priority = ANDROID_LOG_INFO;
     }
     
-    // Format the message
-    char buffer[1024];
-    va_list args;
-    va_start(args, fmt);
-    vsnprintf(buffer, sizeof(buffer), fmt, args);
-    va_end(args);
-    
     // Log with Android logger, including file and function info
     __android_log_print(priority, "EthervoxCore", "[%s:%d %s] %s",
-                       extract_filename(file), line, func, buffer);
+                       extract_filename(file), line, func, message);
 #else
     // On desktop platforms, use colored stderr output
     // Print log prefix with color
@@ -132,15 +166,23 @@ void ethervox_log(ethervox_log_level_t level, const char* file, int line,
             func);
     
     // Print message in color
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
-    
-    // Reset color at end of line
-    fprintf(stderr, "%s\n", COLOR_RESET);
+    fprintf(stderr, "%s%s\n", message, color_reset);
     fflush(stderr);
 #endif
+    
+    // Invoke structured callback if set (C4.3)
+    ethervox_log_entry_t entry = {
+        .level = level,
+        .subsystem = ETHERVOX_SUBSYSTEM_CORE,  // Default subsystem
+        .file = extract_filename(file),
+        .line = line,
+        .func = func,
+        .message = message,
+        .fields = NULL,
+        .field_count = 0,
+        .timestamp_ms = ethervox_time_now_ms()
+    };
+    invoke_callback(&entry);
 }
 
 void ethervox_log_error_context(const ethervox_error_context_t* ctx) {
@@ -172,4 +214,188 @@ void ethervox_log_error_context(const ethervox_error_context_t* ctx) {
     fprintf(stderr, "  Timestamp: %llu ms%s\n", (unsigned long long)ctx->timestamp_ms, COLOR_RESET);
     fflush(stderr);
 #endif
+}
+
+// ============================================================================
+// Structured logging implementation (C4.3)
+// ============================================================================
+
+void ethervox_log_set_callback(ethervox_log_callback_t callback, void* user_data) {
+    if (!g_callback_mutex_init) {
+        ethervox_mutex_init(&g_callback_mutex);
+        g_callback_mutex_init = true;
+    }
+    
+    ethervox_mutex_lock(&g_callback_mutex);
+    g_log_callback = callback;
+    g_log_callback_user_data = user_data;
+    ethervox_mutex_unlock(&g_callback_mutex);
+}
+
+/**
+ * Internal: invoke callback if set
+ */
+static void invoke_callback(const ethervox_log_entry_t* entry) {
+    if (!g_callback_mutex_init) {
+        return;
+    }
+    
+    ethervox_mutex_lock(&g_callback_mutex);
+    if (g_log_callback) {
+        g_log_callback(entry, g_log_callback_user_data);
+    }
+    ethervox_mutex_unlock(&g_callback_mutex);
+}
+
+void ethervox_log_ex(ethervox_log_level_t level, ethervox_log_subsystem_t subsystem,
+                     const char* file, int line, const char* func, const char* fmt, ...) {
+    char message[1024];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(message, sizeof(message), fmt, args);
+    va_end(args);
+    
+    // Call existing log function for console output
+    ethervox_log(level, file, line, func, "%s", message);
+    
+    // Invoke structured callback if set
+    ethervox_log_entry_t entry = {
+        .level = level,
+        .subsystem = subsystem,
+        .file = extract_filename(file),
+        .line = line,
+        .func = func,
+        .message = message,
+        .fields = NULL,
+        .field_count = 0,
+        .timestamp_ms = ethervox_time_now_ms()
+    };
+    invoke_callback(&entry);
+}
+
+void ethervox_log_fields(ethervox_log_level_t level, ethervox_log_subsystem_t subsystem,
+                         const char* file, int line, const char* func,
+                         const ethervox_log_field_t* fields, uint32_t field_count,
+                         const char* fmt, ...) {
+    char message[1024];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(message, sizeof(message), fmt, args);
+    va_end(args);
+    
+    // Call existing log function for console output
+    ethervox_log(level, file, line, func, "%s", message);
+    
+    // Invoke structured callback with fields
+    ethervox_log_entry_t entry = {
+        .level = level,
+        .subsystem = subsystem,
+        .file = extract_filename(file),
+        .line = line,
+        .func = func,
+        .message = message,
+        .fields = fields,
+        .field_count = field_count,
+        .timestamp_ms = ethervox_time_now_ms()
+    };
+    invoke_callback(&entry);
+}
+
+// ============================================================================
+// Metrics implementation (C4.3)
+// ============================================================================
+
+ethervox_result_t ethervox_metrics_snapshot(ethervox_metrics_t* metrics) {
+    if (!metrics) {
+        return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    }
+    
+    if (!g_metrics_mutex_init) {
+        ethervox_mutex_init(&g_metrics_mutex);
+        g_metrics_mutex_init = true;
+    }
+    
+    ethervox_mutex_lock(&g_metrics_mutex);
+    memcpy(metrics, &g_metrics, sizeof(ethervox_metrics_t));
+    ethervox_mutex_unlock(&g_metrics_mutex);
+    
+    return ETHERVOX_SUCCESS;
+}
+
+ethervox_result_t ethervox_metrics_reset(void) {
+    if (!g_metrics_mutex_init) {
+        ethervox_mutex_init(&g_metrics_mutex);
+        g_metrics_mutex_init = true;
+    }
+    
+    ethervox_mutex_lock(&g_metrics_mutex);
+    // Reset cumulative counters, preserve current state
+    g_metrics.models_loaded_total = 0;
+    g_metrics.models_evicted_total = 0;
+    g_metrics.bytes_evicted_total = 0;
+    g_metrics.generations_total = 0;
+    g_metrics.generations_succeeded = 0;
+    g_metrics.generations_failed = 0;
+    g_metrics.tokens_generated_total = 0;
+    g_metrics.generation_time_ms_total = 0;
+    g_metrics.sessions_forked_total = 0;
+    g_metrics.kv_cache_hits = 0;
+    g_metrics.kv_cache_misses = 0;
+    g_metrics.structured_gens_total = 0;
+    g_metrics.avg_confidence = 0.0f;
+    g_metrics.errors_total = 0;
+    g_metrics.errors_oom = 0;
+    g_metrics.errors_timeout = 0;
+    ethervox_mutex_unlock(&g_metrics_mutex);
+    
+    return ETHERVOX_SUCCESS;
+}
+
+// Internal: update metrics (called by various subsystems)
+void ethervox_metrics_record_generation(bool success, uint32_t tokens, uint64_t time_ms) {
+    if (!g_metrics_mutex_init) {
+        ethervox_mutex_init(&g_metrics_mutex);
+        g_metrics_mutex_init = true;
+    }
+    
+    ethervox_mutex_lock(&g_metrics_mutex);
+    g_metrics.generations_total++;
+    if (success) {
+        g_metrics.generations_succeeded++;
+        g_metrics.tokens_generated_total += tokens;
+        g_metrics.generation_time_ms_total += time_ms;
+    } else {
+        g_metrics.generations_failed++;
+    }
+    ethervox_mutex_unlock(&g_metrics_mutex);
+}
+
+void ethervox_metrics_record_structured_gen(float confidence) {
+    if (!g_metrics_mutex_init) {
+        ethervox_mutex_init(&g_metrics_mutex);
+        g_metrics_mutex_init = true;
+    }
+    
+    ethervox_mutex_lock(&g_metrics_mutex);
+    g_metrics.structured_gens_total++;
+    // Running average
+    float n = (float)g_metrics.structured_gens_total;
+    g_metrics.avg_confidence = (g_metrics.avg_confidence * (n - 1.0f) + confidence) / n;
+    ethervox_mutex_unlock(&g_metrics_mutex);
+}
+
+void ethervox_metrics_record_error(ethervox_result_t code) {
+    if (!g_metrics_mutex_init) {
+        ethervox_mutex_init(&g_metrics_mutex);
+        g_metrics_mutex_init = true;
+    }
+    
+    ethervox_mutex_lock(&g_metrics_mutex);
+    g_metrics.errors_total++;
+    if (code == ETHERVOX_ERROR_OUT_OF_MEMORY) {
+        g_metrics.errors_oom++;
+    } else if (code == ETHERVOX_ERROR_TIMEOUT) {
+        g_metrics.errors_timeout++;
+    }
+    ethervox_mutex_unlock(&g_metrics_mutex);
 }

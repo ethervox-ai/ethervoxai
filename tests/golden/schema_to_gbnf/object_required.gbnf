@@ -1,0 +1,3 @@
+root-name-value ::= "\"" ([^"\\\x7F\x00-\x1F] | "\\" ["\\/bfnrt])* "\"" ws
+root ::= "{" ws "\"name\"" ws ":" ws root-name-value ws "}" ws
+ws ::= | " " | "\n" [ \t]{0,20}

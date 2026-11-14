@@ -1,0 +1,41 @@
+{
+  "oneOf": [
+    {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field_0": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "field_0"
+        ]
+      }
+    },
+    {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

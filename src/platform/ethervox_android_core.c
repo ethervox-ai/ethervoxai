@@ -4,8 +4,27 @@
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
  *
- * This file is part of EthervoxAI, licensed under CC BY-NC-SA 4.0.
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * This file is part of EthervoxAI. Proprietary and confidential. See LICENSE.
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
+ *
+ * Granite Speech integration: Mode 1 (voice conversation), Mode 2
+ * (transcription), and Mode 4 (voice-to-text) each go through their own
+ * dedicated JNI entry points, all backed by Granite Speech ASR
+ * (see ethervox/stt.h) instead of Whisper/SpeechRecognizer:
+ *   - Mode 1/4: voiceConversationStart/Stop/Interrupt and
+ *     voiceQueryStart/Stop (see the "Voice Conversation" section below) both
+ *     wrap ethervox_conversation_init/start (src/dialogue/voice_conversation.c),
+ *     the single, platform-agnostic Mode 1/4 orchestrator - Android supplies
+ *     platform-native TTS via the on_speak_request callback and resolves the
+ *     Granite Speech Plus model path against the app's files dir (ASR-only
+ *     prompt, same weights Mode 2 uses in SAA mode); the underlying state
+ *     machine, VAD, and barge-in logic are unchanged from desktop.
+ *   - Mode 2: startVoiceTranscription/stopVoiceTranscription (see "Voice
+ *     Tools / Transcription" below) wrap ethervox_voice_tools_init/
+ *     start_listen/stop_listen, which initialize Granite Speech Plus (SAA)
+ *     internally.
+ * "Which ASR backend is active" is therefore decided in exactly one place
+ * per mode, not split between a Kotlin-only path and a JNI-only path.
  */
 
 #include <android/log.h>
@@ -16,14 +35,23 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <errno.h>
 
 #include "ethervox/audio.h"
 #include "ethervox/llm.h"
 #include "ethervox/stt.h"
 #include "ethervox/wake_word.h"
+#include "ethervox/paths.h"
+#include "ethervox/logging.h"
+#include "ethervox/cancel_token.h"  // N6.4: Cancellation token for generation
+#include "ethervox/kv_cache_persistence.h"  // N6.5: C1.6 cache API
+#include "ethervox/host_tools.h"  // N5.2: Host-registered tools (C2.2)
+#include "ethervox/model_pool.h"  // N6.2a: Model pool for memory management
 // NOTE: dialogue.h removed - using direct governor/registry architecture
 #include "ethervox/compute_tools.h"
 #include "ethervox/config.h"
+#include "ethervox/conversation.h"
 #include "ethervox/conversation_tools.h"
 #include "ethervox/device_profile.h"
 #include "ethervox/get_tool_info.h"
@@ -37,6 +65,7 @@
 #include "ethervox/timer_tools.h"
 #include "ethervox/tool_manifest.h"
 #include "ethervox/kv_cache_persistence.h"  // KV cache save/load for fast startup
+#include "ethervox/conversation_summary.h"  // Conversation summarization for KV cache
 #include "ethervox/tool_prompt_optimizer.h"
 #include "ethervox/unit_conversion.h"
 #include "ethervox/voice_tools.h"
@@ -78,10 +107,9 @@ void ethervox_log_with_callback(int level, const char* tag, const char* fmt, ...
   // Send to Android logcat
   __android_log_print(level, tag, "%s", buffer);
 
-  // Send to callback (debug window) if registered
-  if (g_ethervox_log_callback) {
-    g_ethervox_log_callback(level, tag, buffer);
-  }
+  // Note: C4.3 structured logging - callback invoked by core logging system,
+  // not called directly here. The java_log_callback_wrapper will be invoked
+  // automatically for all log entries if registered.
 }
 
 // JNI callback storage for log forwarding
@@ -103,8 +131,21 @@ static ethervox_tool_registry_t* g_registry = NULL;
 static tool_manifest_registry_t* g_manifest_registry = NULL;
 static ethervox_memory_store_t* g_memory_store = NULL;
 
-// Android-specific files directory
+// Model pool for memory-managed model loading (N6.2a)
+static ethervox_model_pool_t* g_model_pool = NULL;
+static ethervox_model_handle_t* g_governor_handle = NULL;  // Handle for main governor model
+static ethervox_model_handle_t* g_speech_handle = NULL;     // Handle for speech model (when loaded)
+
+// Cancellation token for generation (N6.4)
+static ethervox_cancel_token_t* g_cancel_token = NULL;
+
+// Android-specific files directory (deprecated - migrate to g_android_paths)
 static char g_android_files_dir[512] = {0};
+
+// Android paths configuration (N6.1)
+static char g_paths_buffer[2048] = {0};  // Buffer for path strings
+static ethervox_paths_t g_android_paths = {0};  // Global paths struct
+static bool g_paths_initialized = false;
 
 // Governor runtime configuration (tunable from Java settings)
 typedef struct {
@@ -352,9 +393,11 @@ JNIEXPORT jboolean JNICALL Java_com_droid_ethervox_1core_NativeLib_loadGovernorM
   }
 
   // Load model - Governor will handle KV cache detection, loading, and saving internally
-  LOGI("[JNI] Loading model (Governor will check for KV cache)...");
+  // N6.1: Pass cache_dir string (not the whole paths struct - this version uses legacy signature)
+  const char* cache_dir = g_paths_initialized ? g_android_paths.cache_dir : g_android_files_dir;
+  LOGI("[JNI] Loading model (Governor will check for KV cache at: %s)...", cache_dir ? cache_dir : "(null)");
   ethervox_result_t result = ethervox_governor_load_model(
-      g_governor, path, g_android_files_dir, progress_callback, progress_user_data
+      g_governor, path, cache_dir, NULL, progress_callback, progress_user_data
   );
 
   (*env)->ReleaseStringUTFChars(env, modelPath, path);
@@ -374,6 +417,12 @@ JNIEXPORT jboolean JNICALL Java_com_droid_ethervox_1core_NativeLib_loadGovernorM
     return JNI_FALSE;
   }
 }
+
+// N6.3: Deleted loadGovernorModelWithAudio() and isGovernorAudioCapable() - dead code
+// from failed unified architecture. Android now uses two separate models:
+//   - Governor (text-only) via loadGovernorModel()
+//   - Granite Speech Plus (audio) via ethervox_voice_tools_init() -> STT backend
+// See docs/MODELS.md §1 for why the unified approach failed.
 
 JNIEXPORT jboolean JNICALL
 Java_com_droid_ethervox_1core_NativeLib_wasLastLoadCorrupted(JNIEnv* env, jobject thiz) {
@@ -440,13 +489,22 @@ Java_com_droid_ethervox_1core_NativeLib_clearKvCache(JNIEnv* env, jobject thiz) 
     return JNI_FALSE;
   }
 
-  LOGI("[JNI] Clearing KV cache - will reset on next generation");
+  LOGI("[JNI] Clearing KV cache (force clear with summarization)");
   
-  // Note: KV cache will be implicitly cleared on next generation
-  // as the model will start fresh without previous context.
-  // The conversation memory is preserved in the memory store files.
+  // Actually clear the KV cache using the summarize_and_clear_cache function
+  // This will:
+  // 1. Generate a summary of the conversation
+  // 2. Store it in memory with context_summary tag
+  // 3. Clear conversation tokens from KV cache (keeping system prompt)
+  ethervox_result_t result = ethervox_governor_summarize_and_clear_cache(g_governor, true);
   
-  return JNI_TRUE;
+  if (ethervox_is_success(result)) {
+    LOGI("[JNI] KV cache cleared successfully - context will be restored on next message");
+    return JNI_TRUE;
+  } else {
+    LOGE("[JNI] Failed to clear KV cache");
+    return JNI_FALSE;
+  }
 }
 
 JNIEXPORT jboolean JNICALL
@@ -454,31 +512,83 @@ Java_com_droid_ethervox_1core_NativeLib_deleteSystemPromptCache(JNIEnv* env, job
   (void)env;
   (void)thiz;
   
-  if (!g_android_files_dir) {
+  if (g_android_files_dir[0] == '\0') {
     LOGE("Cannot delete cache - files directory not set");
     return JNI_FALSE;
   }
   
-  // Build cache file path
-  char cache_path[512];
-  snprintf(cache_path, sizeof(cache_path), "%s/cache", g_android_files_dir);
+  // Build cache directory path
+  char cache_dir[512];
+  snprintf(cache_dir, sizeof(cache_dir), "%s/.ethervox/cache", g_android_files_dir);
   
-  LOGI("[JNI] Deleting all KV cache files in: %s", cache_path);
+  LOGI("[JNI] Deleting all KV cache files in: %s", cache_dir);
   
-  // Use system command to remove all .kvcache files
-  char cmd[1024];
-  snprintf(cmd, sizeof(cmd), "rm -f %s/*.kvcache", cache_path);
-  
-  int result = system(cmd);
-  
-  if (result == 0) {
-    LOGI("[JNI] ✓ System prompt cache deleted - next load will regenerate");
-    return JNI_TRUE;
-  } else {
-    LOGW("[JNI] Cache delete command returned %d (may not exist)", result);
-    // Return true anyway - cache not existing is fine
-    return JNI_TRUE;
+  // Open directory and delete .kvcache files using native C operations
+  DIR* dir = opendir(cache_dir);
+  if (!dir) {
+    // Try without .ethervox subdirectory
+    snprintf(cache_dir, sizeof(cache_dir), "%s/cache", g_android_files_dir);
+    LOGI("[JNI] Trying alternate path: %s", cache_dir);
+    dir = opendir(cache_dir);
+    
+    if (!dir) {
+      LOGW("[JNI] Cache directory does not exist - nothing to delete");
+      return JNI_TRUE;  // Not an error if cache doesn't exist
+    }
   }
+  
+  int deleted_count = 0;
+  int error_count = 0;
+  int total_files = 0;
+  struct dirent* entry;
+  
+  while ((entry = readdir(dir)) != NULL) {
+    // Skip . and ..
+    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+      continue;
+    }
+    
+    total_files++;
+    LOGI("[JNI]   Found file: %s", entry->d_name);
+    
+    // Check if file ends with .kvcache
+    size_t name_len = strlen(entry->d_name);
+    if (name_len > 8 && strcmp(entry->d_name + name_len - 8, ".kvcache") == 0) {
+      // Build full path
+      char file_path[768];
+      snprintf(file_path, sizeof(file_path), "%s/%s", cache_dir, entry->d_name);
+      
+      LOGI("[JNI]   Attempting to delete: %s", file_path);
+      
+      // Delete file using unlink
+      if (unlink(file_path) == 0) {
+        LOGI("[JNI]   ✓ Deleted: %s", entry->d_name);
+        deleted_count++;
+      } else {
+        LOGE("[JNI]   ✗ Failed to delete: %s (errno=%d: %s)", 
+             entry->d_name, errno, strerror(errno));
+        error_count++;
+      }
+    }
+  }
+  
+  closedir(dir);
+  
+  LOGI("[JNI] Directory scan complete: %d total files, %d deleted, %d errors", 
+       total_files, deleted_count, error_count);
+  
+  if (deleted_count > 0) {
+    LOGI("[JNI] ✓ Deleted %d KV cache file(s) - next load will regenerate", deleted_count);
+  } else {
+    LOGI("[JNI] No .kvcache files found to delete");
+  }
+  
+  if (error_count > 0) {
+    LOGW("[JNI] ⚠ Failed to delete %d file(s)", error_count);
+  }
+  
+  // Return true if we deleted at least one file or if there were no files to delete
+  return (deleted_count > 0 || error_count == 0) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL Java_com_droid_ethervox_1core_NativeLib_isGovernorLoaded(JNIEnv* env,
@@ -497,6 +607,7 @@ JNIEXPORT jobject JNICALL Java_com_droid_ethervox_1core_NativeLib_getKvCacheStat
                                                                                      jobject thiz) {
   (void)thiz;
 
+  // Return runtime KV cache usage for UI visualization
   if (!g_governor || !ethervox_governor_is_loaded(g_governor)) {
     return NULL;
   }
@@ -523,7 +634,7 @@ JNIEXPORT jobject JNICALL Java_com_droid_ethervox_1core_NativeLib_getKvCacheStat
     return NULL;
   }
 
-  // Create and return KvCacheStatus object
+  // Create and return KvCacheStatus object with runtime stats
   jobject result = (*env)->NewObject(env, kvCacheClass, constructor, 
                                       (jint)current_pos, 
                                       (jint)context_size, 
@@ -552,6 +663,59 @@ JNIEXPORT jstring JNICALL Java_com_droid_ethervox_1core_NativeLib_getKvCacheCont
   free(contents);
   
   return result;
+}
+
+JNIEXPORT jstring JNICALL Java_com_droid_ethervox_1core_NativeLib_getSystemPromptContent(JNIEnv* env,
+                                                                                          jobject thiz) {
+  (void)thiz;
+
+  if (!g_governor || !ethervox_governor_is_loaded(g_governor)) {
+    return NULL;
+  }
+
+  char* contents = ethervox_governor_get_system_prompt_content(g_governor);
+  if (!contents) {
+    return NULL;
+  }
+
+  // Create Java string from C string
+  jstring result = (*env)->NewStringUTF(env, contents);
+  
+  // Free the C string
+  free(contents);
+  
+  return result;
+}
+
+JNIEXPORT jstring JNICALL Java_com_droid_ethervox_1core_NativeLib_triggerConversationSummary(JNIEnv* env,
+                                                                                              jobject thiz) {
+  (void)thiz;
+
+  if (!g_governor || !ethervox_governor_is_loaded(g_governor)) {
+    return (*env)->NewStringUTF(env, "Error: Governor not loaded");
+  }
+
+  if (!g_memory_store || !g_memory_store->is_initialized) {
+    return (*env)->NewStringUTF(env, "Error: Memory store not initialized");
+  }
+
+  // Allocate buffer for summary output
+  char summary_buffer[2048];
+  
+  // Call the conversation summary generation function
+  ethervox_result_t result = ethervox_generate_conversation_summary(g_governor, g_memory_store, summary_buffer, sizeof(summary_buffer));
+  
+  if (result == ETHERVOX_SUCCESS) {
+    if (summary_buffer[0] == '\0') {
+      return (*env)->NewStringUTF(env, "No conversation to summarize");
+    }
+    return (*env)->NewStringUTF(env, "Conversation summarized and moved into the KV cache");
+  } else {
+    // Get error message based on result code
+    char error_msg[256];
+    snprintf(error_msg, sizeof(error_msg), "Error: Failed to generate summary (code %d)", result);
+    return (*env)->NewStringUTF(env, error_msg);
+  }
 }
 
 JNIEXPORT jobjectArray JNICALL
@@ -1024,14 +1188,48 @@ JNIEXPORT void JNICALL Java_com_droid_ethervox_1core_NativeLib_runLlmToolTests(J
   (*env)->ReleaseStringUTFChars(env, modelPath, model_path_str);
 }
 
-JNIEXPORT jint JNICALL Java_com_droid_ethervox_1core_NativeLib_platformInit(JNIEnv* env,
-                                                                            jobject thiz) {
+JNIEXPORT jint JNICALL Java_com_droid_ethervox_1core_NativeLib_platformInit(
+    JNIEnv* env,
+    jobject thiz,
+    jlong memory_budget_bytes) {
   (void)thiz;
 
   if (g_platform) {
     LOGI("Platform already initialized");
     return 0;
   }
+
+  // N6.2b: Validate memory budget (fail init if budget is absurd)
+  const uint64_t MIN_BUDGET_BYTES = 500ULL * 1024 * 1024;   // 500 MB (governor alone is ~900MB)
+  const uint64_t MAX_BUDGET_BYTES = 20ULL * 1024 * 1024 * 1024;  // 20 GB (sanity check)
+  
+  if (memory_budget_bytes <= 0) {
+    LOGE("Memory budget is zero or negative: %lld bytes - init failed", (long long)memory_budget_bytes);
+    LOGE("Budget derivation formula may be incorrect (totalRAM too small or headroom too large)");
+    return -1;
+  }
+  
+  if ((uint64_t)memory_budget_bytes < MIN_BUDGET_BYTES) {
+    LOGE("Memory budget too small: %lld bytes (%.1f MB) - minimum is %llu MB",
+         (long long)memory_budget_bytes,
+         memory_budget_bytes / (1024.0 * 1024.0),
+         MIN_BUDGET_BYTES / (1024ULL * 1024));
+    LOGE("Device likely has insufficient RAM for model loading");
+    return -1;
+  }
+  
+  if ((uint64_t)memory_budget_bytes > MAX_BUDGET_BYTES) {
+    LOGE("Memory budget absurdly large: %lld bytes (%.1f GB) - maximum is %llu GB",
+         (long long)memory_budget_bytes,
+         memory_budget_bytes / (1024.0 * 1024.0 * 1024.0),
+         MAX_BUDGET_BYTES / (1024ULL * 1024 * 1024));
+    LOGE("Budget derivation may be incorrect");
+    return -1;
+  }
+  
+  LOGI("Memory budget validated: %lld bytes (%.2f GB)",
+       (long long)memory_budget_bytes,
+       memory_budget_bytes / (1024.0 * 1024.0 * 1024.0));
 
   g_platform = (ethervox_platform_t*)calloc(1, sizeof(ethervox_platform_t));
   if (!g_platform) {
@@ -1140,7 +1338,7 @@ JNIEXPORT jint JNICALL Java_com_droid_ethervox_1core_NativeLib_platformInit(JNIE
     LOGI("Registered unit conversion tool");
   }
 
-#if HAVE_LIBCURL
+#if HAVE_LIBCURL && ETHERVOX_FEATURE_WEATHER
   // Register weather tools (requires libcurl - only available on desktop)
   ethervox_result_t weather_result = ethervox_weather_tools_register(g_registry);
   if (ethervox_is_success(weather_result)) {
@@ -1149,7 +1347,7 @@ JNIEXPORT jint JNICALL Java_com_droid_ethervox_1core_NativeLib_platformInit(JNIE
   } else {
     LOGW("Weather tools unavailable (libcurl failed: %d)", weather_result);
   }
-#elif defined(ETHERVOX_PLATFORM_ANDROID)
+#elif defined(ETHERVOX_PLATFORM_ANDROID) && ETHERVOX_FEATURE_WEATHER
   // Android: Register weather tools (uses JNI HTTP client)
   ethervox_result_t weather_result = ethervox_weather_tools_register(g_registry);
   if (ethervox_is_success(weather_result)) {
@@ -1188,6 +1386,26 @@ JNIEXPORT jint JNICALL Java_com_droid_ethervox_1core_NativeLib_platformInit(JNIE
 
   LOGI("Total tools registered: %d", tool_count);
 
+  // Create model pool for memory-managed model loading (N6.2a/N6.2b)
+  // N6.2b: Budget derived from device RAM via Kotlin formula (totalRAM - 1.5GB headroom)
+  if (g_paths_initialized) {
+    ethervox_result_t pool_result = ethervox_model_pool_create(
+        &g_android_paths,
+        (uint64_t)memory_budget_bytes,  // N6.2b: device-derived budget
+        &g_model_pool
+    );
+    if (ethervox_is_error(pool_result)) {
+      LOGE("Failed to create model pool - error code: %d", pool_result);
+      // Continue anyway - fall back to direct loading if pool unavailable
+      g_model_pool = NULL;
+    } else {
+      LOGI("Model pool created with budget: %.2f GB",
+           memory_budget_bytes / (1024.0 * 1024.0 * 1024.0));
+    }
+  } else {
+    LOGW("Paths not initialized yet - model pool creation deferred");
+  }
+
   // NOTE: Governor initialization moved to platformInitGovernor()
   // This allows user to choose minimal vs full mode before governor init
 
@@ -1199,7 +1417,7 @@ JNIEXPORT jint JNICALL Java_com_droid_ethervox_1core_NativeLib_platformInit(JNIE
 }
 
 JNIEXPORT jint JNICALL Java_com_droid_ethervox_1core_NativeLib_platformInitGovernor(
-    JNIEnv* env, jobject thiz, jboolean minimal_mode) {
+    JNIEnv* env, jobject thiz, jboolean minimal_mode, jboolean is_finetuned) {
   (void)env;
   (void)thiz;
 
@@ -1221,7 +1439,7 @@ JNIEXPORT jint JNICALL Java_com_droid_ethervox_1core_NativeLib_platformInitGover
     return -1;
   }
 
-  // Initialize Governor with chosen config (minimal or full)
+  // Initialize Governor with chosen config (minimal, finetuned, or full)
   ethervox_governor_config_t gov_config = ethervox_governor_default_config();
 
   // Apply runtime configuration from g_governor_config
@@ -1233,6 +1451,9 @@ JNIEXPORT jint JNICALL Java_com_droid_ethervox_1core_NativeLib_platformInitGover
   if (minimal_mode) {
     gov_config.system_prompt_mode = ETHERVOX_GOVERNOR_MODE_MINIMAL;
     LOGI("Initializing Governor in MINIMAL MODE (fast loading, tools disabled)");
+  } else if (is_finetuned) {
+    gov_config.system_prompt_mode = ETHERVOX_GOVERNOR_MODE_FINETUNED;
+    LOGI("Initializing Governor in FINETUNED MODE (basic instructions, no tool list)");
   } else {
     gov_config.system_prompt_mode = ETHERVOX_GOVERNOR_MODE_FULL;
     LOGI("Initializing Governor in FULL MODE (all tools available)");
@@ -1248,7 +1469,20 @@ JNIEXPORT jint JNICALL Java_com_droid_ethervox_1core_NativeLib_platformInitGover
     return -1;
   }
 
-  LOGI("Governor initialized successfully (mode: %s)", minimal_mode ? "MINIMAL" : "FULL");
+  // N6.2a-core: Route governor model loading through the memory pool
+  if (g_model_pool) {
+    ethervox_result_t pool_result = ethervox_governor_set_model_pool(g_governor, g_model_pool);
+    if (ethervox_is_error(pool_result)) {
+      LOGE("Failed to set model pool on governor - error code: %d", pool_result);
+      ethervox_governor_cleanup(g_governor);
+      g_governor = NULL;
+      return -1;
+    }
+    LOGI("[Governor] Configured to load via model pool");
+  }
+
+  const char* mode_name = minimal_mode ? "MINIMAL" : (is_finetuned ? "FINETUNED" : "FULL");
+  LOGI("Governor initialized successfully (mode: %s)", mode_name);
 
   return 0;
 }
@@ -1259,6 +1493,15 @@ JNIEXPORT void JNICALL Java_com_droid_ethervox_1core_NativeLib_platformCleanup(J
   (void)thiz;
 
   // Cleanup in reverse order of initialization
+
+  // Cleanup model pool (N6.2a) - unloads all models
+  if (g_model_pool) {
+    ethervox_model_pool_destroy(g_model_pool);
+    g_model_pool = NULL;
+    g_governor_handle = NULL;  // Handles invalidated by pool destruction
+    g_speech_handle = NULL;
+    LOGI("Model pool cleaned up");
+  }
 
   if (g_manifest_registry) {
     // Manifest registry cleanup (if needed)
@@ -1497,7 +1740,23 @@ JNIEXPORT void JNICALL Java_com_droid_ethervox_1core_NativeLib_wakeWordCleanup(J
 }
 
 // ===========================================================================
-// Speech-to-Text
+// Speech-to-Text (generic, currently unused)
+//
+// NOTE (Granite Speech integration): sttInit/sttStart/sttCleanup below are a
+// generic, backend-selectable STT session that predates the Granite Speech
+// work and is not currently called by any Android flow:
+//   - Mode 2 (Transcription) uses ethervox_voice_tools_init/start_listen
+//     directly (see "Voice Tools / Transcription" section below), which
+//     already initializes Granite Speech Plus (SAA) internally - it does not
+//     go through sttInit at all.
+//   - Mode 1 (voice conversation) and Mode 4 (voice-to-text) now go through
+//     ethervox_conversation_init/start (see "Voice Conversation" section
+//     below), which resolves and initializes the Granite Speech Plus model
+//     (ASR-only prompt) internally via voice_conversation.c - they also do
+//     not go through sttInit.
+// This generic path is left in place only in case a future feature needs a
+// standalone STT session outside of either orchestrator; it is not part of
+// the Mode 1/2/4 JNI surface NativeLib.kt should call.
 // ===========================================================================
 
 JNIEXPORT jint JNICALL Java_com_droid_ethervox_1core_NativeLib_sttInit(JNIEnv* env, jobject thiz,
@@ -1605,11 +1864,23 @@ JNIEXPORT jstring JNICALL Java_com_droid_ethervox_1core_NativeLib_processDialogu
     }
   }
 
+  // N6.4: Create cancel token for synchronous execution
+  if (g_cancel_token) {
+    ethervox_cancel_token_free(g_cancel_token);
+    g_cancel_token = NULL;
+  }
+  ethervox_result_t token_result = ethervox_cancel_token_create(&g_cancel_token);
+  if (ethervox_is_error(token_result)) {
+    LOGE("Failed to create cancel token");
+    (*env)->ReleaseStringUTFChars(env, user_text, text);
+    return (*env)->NewStringUTF(env, "[ERROR] Failed to create cancel token");
+  }
+
   // Process with governor execute API
   char* response = NULL;
   char* error = NULL;
   ethervox_governor_status_t status =
-      ethervox_governor_execute(g_governor, text, &response, &error, NULL, NULL, NULL, NULL);
+      ethervox_governor_execute(g_governor, text, g_cancel_token, &response, &error, NULL, NULL, NULL, NULL, NULL);
 
   (*env)->ReleaseStringUTFChars(env, user_text, text);
 
@@ -1887,13 +2158,26 @@ JNIEXPORT void JNICALL Java_com_droid_ethervox_1core_NativeLib_processDialogueSt
   // Zero out tools_called array
   memset(stream_ctx.tools_called, 0, sizeof(stream_ctx.tools_called));
 
+  // N6.4: Create a fresh cancel token for this generation
+  if (g_cancel_token) {
+    ethervox_cancel_token_free(g_cancel_token);
+    g_cancel_token = NULL;
+  }
+  ethervox_result_t token_result = ethervox_cancel_token_create(&g_cancel_token);
+  if (ethervox_is_error(token_result)) {
+    LOGE("Failed to create cancel token");
+    (*env)->ReleaseStringUTFChars(env, user_text, text);
+    return;
+  }
+
   // Execute with streaming token callback
   char* response = NULL;
   char* error = NULL;
   ethervox_governor_status_t status =
-      ethervox_governor_execute(g_governor, text, &response, &error,
+      ethervox_governor_execute(g_governor, text, g_cancel_token, &response, &error,
                                 NULL,                               // metrics (optional)
                                 native_governor_progress_callback,  // progress callback
+                                NULL,                               // event callback (N6.1 - not used yet)
                                 native_token_callback,              // token callback for streaming
                                 &stream_ctx                         // user data
       );
@@ -1957,21 +2241,21 @@ JNIEXPORT void JNICALL Java_com_droid_ethervox_1core_NativeLib_processDialogueSt
 }
 
 /**
- * Cancel ongoing LLM processing
- * Sets interrupt flag that will be checked during token generation
+ * Cancel ongoing LLM processing (N6.4)
+ * Cancels the active cancel token, stopping generation within 200ms
  */
 JNIEXPORT void JNICALL Java_com_droid_ethervox_1core_NativeLib_cancelProcessing(JNIEnv* env,
                                                                                 jobject thiz) {
   (void)env;
   (void)thiz;
 
-  if (!g_governor) {
-    LOGW("cancelProcessing: No active governor to cancel");
+  if (!g_cancel_token) {
+    LOGW("cancelProcessing: No active cancel token");
     return;
   }
 
-  ethervox_governor_request_interrupt(g_governor);
-  LOGI("cancelProcessing: Interrupt requested");
+  ethervox_cancel_token_cancel(g_cancel_token);
+  LOGI("cancelProcessing: Generation cancelled via token");
 }
 
 // DEPRECATED: Language handling is now done by the governor's language detection
@@ -2294,16 +2578,29 @@ static void sanitize_utf8_for_java(char* buffer, size_t max_len) {
   }
 }
 
-static void java_log_callback_wrapper(int level, const char* tag, const char* message) {
-  if (!g_jvm || !g_log_callback_obj || !g_log_callback_method) {
+// JNI log callback wrapper for C4.3 structured logging
+static void java_log_callback_wrapper(const ethervox_log_entry_t* entry, void* user_data) {
+  (void)user_data;  // Unused
+  
+  if (!g_jvm || !g_log_callback_obj || !g_log_callback_method || !entry) {
     return;
   }
 
-  // Guard against NULL pointers
-  if (!tag)
-    tag = "EthervoxCore";
-  if (!message)
-    message = "";
+  // Map ethervox_log_level_t to Android log priority
+  int android_level = ANDROID_LOG_INFO;
+  switch (entry->level) {
+    case ETHERVOX_LOG_LEVEL_TRACE:   android_level = ANDROID_LOG_VERBOSE; break;
+    case ETHERVOX_LOG_LEVEL_DEBUG:   android_level = ANDROID_LOG_DEBUG; break;
+    case ETHERVOX_LOG_LEVEL_INFO:    android_level = ANDROID_LOG_INFO; break;
+    case ETHERVOX_LOG_LEVEL_WARN:    android_level = ANDROID_LOG_WARN; break;
+    case ETHERVOX_LOG_LEVEL_ERROR:   android_level = ANDROID_LOG_ERROR; break;
+    case ETHERVOX_LOG_LEVEL_FATAL:   android_level = ANDROID_LOG_FATAL; break;
+    case ETHERVOX_LOG_LEVEL_OFF:     android_level = ANDROID_LOG_SILENT; break;
+  }
+  
+  // Build tag from subsystem (e.g., "llm", "governor", "audio")
+  const char* tag = entry->func ? entry->func : "EthervoxCore";
+  const char* message = entry->message ? entry->message : "";
 
   JNIEnv* env = NULL;
   jint result = (*g_jvm)->GetEnv(g_jvm, (void**)&env, JNI_VERSION_1_6);
@@ -2331,7 +2628,7 @@ static void java_log_callback_wrapper(int level, const char* tag, const char* me
   jstring jMessage = (*env)->NewStringUTF(env, safe_message);
 
   if (jTag && jMessage) {
-    (*env)->CallVoidMethod(env, g_log_callback_obj, g_log_callback_method, level, jTag, jMessage);
+    (*env)->CallVoidMethod(env, g_log_callback_obj, g_log_callback_method, android_level, jTag, jMessage);
   }
 
   if (jTag)
@@ -2457,6 +2754,41 @@ Java_com_droid_ethervox_1core_NativeLib_getLlamaPerformanceMetrics(JNIEnv* env, 
 // Global voice session state for transcription
 static ethervox_voice_session_t* g_voice_session = NULL;
 
+// Defined below, alongside the rest of the Mode 1/4 conversation JNI glue;
+// forward-declared here so the transcription-segment bridge (which needs
+// the same attach/detach pattern) can be defined before them.
+static JNIEnv* conversation_attach_env(bool* needs_detach);
+static void conversation_detach_env(bool needs_detach);
+
+// TASK-N7.8: JNI bridge for streaming transcription-segment events
+// (TASK-C3.5's ethervox_voice_tools_set_event_callback(), never previously
+// wired to Kotlin - the transport existed, nothing on the Java side called
+// it). Mirrors the g_conversation_callback_obj pattern above: a global ref
+// to the Kotlin callback, invoked from whichever native thread the event
+// arrives on (the transcription dispatch thread - see voice_tools.c) via
+// attach/detach, matching conversation_attach_env()/conversation_detach_env().
+static jobject g_transcription_segment_callback_obj = NULL;
+static jmethodID g_transcription_on_segment = NULL;
+
+static bool jni_transcription_on_segment(const ethervox_event_t* event, void* user_data) {
+  (void)user_data;
+  if (!event || event->type != ETHERVOX_EVENT_TRANSCRIPTION_SEGMENT) return true;
+  if (!g_transcription_segment_callback_obj || !g_transcription_on_segment) return true;
+
+  bool detach = false;
+  JNIEnv* env = conversation_attach_env(&detach);
+  if (!env) return true;
+
+  const ethervox_event_transcription_segment_t* seg = &event->transcription_segment;
+  jstring jText = create_jstring(env, seg->text ? seg->text : "");
+  (*env)->CallVoidMethod(env, g_transcription_segment_callback_obj, g_transcription_on_segment,
+                         (jint)seg->segment_id, (jint)seg->speaker_id, (jboolean)seg->is_final,
+                         jText);
+  if (jText) (*env)->DeleteLocalRef(env, jText);
+  conversation_detach_env(detach);
+  return true;
+}
+
 /**
  * Get Android-specific files directory (set from Kotlin)
  * Returns NULL if not on Android or not set
@@ -2471,7 +2803,7 @@ const char* ethervox_get_android_files_dir(void) {
 }
 
 JNIEXPORT void JNICALL Java_com_droid_ethervox_1core_NativeLib_setAndroidFilesDir(
-    JNIEnv* env, jobject thiz, jstring filesDir) {
+    JNIEnv* env, jobject thiz, jstring filesDir, jstring cacheDir) {
   (void)thiz;
 
   if (!filesDir) {
@@ -2479,15 +2811,92 @@ JNIEXPORT void JNICALL Java_com_droid_ethervox_1core_NativeLib_setAndroidFilesDi
     return;
   }
 
-  const char* dir = (*env)->GetStringUTFChars(env, filesDir, NULL);
-  if (dir) {
-    strncpy(g_android_files_dir, dir, sizeof(g_android_files_dir) - 1);
-    g_android_files_dir[sizeof(g_android_files_dir) - 1] = '\0';
-    (*env)->ReleaseStringUTFChars(env, filesDir, dir);
+  // Get files directory string
+  const char* files = (*env)->GetStringUTFChars(env, filesDir, NULL);
+  if (!files) {
+    LOGE("Failed to get files directory string");
+    return;
+  }
 
-    LOGI("[Android] Files directory set to: %s", g_android_files_dir);
-    LOGI("[Android] Whisper models: %s/models/whisper/", g_android_files_dir);
-    LOGI("[Android] Transcripts: %s/transcripts/", g_android_files_dir);
+  // Get cache directory string (optional for backward compatibility)
+  const char* cache = NULL;
+  if (cacheDir) {
+    cache = (*env)->GetStringUTFChars(env, cacheDir, NULL);
+  }
+
+  // Copy to deprecated g_android_files_dir for backward compatibility
+  strncpy(g_android_files_dir, files, sizeof(g_android_files_dir) - 1);
+  g_android_files_dir[sizeof(g_android_files_dir) - 1] = '\0';
+
+  // Initialize g_android_paths structure (N6.1)
+  // Use g_paths_buffer to store the strings so they persist
+  size_t offset = 0;
+  
+  // data_dir = filesDir
+  size_t files_len = strlen(files);
+  if (offset + files_len + 1 < sizeof(g_paths_buffer)) {
+    strncpy(g_paths_buffer + offset, files, sizeof(g_paths_buffer) - offset - 1);
+    g_android_paths.data_dir = g_paths_buffer + offset;
+    offset += files_len + 1;
+  }
+
+  // cache_dir = cacheDir (or filesDir/cache if not provided)
+  if (cache) {
+    size_t cache_len = strlen(cache);
+    if (offset + cache_len + 1 < sizeof(g_paths_buffer)) {
+      strncpy(g_paths_buffer + offset, cache, sizeof(g_paths_buffer) - offset - 1);
+      g_android_paths.cache_dir = g_paths_buffer + offset;
+      offset += cache_len + 1;
+    }
+  } else {
+    // Fallback: use filesDir/cache
+    char cache_fallback[512];
+    snprintf(cache_fallback, sizeof(cache_fallback), "%s/cache", files);
+    size_t fallback_len = strlen(cache_fallback);
+    if (offset + fallback_len + 1 < sizeof(g_paths_buffer)) {
+      strncpy(g_paths_buffer + offset, cache_fallback, sizeof(g_paths_buffer) - offset - 1);
+      g_android_paths.cache_dir = g_paths_buffer + offset;
+      offset += fallback_len + 1;
+    }
+  }
+
+  // models_dir = filesDir/models
+  char models_path[512];
+  snprintf(models_path, sizeof(models_path), "%s/models", files);
+  size_t models_len = strlen(models_path);
+  if (offset + models_len + 1 < sizeof(g_paths_buffer)) {
+    strncpy(g_paths_buffer + offset, models_path, sizeof(g_paths_buffer) - offset - 1);
+    g_android_paths.models_dir = g_paths_buffer + offset;
+    offset += models_len + 1;
+  }
+
+  // temp_dir = cacheDir/tmp (or filesDir/tmp if cache not provided)
+  char temp_path[512];
+  if (cache) {
+    snprintf(temp_path, sizeof(temp_path), "%s/tmp", cache);
+  } else {
+    snprintf(temp_path, sizeof(temp_path), "%s/tmp", files);
+  }
+  size_t temp_len = strlen(temp_path);
+  if (offset + temp_len + 1 < sizeof(g_paths_buffer)) {
+    strncpy(g_paths_buffer + offset, temp_path, sizeof(g_paths_buffer) - offset - 1);
+    g_android_paths.temp_dir = g_paths_buffer + offset;
+    offset += temp_len + 1;
+  }
+
+  g_paths_initialized = true;
+
+  LOGI("[Android] Paths configured:");
+  LOGI("  data_dir:   %s", g_android_paths.data_dir);
+  LOGI("  cache_dir:  %s", g_android_paths.cache_dir);
+  LOGI("  models_dir: %s", g_android_paths.models_dir);
+  LOGI("  temp_dir:   %s", g_android_paths.temp_dir);
+  LOGI("[Android] Granite Speech models: %s/%s/", g_android_paths.models_dir,
+       ETHERVOX_GRANITE_SPEECH_SUBDIR);
+
+  (*env)->ReleaseStringUTFChars(env, filesDir, files);
+  if (cache) {
+    (*env)->ReleaseStringUTFChars(env, cacheDir, cache);
   }
 }
 
@@ -2520,17 +2929,18 @@ Java_com_droid_ethervox_1core_NativeLib_startVoiceTranscription(JNIEnv* env, job
     LOGI("[Voice] [OK] Memory store exists");
 
     LOGI("[Voice] Calling ethervox_voice_tools_init...");
-    int ret = ethervox_voice_tools_init(g_voice_session, g_memory_store);
+    // N6.3: Pass model pool for budget enforcement
+    int ret = ethervox_voice_tools_init(g_voice_session, g_memory_store, g_model_pool);
     if (ret != 0) {
       LOGE("[Voice] [FAIL] ERROR: Failed to initialize voice tools: %d", ret);
-      LOGE("[Voice] This usually means Whisper model not found!");
-      LOGE("[Voice] Check Settings → Whisper Model section to download");
+      LOGE("[Voice] This usually means the Granite Speech Plus model was not found!");
+      LOGE("[Voice] Check Settings → Granite Speech Plus Model section to download");
       free(g_voice_session);
       g_voice_session = NULL;
       return ret;
     }
     LOGI("[Voice] [OK] Voice tools initialized successfully!");
-    LOGI("[Voice] [OK] Whisper model loaded and ready");
+    LOGI("[Voice] [OK] Granite Speech Plus model loaded and ready");
   } else {
     LOGI("[Voice] Voice session already initialized (is_initialized=%d)",
          g_voice_session->is_initialized);
@@ -2544,6 +2954,16 @@ Java_com_droid_ethervox_1core_NativeLib_startVoiceTranscription(JNIEnv* env, job
   }
   LOGI("[Voice] [OK] Session verification passed");
 
+  // TASK-N7.8: (re-)wire the streaming-segment callback onto this session.
+  // ethervox_voice_tools_init() memset()s the whole struct including
+  // transcription_event_cb, so a callback registered via
+  // registerVoiceTranscriptionCallback() before the very first
+  // startVoiceTranscription() call (when g_voice_session was still NULL)
+  // needs to be re-applied here once the session actually exists.
+  if (g_transcription_segment_callback_obj) {
+    ethervox_voice_tools_set_event_callback(g_voice_session, jni_transcription_on_segment, NULL);
+  }
+
   // Start listening (recording + VAD)
   LOGI("[Voice] Starting voice recording...");
   int ret = ethervox_voice_tools_start_listen(g_voice_session);
@@ -2555,6 +2975,54 @@ Java_com_droid_ethervox_1core_NativeLib_startVoiceTranscription(JNIEnv* env, job
   LOGI("[Voice] [OK] Voice transcription started successfully!");
   LOGI("[Voice] ========================================");
   return 0;
+}
+
+/**
+ * TASK-N7.8: register/unregister a Kotlin listener for streaming
+ * transcription-segment events (TASK-C3.5's event, dispatched once per
+ * finalized chunk during recording - the transport already existed in the
+ * native backend; this is what makes it reachable from Kotlin at all).
+ * Pass null to unregister. Must be called after startVoiceTranscription()
+ * has initialized g_voice_session at least once (it registers on whatever
+ * session currently exists and re-registers on every start, since
+ * ethervox_voice_tools_init() doesn't reset transcription_event_cb - see
+ * that function's own memset(session, 0, ...) at the top, which does clear
+ * it, so re-registering after every startVoiceTranscription() call is
+ * required, not just defensive).
+ */
+JNIEXPORT void JNICALL
+Java_com_droid_ethervox_1core_NativeLib_registerVoiceTranscriptionCallback(
+    JNIEnv* env, jobject thiz, jobject callback) {
+  (void)thiz;
+
+  if (g_transcription_segment_callback_obj) {
+    (*env)->DeleteGlobalRef(env, g_transcription_segment_callback_obj);
+    g_transcription_segment_callback_obj = NULL;
+    g_transcription_on_segment = NULL;
+  }
+
+  if (!callback) {
+    if (g_voice_session) {
+      ethervox_voice_tools_set_event_callback(g_voice_session, NULL, NULL);
+    }
+    return;
+  }
+
+  if (!g_jvm) {
+    (*env)->GetJavaVM(env, &g_jvm);
+  }
+
+  g_transcription_segment_callback_obj = (*env)->NewGlobalRef(env, callback);
+  jclass callbackClass = (*env)->GetObjectClass(env, callback);
+  g_transcription_on_segment =
+      (*env)->GetMethodID(env, callbackClass, "onSegment", "(IIZLjava/lang/String;)V");
+  if ((*env)->ExceptionCheck(env)) {
+    (*env)->ExceptionClear(env);
+  }
+
+  if (g_voice_session) {
+    ethervox_voice_tools_set_event_callback(g_voice_session, jni_transcription_on_segment, NULL);
+  }
 }
 
 JNIEXPORT jstring JNICALL
@@ -2628,6 +3096,334 @@ Java_com_droid_ethervox_1core_NativeLib_isVoiceTranscribing(JNIEnv* env, jobject
 }
 
 // ===========================================================================
+// Voice Conversation (Mode 1: full-duplex conversation, Mode 4: voice-to-text)
+//
+// Both modes are driven by the same cross-platform orchestrator
+// (ethervox_conversation_t, src/dialogue/voice_conversation.c) - the only
+// difference is tts_enabled, which controls whether conversation_on_speak()
+// hands text to onSpeakRequest (Mode 1) or just reports it via
+// onResponseText for display (Mode 4, no audio at all). Only one such
+// session can be active at a time (Mode 1 and Mode 4 are mutually
+// exclusive, same as Mode 2's Base/Plus exclusivity above).
+//
+// Callbacks fire from voice_conversation.c's own background pthread, not
+// this JNI-calling thread, so every callback below must attach/detach from
+// the JVM itself (see conversation_attach_env/conversation_detach_env),
+// following the same pattern as java_log_callback_wrapper further down this
+// file.
+// ===========================================================================
+
+static ethervox_conversation_session_t* g_conversation_session = NULL;
+static jobject g_conversation_callback_obj = NULL;
+static jmethodID g_conv_on_state_changed = NULL;
+static jmethodID g_conv_on_user_transcript = NULL;
+static jmethodID g_conv_on_response_text = NULL;
+static jmethodID g_conv_on_speak_request = NULL;
+static jmethodID g_conv_on_error = NULL;
+
+static JNIEnv* conversation_attach_env(bool* needs_detach) {
+  *needs_detach = false;
+  if (!g_jvm) {
+    return NULL;
+  }
+
+  JNIEnv* env = NULL;
+  jint result = (*g_jvm)->GetEnv(g_jvm, (void**)&env, JNI_VERSION_1_6);
+  if (result == JNI_EDETACHED) {
+    if ((*g_jvm)->AttachCurrentThread(g_jvm, &env, NULL) != JNI_OK) {
+      return NULL;
+    }
+    *needs_detach = true;
+  }
+  return env;
+}
+
+static void conversation_detach_env(bool needs_detach) {
+  if (needs_detach && g_jvm) {
+    (*g_jvm)->DetachCurrentThread(g_jvm);
+  }
+}
+
+static void jni_conversation_on_state_change(ethervox_conversation_state_t state, void* user_data) {
+  (void)user_data;
+  if (!g_conversation_callback_obj || !g_conv_on_state_changed) {
+    return;
+  }
+
+  bool detach = false;
+  JNIEnv* env = conversation_attach_env(&detach);
+  if (!env) {
+    return;
+  }
+
+  (*env)->CallVoidMethod(env, g_conversation_callback_obj, g_conv_on_state_changed, (jint)state);
+  conversation_detach_env(detach);
+}
+
+static void jni_conversation_on_user_transcript(const char* text, const char* language,
+                                                 void* user_data) {
+  (void)user_data;
+  if (!g_conversation_callback_obj || !g_conv_on_user_transcript) {
+    return;
+  }
+
+  bool detach = false;
+  JNIEnv* env = conversation_attach_env(&detach);
+  if (!env) {
+    return;
+  }
+
+  jstring jText = create_jstring(env, text ? text : "");
+  jstring jLanguage = language ? create_jstring(env, language) : NULL;
+  (*env)->CallVoidMethod(env, g_conversation_callback_obj, g_conv_on_user_transcript, jText,
+                         jLanguage);
+  if (jText) (*env)->DeleteLocalRef(env, jText);
+  if (jLanguage) (*env)->DeleteLocalRef(env, jLanguage);
+  conversation_detach_env(detach);
+}
+
+static void jni_conversation_on_response_text(const char* text, const char* language,
+                                               void* user_data) {
+  (void)user_data;
+  if (!g_conversation_callback_obj || !g_conv_on_response_text) {
+    return;
+  }
+
+  bool detach = false;
+  JNIEnv* env = conversation_attach_env(&detach);
+  if (!env) {
+    return;
+  }
+
+  jstring jText = create_jstring(env, text ? text : "");
+  jstring jLanguage = language ? create_jstring(env, language) : NULL;
+  (*env)->CallVoidMethod(env, g_conversation_callback_obj, g_conv_on_response_text, jText,
+                         jLanguage);
+  if (jText) (*env)->DeleteLocalRef(env, jText);
+  if (jLanguage) (*env)->DeleteLocalRef(env, jLanguage);
+  conversation_detach_env(detach);
+}
+
+// Mode 1 only (tts_enabled=true) - hands the Governor's response text off to
+// the platform TTS engine (Android TextToSpeech). Fire-and-forget: Kotlin
+// must call voiceConversationNotifySpeakingDone() from its
+// UtteranceProgressListener.onDone()/onError() once playback finishes, or
+// the conversation thread stalls in SPEAKING until its internal 30s
+// safety-net timeout (see ethervox_conversation_notify_speaking_done's doc
+// comment in conversation.h).
+static void jni_conversation_on_speak_request(const char* text, const char* language,
+                                               int speaker_id, bool allow_interrupt,
+                                               void* user_data) {
+  (void)user_data;
+  if (!g_conversation_callback_obj || !g_conv_on_speak_request) {
+    return;
+  }
+
+  bool detach = false;
+  JNIEnv* env = conversation_attach_env(&detach);
+  if (!env) {
+    return;
+  }
+
+  jstring jText = create_jstring(env, text ? text : "");
+  jstring jLanguage = language ? create_jstring(env, language) : NULL;
+  (*env)->CallVoidMethod(env, g_conversation_callback_obj, g_conv_on_speak_request, jText,
+                         jLanguage, (jint)speaker_id, (jboolean)allow_interrupt);
+  if (jText) (*env)->DeleteLocalRef(env, jText);
+  if (jLanguage) (*env)->DeleteLocalRef(env, jLanguage);
+  conversation_detach_env(detach);
+}
+
+static void jni_conversation_on_error(const char* message, void* user_data) {
+  (void)user_data;
+  if (!g_conversation_callback_obj || !g_conv_on_error) {
+    return;
+  }
+
+  bool detach = false;
+  JNIEnv* env = conversation_attach_env(&detach);
+  if (!env) {
+    return;
+  }
+
+  jstring jMessage = create_jstring(env, message ? message : "");
+  (*env)->CallVoidMethod(env, g_conversation_callback_obj, g_conv_on_error, jMessage);
+  (*env)->DeleteLocalRef(env, jMessage);
+  conversation_detach_env(detach);
+}
+
+// Shared start/stop logic for both voiceConversationStart (Mode 1) and
+// voiceQueryStart (Mode 4); tts_enabled is the only difference between them.
+// barge_in_enabled comes from Kotlin's AcousticEchoCanceler.isAvailable()
+// check (see NativeLib.kt's doc comments) - the C side does not attempt its
+// own AEC capability detection.
+static jint start_voice_conversation_session(JNIEnv* env, jobject callback, bool tts_enabled,
+                                              bool barge_in_enabled) {
+  if (g_conversation_session) {
+    LOGW("[VoiceConversation] Session already active - stop it before starting a new one");
+    return -1;
+  }
+
+  if (!g_governor) {
+    LOGE("[VoiceConversation] Governor not initialized");
+    return -1;
+  }
+
+  if (!g_jvm) {
+    (*env)->GetJavaVM(env, &g_jvm);
+  }
+
+  g_conversation_callback_obj = (*env)->NewGlobalRef(env, callback);
+  jclass callbackClass = (*env)->GetObjectClass(env, callback);
+  g_conv_on_state_changed = (*env)->GetMethodID(env, callbackClass, "onStateChanged", "(I)V");
+  g_conv_on_user_transcript = (*env)->GetMethodID(
+      env, callbackClass, "onUserTranscript", "(Ljava/lang/String;Ljava/lang/String;)V");
+  g_conv_on_response_text = (*env)->GetMethodID(
+      env, callbackClass, "onResponseText", "(Ljava/lang/String;Ljava/lang/String;)V");
+  g_conv_on_speak_request = (*env)->GetMethodID(
+      env, callbackClass, "onSpeakRequest", "(Ljava/lang/String;Ljava/lang/String;IZ)V");
+  g_conv_on_error = (*env)->GetMethodID(env, callbackClass, "onError", "(Ljava/lang/String;)V");
+
+  if ((*env)->ExceptionCheck(env)) {
+    (*env)->ExceptionClear(env);
+  }
+
+  ethervox_conversation_config_t config = ethervox_conversation_get_default_config();
+  // Mode 1/4 are both manually triggered (a "Talk"/"Voice query" button, not
+  // a wake word), so always_listening=true regardless of the desktop-only
+  // default in get_default_config().
+  config.always_listening = true;
+  config.tts_enabled = tts_enabled;
+  config.barge_in_enabled = barge_in_enabled;
+  config.on_state_change = jni_conversation_on_state_change;
+  config.on_user_transcript = jni_conversation_on_user_transcript;
+  config.on_response_text = jni_conversation_on_response_text;
+  config.on_error = jni_conversation_on_error;
+  if (tts_enabled) {
+    config.on_speak_request = jni_conversation_on_speak_request;
+  }
+
+  // Resolve Granite Speech Plus model paths against the Android app files
+  // dir (same convention ethervox_voice_tools_init uses for Mode 2 in
+  // src/plugins/voice_tools/voice_tools.c) - conversation_thread() honors
+  // these directly rather than falling back to its getenv("HOME") desktop
+  // default (see the fix in voice_conversation.c). A single Plus (model,
+  // mmproj) pair now backs every voice mode: voice_conversation.c hardcodes
+  // stt_config.backend = ETHERVOX_STT_BACKEND_GRANITE_SPEECH (non-plus) for
+  // Mode 1/4, which selects the plain ASR-only prompt in
+  // granite_speech_backend.c - functionally equivalent to the old separate
+  // BASE model per IBM's model card, just running on the Plus weights.
+  static char speech_model_path[512];
+  static char speech_mmproj_path[512];
+  const char* files_dir = ethervox_get_android_files_dir();
+  if (files_dir) {
+    snprintf(speech_model_path, sizeof(speech_model_path),
+             "%s/models/%s/granite-speech-4.1-2b-plus.Q4_K_M.gguf", files_dir,
+             ETHERVOX_GRANITE_SPEECH_SUBDIR);
+    snprintf(speech_mmproj_path, sizeof(speech_mmproj_path),
+             "%s/models/%s/mmproj-granite-speech-4.1-2b-plus-Q4_K_M.gguf", files_dir,
+             ETHERVOX_GRANITE_SPEECH_SUBDIR);
+    config.stt.model_path = speech_model_path;
+    config.stt.mmproj_path = speech_mmproj_path;
+    LOGI("[VoiceConversation] Granite Speech Plus model path: %s", speech_model_path);
+  } else {
+    LOGW("[VoiceConversation] Android files dir not set - falling back to desktop model path");
+  }
+
+  g_conversation_session = ethervox_conversation_init(&config, g_governor);
+  if (!g_conversation_session) {
+    LOGE("[VoiceConversation] ethervox_conversation_init failed");
+    (*env)->DeleteGlobalRef(env, g_conversation_callback_obj);
+    g_conversation_callback_obj = NULL;
+    return -1;
+  }
+
+  ethervox_result_t result = ethervox_conversation_start(g_conversation_session);
+  if (ethervox_is_error(result)) {
+    LOGE("[VoiceConversation] ethervox_conversation_start failed: %d", result);
+    ethervox_conversation_cleanup(g_conversation_session);
+    g_conversation_session = NULL;
+    (*env)->DeleteGlobalRef(env, g_conversation_callback_obj);
+    g_conversation_callback_obj = NULL;
+    return -1;
+  }
+
+  LOGI("[VoiceConversation] Session started (tts_enabled=%d)", tts_enabled);
+  return 0;
+}
+
+static void stop_voice_conversation_session(JNIEnv* env) {
+  if (!g_conversation_session) {
+    return;
+  }
+
+  ethervox_conversation_stop(g_conversation_session);
+  ethervox_conversation_cleanup(g_conversation_session);
+  g_conversation_session = NULL;
+
+  if (g_conversation_callback_obj) {
+    (*env)->DeleteGlobalRef(env, g_conversation_callback_obj);
+    g_conversation_callback_obj = NULL;
+  }
+  g_conv_on_state_changed = NULL;
+  g_conv_on_user_transcript = NULL;
+  g_conv_on_response_text = NULL;
+  g_conv_on_speak_request = NULL;
+  g_conv_on_error = NULL;
+
+  LOGI("[VoiceConversation] Session stopped");
+}
+
+JNIEXPORT jint JNICALL Java_com_droid_ethervox_1core_NativeLib_voiceConversationStart(
+    JNIEnv* env, jobject thiz, jobject callback, jboolean bargeInEnabled) {
+  (void)thiz;
+  return start_voice_conversation_session(env, callback, /*tts_enabled=*/true,
+                                           /*barge_in_enabled=*/bargeInEnabled);
+}
+
+JNIEXPORT void JNICALL Java_com_droid_ethervox_1core_NativeLib_voiceConversationStop(JNIEnv* env,
+                                                                                      jobject thiz) {
+  (void)thiz;
+  stop_voice_conversation_session(env);
+}
+
+JNIEXPORT void JNICALL Java_com_droid_ethervox_1core_NativeLib_voiceConversationInterrupt(
+    JNIEnv* env, jobject thiz) {
+  (void)env;
+  (void)thiz;
+  if (g_conversation_session) {
+    ethervox_conversation_interrupt(g_conversation_session);
+  }
+}
+
+// Called from Kotlin's UtteranceProgressListener.onDone()/onError() once
+// platform TTS finishes playing an onSpeakRequest utterance - see the doc
+// comment on jni_conversation_on_speak_request above.
+JNIEXPORT void JNICALL Java_com_droid_ethervox_1core_NativeLib_voiceConversationNotifySpeakingDone(
+    JNIEnv* env, jobject thiz) {
+  (void)env;
+  (void)thiz;
+  if (g_conversation_session) {
+    ethervox_conversation_notify_speaking_done(g_conversation_session);
+  }
+}
+
+JNIEXPORT jint JNICALL Java_com_droid_ethervox_1core_NativeLib_voiceQueryStart(JNIEnv* env,
+                                                                                jobject thiz,
+                                                                                jobject callback,
+                                                                                jboolean bargeInEnabled) {
+  (void)thiz;
+  return start_voice_conversation_session(env, callback, /*tts_enabled=*/false,
+                                           /*barge_in_enabled=*/bargeInEnabled);
+}
+
+JNIEXPORT void JNICALL Java_com_droid_ethervox_1core_NativeLib_voiceQueryStop(JNIEnv* env,
+                                                                               jobject thiz) {
+  (void)thiz;
+  stop_voice_conversation_session(env);
+}
+
+// ===========================================================================
 // Mobile Optimization Features (Minimal Mode, Secret Mode)
 // ===========================================================================
 
@@ -2652,6 +3448,155 @@ JNIEXPORT jboolean JNICALL Java_com_droid_ethervox_1core_NativeLib_getPrivacyMod
   (void)thiz;
 
   return ethervox_memory_get_privacy_mode() ? JNI_TRUE : JNI_FALSE;
+}
+
+// ===========================================================================
+// Memory Pool Admission Control (N6.2c)
+// ===========================================================================
+
+JNIEXPORT jlongArray JNICALL Java_com_droid_ethervox_1core_NativeLib_checkModelWouldFit(
+    JNIEnv* env, jobject thiz, jstring modelPath, jint contextSize, jboolean useGpu) {
+  (void)thiz;
+  
+  if (!g_model_pool) {
+    LOGE("Model pool not initialized");
+    return NULL;
+  }
+  
+  const char* path = (*env)->GetStringUTFChars(env, modelPath, NULL);
+  if (!path) {
+    return NULL;
+  }
+  
+  // Build model config for admission check
+  ethervox_model_config_t config = {0};
+  config.model_path = path;
+  config.mmproj_path = NULL;
+  config.context_size = (uint32_t)contextSize;
+  config.n_threads = sysconf(_SC_NPROCESSORS_ONLN);  // Use all cores
+  config.n_seq_max = 2;  // Default for text-only models
+  config.use_gpu = useGpu ? true : false;
+  config.kv_unified = false;
+  config.role = "temp_check";  // Temporary role for estimation
+  config.residency = ETHERVOX_RESIDENCY_RESIDENT;
+  config.ttl_seconds = 0;
+  
+  bool fits = false;
+  uint64_t required_bytes = 0;
+  ethervox_result_t result = ethervox_model_pool_would_fit(g_model_pool, &config, &fits, &required_bytes);
+  
+  (*env)->ReleaseStringUTFChars(env, modelPath, path);
+  
+  if (ethervox_is_error(result)) {
+    LOGE("Failed to check would_fit: error code %d", result);
+    return NULL;
+  }
+  
+  // Return [fits (0 or 1), requiredBytes]
+  jlongArray result_array = (*env)->NewLongArray(env, 2);
+  if (!result_array) {
+    return NULL;
+  }
+  
+  jlong values[2];
+  values[0] = fits ? 1 : 0;
+  values[1] = (jlong)required_bytes;
+  (*env)->SetLongArrayRegion(env, result_array, 0, 2, values);
+  
+  LOGI("Model admission check: %s fits=%d, required=%.2f GB",
+       config.model_path,
+       fits,
+       required_bytes / (1024.0 * 1024.0 * 1024.0));
+  
+  return result_array;
+}
+
+JNIEXPORT jlongArray JNICALL Java_com_droid_ethervox_1core_NativeLib_getMemoryPoolUsage(
+    JNIEnv* env, jobject thiz) {
+  (void)thiz;
+  
+  if (!g_model_pool) {
+    return NULL;
+  }
+  
+  uint64_t used_bytes = 0;
+  uint64_t budget_bytes = 0;
+  ethervox_result_t result = ethervox_model_pool_memory_usage(g_model_pool, &used_bytes, &budget_bytes);
+  
+  if (ethervox_is_error(result)) {
+    return NULL;
+  }
+  
+  // Return [used, budget]
+  jlongArray result_array = (*env)->NewLongArray(env, 2);
+  if (!result_array) {
+    return NULL;
+  }
+  
+  jlong values[2];
+  values[0] = (jlong)used_bytes;
+  values[1] = (jlong)budget_bytes;
+  (*env)->SetLongArrayRegion(env, result_array, 0, 2, values);
+  
+  return result_array;
+}
+
+// ===========================================================================
+// Memory Pressure Callbacks (N6.2d)
+// ===========================================================================
+
+JNIEXPORT void JNICALL Java_com_droid_ethervox_1core_NativeLib_onMemoryPressure(
+    JNIEnv* env, jobject thiz, jint level) {
+  (void)env;
+  (void)thiz;
+  
+  if (!g_model_pool) {
+    LOGE("Model pool not initialized - cannot respond to memory pressure");
+    return;
+  }
+  
+  // Android ComponentCallbacks2 constants:
+  // TRIM_MEMORY_RUNNING_LOW = 10
+  // TRIM_MEMORY_RUNNING_CRITICAL = 15
+  
+  uint64_t bytes_to_free = 0;
+  const char* level_name = "UNKNOWN";
+  
+  if (level == 10) {  // TRIM_MEMORY_RUNNING_LOW
+    bytes_to_free = 500ULL * 1024 * 1024;  // Try to free 500 MB
+    level_name = "RUNNING_LOW";
+  } else if (level == 15) {  // TRIM_MEMORY_RUNNING_CRITICAL
+    bytes_to_free = 0;  // 0 means evict as much as possible
+    level_name = "RUNNING_CRITICAL";
+  } else {
+    LOGW("Unhandled memory pressure level: %d", level);
+    return;
+  }
+  
+  LOGI("[MemoryPressure] OS signaled %s (level %d) - attempting eviction", level_name, level);
+  
+  // Always protect the "main" role (governor) from eviction
+  const char* protected_roles[] = { "main", NULL };
+  
+  uint64_t freed_bytes = 0;
+  ethervox_result_t result = ethervox_model_pool_evict_lru(
+      g_model_pool,
+      bytes_to_free,
+      protected_roles,
+      &freed_bytes
+  );
+  
+  if (ethervox_is_success(result)) {
+    if (freed_bytes > 0) {
+      LOGI("[MemoryPressure] Evicted %.2f MB in response to %s",
+           freed_bytes / (1024.0 * 1024.0),
+           level_name);
+    } else {
+      LOGI("[MemoryPressure] No evictable models found (all resident or protected)");
+    }
+  } else {
+    LOGE("[MemoryPressure] Eviction failed with error code: %d", result);
+  }
 }
 
 JNIEXPORT jboolean JNICALL Java_com_droid_ethervox_1core_NativeLib_loadGovernorModelMinimal(
@@ -2709,8 +3654,10 @@ JNIEXPORT jboolean JNICALL Java_com_droid_ethervox_1core_NativeLib_loadGovernorM
     }
   }
 
+  // N6.1: Pass cache_dir string for KV cache (not whole paths struct)
+  const char* cache_dir = g_paths_initialized ? g_android_paths.cache_dir : g_android_files_dir;
   ethervox_result_t result = ethervox_governor_load_model(
-      g_governor, path, g_android_files_dir, progress_callback, progress_user_data
+      g_governor, path, cache_dir, NULL, progress_callback, progress_user_data
   );
 
   (*env)->ReleaseStringUTFChars(env, modelPath, path);
@@ -2723,4 +3670,355 @@ JNIEXPORT jboolean JNICALL Java_com_droid_ethervox_1core_NativeLib_loadGovernorM
     LOGE("Failed to load Governor model");
     return JNI_FALSE;
   }
+}
+
+// ============================================================================
+// Additional Conversation Summary JNI Functions
+// ============================================================================
+
+/**
+ * Get the last generated conversation summary text for UI display
+ */
+JNIEXPORT jstring JNICALL
+Java_com_droid_ethervox_1core_NativeLib_getLastSummary(
+    JNIEnv* env, jobject thiz
+) {
+    (void)thiz;
+    const char* summary = ethervox_get_last_summary();
+    return (*env)->NewStringUTF(env, summary);
+}
+
+/**
+ * Restore conversation context from memory
+ */
+JNIEXPORT jboolean JNICALL
+Java_com_droid_ethervox_1core_NativeLib_restoreContextFromMemory(
+    JNIEnv* env, jobject thiz
+) {
+    (void)thiz;
+    (void)env;
+    
+    if (!g_governor || !g_memory_store) {
+        LOGE("[JNI] Governor or memory store not initialized");
+        return JNI_FALSE;
+    }
+    
+    LOGI("[JNI] Restoring conversation context from memory...");
+    
+    ethervox_result_t result = ethervox_restore_context_from_memory(
+        g_governor,
+        g_memory_store
+    );
+    
+    return ethervox_is_success(result) ? JNI_TRUE : JNI_FALSE;
+}
+
+/**
+ * Load conversation summary from KV cache file (if exists)
+ */
+JNIEXPORT jboolean JNICALL
+Java_com_droid_ethervox_1core_NativeLib_loadConversationSummary(
+    JNIEnv* env, jobject thiz
+) {
+    (void)thiz;
+    (void)env;
+    
+    if (!g_governor) {
+        LOGE("[JNI] Governor not initialized");
+        return JNI_FALSE;
+    }
+    
+    if (g_android_files_dir[0] == '\0') {
+        LOGE("[JNI] Android files directory not set");
+        return JNI_FALSE;
+    }
+    
+    char cache_dir[512];
+    snprintf(cache_dir, sizeof(cache_dir), "%s/cache", g_android_files_dir);
+    
+    LOGI("[JNI] Loading conversation summary from: %s", cache_dir);
+    
+    ethervox_result_t result = ethervox_load_conversation_summary(
+        g_governor,
+        cache_dir
+    );
+    
+    if (!ethervox_is_success(result)) {
+        LOGE("[JNI] Failed to load conversation summary: %d", result);
+        return JNI_FALSE;
+    }
+    
+    // After loading summary, restore recent context from memory
+    if (g_memory_store) {
+        ethervox_restore_context_from_memory(g_governor, g_memory_store);
+    }
+    
+    return JNI_TRUE;
+}
+
+// ============================================================================
+// Host-registered tools (N5.2 - C2.2 API)
+// ============================================================================
+
+// Global ref to NativeLib instance for tool callbacks
+static jobject g_native_lib_instance = NULL;
+
+/**
+ * Context passed to host tool callbacks via user_data.
+ * Contains tool name needed to route execution back to correct Kotlin implementation.
+ */
+typedef struct host_tool_context {
+    char* tool_name;  // Tool name for routing
+    struct host_tool_context* next;  // Linked list for cleanup
+} host_tool_context_t;
+
+// Head of linked list tracking all allocated contexts (for cleanup)
+static host_tool_context_t* g_host_tool_contexts = NULL;
+
+/**
+ * Host tool execution callback invoked by ethervox_core.
+ * 
+ * This is called by the core when the governor needs to execute a host tool:
+ * 1. Model requests tool execution
+ * 2. Core invokes this callback with arguments
+ * 3. We extract tool name from user_data, attach to JVM thread
+ * 4. Call back into Kotlin via invokeHostToolFromNative(toolName, argumentsJson)
+ * 5. Kotlin HostToolRegistry finds the HostTool instance and executes it
+ * 6. Result is returned back through JNI to core -> model
+ * 
+ * Threading: Called from core's tool execution thread (not Android main thread).
+ * Memory: result_out and error_out are malloc'd strings - caller uses ethervox_string_free().
+ */
+static ethervox_result_t host_tool_callback(
+    const char* arguments_json,
+    void* user_data,
+    char** result_out,
+    char** error_out
+) {
+    if (!user_data) {
+        LOGE("Host tool callback: user_data is NULL");
+        *error_out = strdup("Internal error: tool context missing");
+        return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    }
+    
+    host_tool_context_t* context = (host_tool_context_t*)user_data;
+    const char* tool_name = context->tool_name;
+    
+    if (!g_jvm || !g_native_lib_instance) {
+        LOGE("Host tool callback: JVM or NativeLib instance not initialized");
+        *error_out = strdup("JVM not initialized");
+        return ETHERVOX_ERROR_INVALID_STATE;
+    }
+    
+    // Attach current thread to JVM
+    JNIEnv* env = NULL;
+    int attach_result = (*g_jvm)->AttachCurrentThread(g_jvm, &env, NULL);
+    if (attach_result != JNI_OK || !env) {
+        LOGE("Failed to attach thread to JVM: %d", attach_result);
+        *error_out = strdup("Failed to attach to JVM");
+        return ETHERVOX_ERROR_INVALID_STATE;
+    }
+    
+    // Find NativeLib class and invokeHostToolFromNative method
+    jclass native_lib_class = (*env)->GetObjectClass(env, g_native_lib_instance);
+    if (!native_lib_class) {
+        LOGE("Failed to get NativeLib class");
+        *error_out = strdup("Failed to get NativeLib class");
+        (*g_jvm)->DetachCurrentThread(g_jvm);
+        return ETHERVOX_ERROR_INVALID_STATE;
+    }
+    
+    jmethodID invoke_method = (*env)->GetMethodID(
+        env,
+        native_lib_class,
+        "invokeHostToolFromNative",
+        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
+    );
+    
+    if (!invoke_method) {
+        LOGE("Failed to find invokeHostToolFromNative method");
+        *error_out = strdup("Method not found");
+        (*g_jvm)->DetachCurrentThread(g_jvm);
+        return ETHERVOX_ERROR_INVALID_STATE;
+    }
+    
+    // Convert C strings to Java strings
+    jstring j_tool_name = (*env)->NewStringUTF(env, tool_name);
+    jstring j_arguments = (*env)->NewStringUTF(env, arguments_json);
+    
+    if (!j_tool_name || !j_arguments) {
+        LOGE("Failed to create Java strings");
+        *error_out = strdup("Failed to create Java strings");
+        (*g_jvm)->DetachCurrentThread(g_jvm);
+        return ETHERVOX_ERROR_OUT_OF_MEMORY;
+    }
+    
+    // Call Kotlin method
+    jstring j_result = (jstring)(*env)->CallObjectMethod(
+        env,
+        g_native_lib_instance,
+        invoke_method,
+        j_tool_name,
+        j_arguments
+    );
+    
+    // Check for exceptions during execution
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        *error_out = strdup("Tool execution threw exception");
+        (*g_jvm)->DetachCurrentThread(g_jvm);
+        return ETHERVOX_ERROR_FAILED;
+    }
+    
+    // Convert result back to C string
+    if (j_result) {
+        const char* result_str = (*env)->GetStringUTFChars(env, j_result, NULL);
+        if (result_str) {
+            *result_out = strdup(result_str);
+            (*env)->ReleaseStringUTFChars(env, j_result, result_str);
+            
+            if (!*result_out) {
+                *error_out = strdup("Failed to allocate result string");
+                (*g_jvm)->DetachCurrentThread(g_jvm);
+                return ETHERVOX_ERROR_OUT_OF_MEMORY;
+            }
+        } else {
+            *error_out = strdup("Failed to get result string");
+            (*g_jvm)->DetachCurrentThread(g_jvm);
+            return ETHERVOX_ERROR_FAILED;
+        }
+    } else {
+        *error_out = strdup("Tool returned null");
+        (*g_jvm)->DetachCurrentThread(g_jvm);
+        return ETHERVOX_ERROR_FAILED;
+    }
+    
+    (*g_jvm)->DetachCurrentThread(g_jvm);
+    return ETHERVOX_SUCCESS;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_droid_ethervox_1core_NativeLib_registerHostTool(
+    JNIEnv* env,
+    jobject thiz,
+    jstring j_name,
+    jstring j_description,
+    jstring j_schema_json,
+    jboolean j_is_mutating
+) {
+    // Store JavaVM and NativeLib instance for callbacks (first call only)
+    if (!g_jvm) {
+        (*env)->GetJavaVM(env, &g_jvm);
+    }
+    
+    if (!g_native_lib_instance) {
+        g_native_lib_instance = (*env)->NewGlobalRef(env, thiz);
+    }
+    
+    if (!g_manifest_registry) {
+        LOGE("registerHostTool: Manifest registry not initialized");
+        return JNI_FALSE;
+    }
+    
+    // Convert Java strings to C
+    const char* name = (*env)->GetStringUTFChars(env, j_name, NULL);
+    const char* description = (*env)->GetStringUTFChars(env, j_description, NULL);
+    const char* schema_json = (*env)->GetStringUTFChars(env, j_schema_json, NULL);
+    bool is_mutating = (j_is_mutating == JNI_TRUE);
+    
+    // Allocate context for callback (stores tool name for routing)
+    host_tool_context_t* context = (host_tool_context_t*)malloc(sizeof(host_tool_context_t));
+    if (!context) {
+        LOGE("registerHostTool: Failed to allocate context");
+        (*env)->ReleaseStringUTFChars(env, j_name, name);
+        (*env)->ReleaseStringUTFChars(env, j_description, description);
+        (*env)->ReleaseStringUTFChars(env, j_schema_json, schema_json);
+        return JNI_FALSE;
+    }
+    
+    context->tool_name = strdup(name);
+    if (!context->tool_name) {
+        LOGE("registerHostTool: Failed to duplicate tool name");
+        free(context);
+        (*env)->ReleaseStringUTFChars(env, j_name, name);
+        (*env)->ReleaseStringUTFChars(env, j_description, description);
+        (*env)->ReleaseStringUTFChars(env, j_schema_json, schema_json);
+        return JNI_FALSE;
+    }
+    
+    // Add to linked list for cleanup
+    context->next = g_host_tool_contexts;
+    g_host_tool_contexts = context;
+    
+    // Create host tool descriptor
+    ethervox_host_tool_t tool = {
+        .name = name,
+        .description = description,
+        .parameters_schema_json = schema_json,
+        .is_mutating = is_mutating,
+        .invoke = host_tool_callback,
+        .user_data = context  // Pass context so callback can route to correct tool
+    };
+    
+    // Register tool with core
+    ethervox_result_t result = ethervox_tool_registry_register_host_tool(
+        g_manifest_registry,
+        &tool
+    );
+    
+    // Release Java strings
+    (*env)->ReleaseStringUTFChars(env, j_name, name);
+    (*env)->ReleaseStringUTFChars(env, j_description, description);
+    (*env)->ReleaseStringUTFChars(env, j_schema_json, schema_json);
+    
+    if (!ethervox_is_success(result)) {
+        LOGE("registerHostTool: Registration failed: %d", result);
+        free(context->tool_name);
+        free(context);
+        return JNI_FALSE;
+    }
+    
+    LOGI("Registered host tool: %s (mutating=%d)", context->tool_name, is_mutating);
+    return JNI_TRUE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_droid_ethervox_1core_NativeLib_clearHostTools(JNIEnv* env, jobject thiz) {
+    (void)env;
+    (void)thiz;
+    
+    if (!g_manifest_registry) {
+        LOGE("clearHostTools: Manifest registry not initialized");
+        return;
+    }
+    
+    // Clear tools from registry
+    ethervox_tool_registry_clear_host_tools(g_manifest_registry);
+    
+    // Free all allocated contexts
+    host_tool_context_t* context = g_host_tool_contexts;
+    while (context) {
+        host_tool_context_t* next = context->next;
+        free(context->tool_name);
+        free(context);
+        context = next;
+    }
+    g_host_tool_contexts = NULL;
+    
+    LOGI("Cleared all host tools and freed contexts");
+}
+
+JNIEXPORT void JNICALL
+Java_com_droid_ethervox_1core_NativeLib_setHostToolTimeout(JNIEnv* env, jobject thiz, jlong timeout_ms) {
+    (void)env;
+    (void)thiz;
+    
+    if (!g_manifest_registry) {
+        LOGE("setHostToolTimeout: Manifest registry not initialized");
+        return;
+    }
+    
+    ethervox_tool_registry_set_timeout(g_manifest_registry, (uint32_t)timeout_ms);
+    LOGI("Set host tool timeout: %ldms", (long)timeout_ms);
 }

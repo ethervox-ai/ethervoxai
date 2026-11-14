@@ -1,0 +1,17 @@
+[
+  {
+    "name": "context_manage",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Manage context window when running low on space. CRITICAL: You MUST call this when context usage exceeds 80%. Choose action based on situation: summarize_old (best - preserves info), shift_window (fast - drops old), prune_unimportant (selective).",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "enum": ["summarize_old", "shift_window", "prune_unimportant"], "description": "Management action to perform" },
+        "keep_last_n_turns": { "type": "integer", "minimum": 5, "maximum": 50, "default": 10, "description": "Number of recent turns to keep verbatim" },
+        "summary_detail": { "type": "string", "enum": ["brief", "moderate", "detailed"], "default": "moderate", "description": "Summary detail level" }
+      },
+      "required": ["action"]
+    }
+  }
+]

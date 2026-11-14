@@ -3,8 +3,8 @@
  * @brief Weather forecast tool using Open-Meteo API
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * Licensed under CC BY-NC-SA 4.0
- * For full license terms, see: https://creativecommons.org/licenses/by-nc-sa/4.0/
+ * Proprietary and confidential. See LICENSE.
+ * For full license terms, see: LICENSE
  * 
  * Weather data provided by Open-Meteo (MIT License)
  * API: https://open-meteo.com

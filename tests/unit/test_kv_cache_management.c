@@ -49,8 +49,8 @@ static void test_basic_reset(ethervox_governor_t* governor) {
   char* error = NULL;
 
   TEST_INFO("Executing first query to populate KV cache...");
-  int status = ethervox_governor_execute(governor, "What is 2 + 2?", &response, &error, NULL, NULL,
-                                         NULL, NULL);
+  int status = ethervox_governor_execute(governor, "What is 2 + 2?", NULL, &response, &error, NULL,
+                                         NULL, NULL, NULL, NULL);
 
   if (status != 0 || !response) {
     TEST_FAIL("First query failed: %s", error ? error : "unknown");
@@ -76,8 +76,8 @@ static void test_basic_reset(ethervox_governor_t* governor) {
 
   // Execute another query after reset
   TEST_INFO("Executing second query after reset...");
-  status = ethervox_governor_execute(governor, "What is 3 + 3?", &response, &error, NULL, NULL,
-                                     NULL, NULL);
+  status = ethervox_governor_execute(governor, "What is 3 + 3?", NULL, &response, &error, NULL, NULL,
+                                     NULL, NULL, NULL);
 
   if (status != 0 || !response) {
     TEST_FAIL("Second query after reset failed: %s", error ? error : "unknown");
@@ -115,8 +115,8 @@ static void test_multiple_resets(ethervox_governor_t* governor) {
     char* response = NULL;
     char* error = NULL;
 
-    int status =
-        ethervox_governor_execute(governor, query, &response, &error, NULL, NULL, NULL, NULL);
+    int status = ethervox_governor_execute(governor, query, NULL, &response, &error, NULL, NULL,
+                                           NULL, NULL, NULL);
 
     if (status != 0 || !response) {
       TEST_FAIL("  Cycle %d: Query failed: %s", cycle + 1, error ? error : "unknown");
@@ -170,8 +170,8 @@ static void test_context_clearing_at_50_percent(ethervox_governor_t* governor) {
     char* response = NULL;
     char* error = NULL;
 
-    int status =
-        ethervox_governor_execute(governor, query, &response, &error, NULL, NULL, NULL, NULL);
+    int status = ethervox_governor_execute(governor, query, NULL, &response, &error, NULL, NULL,
+                                           NULL, NULL, NULL);
 
     if (status != 0 || !response) {
       if (error && strstr(error, "Context window exceeded")) {
@@ -224,8 +224,8 @@ static void test_rapid_resets(ethervox_governor_t* governor) {
     char* response = NULL;
     char* error = NULL;
 
-    int status = ethervox_governor_execute(governor, "Simple test query after rapid resets",
-                                           &response, &error, NULL, NULL, NULL, NULL);
+    int status = ethervox_governor_execute(governor, "Simple test query after rapid resets", NULL,
+                                           &response, &error, NULL, NULL, NULL, NULL, NULL);
 
     if (status != 0 || !response) {
       TEST_FAIL("Governor damaged after rapid resets: %s", error ? error : "unknown");
@@ -254,8 +254,8 @@ static void test_reset_after_tools(ethervox_governor_t* governor) {
   char* error = NULL;
 
   TEST_INFO("Executing query that triggers calculator tool...");
-  int status = ethervox_governor_execute(governor, "Calculate 123 * 456", &response, &error, NULL,
-                                         NULL, NULL, NULL);
+  int status = ethervox_governor_execute(governor, "Calculate 123 * 456", NULL, &response, &error,
+                                         NULL, NULL, NULL, NULL, NULL);
 
   if (status != 0 || !response) {
     TEST_WARN("Tool query failed (continuing): %s", error ? error : "unknown");
@@ -275,8 +275,8 @@ static void test_reset_after_tools(ethervox_governor_t* governor) {
   }
 
   TEST_INFO("Executing query after reset...");
-  status = ethervox_governor_execute(governor, "What is your name?", &response, &error, NULL, NULL,
-                                     NULL, NULL);
+  status = ethervox_governor_execute(governor, "What is your name?", NULL, &response, &error, NULL,
+                                     NULL, NULL, NULL, NULL);
 
   if (status != 0 || !response) {
     TEST_FAIL("Query after tool reset failed: %s", error ? error : "unknown");
@@ -353,7 +353,7 @@ int main(int argc, char** argv) {
 
   // Load model
   printf("Loading model (this may take a moment)...\n");
-  if (ethervox_governor_load_model(governor, model_path, NULL, NULL, NULL) != 0) {
+  if (ethervox_governor_load_model(governor, model_path, NULL, NULL, NULL, NULL) != 0) {
     printf(COLOR_RED "Failed to load model from: %s\n" COLOR_RESET, model_path);
     printf("Please ensure the model file exists and is readable.\n");
     ethervox_governor_cleanup(governor);

@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "string",
+      "maxLength": 24
+    },
+    "field_1": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer"
+        }
+      ]
+    },
+    "field_2": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "number"
+        },
+        "field_1": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "field_0",
+        "field_1"
+      ]
+    }
+  },
+  "required": [
+    "field_1",
+    "field_2"
+  ]
+}

@@ -1,0 +1,8 @@
+root-variant0-tool-value ::= "\"calculator\""
+root-variant0-expression-value ::= "\"" ([^"\\\x7F\x00-\x1F] | "\\" ["\\/bfnrt])* "\"" ws
+root-variant0 ::= "{" ws "\"tool\"" ws ":" ws root-variant0-tool-value ws "," ws "\"expression\"" ws ":" ws root-variant0-expression-value ws "}" ws
+root-variant1-tool-value ::= "\"weather\""
+root-variant1-location-value ::= "\"" ([^"\\\x7F\x00-\x1F] | "\\" ["\\/bfnrt])* "\"" ws
+root-variant1 ::= "{" ws "\"tool\"" ws ":" ws root-variant1-tool-value ws "," ws "\"location\"" ws ":" ws root-variant1-location-value ws "}" ws
+root ::= root-variant0 | root-variant1
+ws ::= | " " | "\n" [ \t]{0,20}

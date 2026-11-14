@@ -4,8 +4,8 @@
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
  *
- * This file is part of EthervoxAI, licensed under CC BY-NC-SA 4.0.
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * This file is part of EthervoxAI. Proprietary and confidential. See LICENSE.
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include <jni.h>

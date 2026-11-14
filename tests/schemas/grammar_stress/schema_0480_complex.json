@@ -1,0 +1,201 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "string"
+        },
+        "field_1": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field_0",
+        "field_1"
+      ]
+    },
+    "field_1": {
+      "type": "string"
+    },
+    "field_2": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "string"
+        },
+        "field_1": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "object",
+              "properties": {
+                "field_0": {
+                  "type": "integer"
+                },
+                "field_1": {
+                  "type": "number"
+                }
+              }
+            },
+            "field_1": {
+              "type": "number",
+              "minimum": 25,
+              "maximum": 203
+            }
+          },
+          "required": [
+            "field_0",
+            "field_1"
+          ]
+        },
+        "field_2": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field_0": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "field_3": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "field_4": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "string",
+              "maxLength": 49
+            },
+            "field_1": {
+              "type": "integer",
+              "minimum": 21,
+              "maximum": 313
+            }
+          },
+          "required": [
+            "field_0"
+          ]
+        }
+      },
+      "required": [
+        "field_0",
+        "field_3",
+        "field_4"
+      ]
+    },
+    "field_3": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "integer",
+          "minimum": 63,
+          "maximum": 359
+        },
+        "field_1": {
+          "type": "string"
+        },
+        "field_2": {
+          "type": "string"
+        },
+        "field_3": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "number"
+            },
+            "field_1": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "field_0",
+            "field_1"
+          ]
+        },
+        "field_4": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "field_0",
+        "field_1",
+        "field_4"
+      ]
+    },
+    "field_4": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "object",
+              "properties": {
+                "field_0": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "field_0"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "string"
+            },
+            "field_1": {
+              "type": "number"
+            },
+            "field_2": {
+              "type": "string"
+            },
+            "field_3": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "field_0",
+            "field_1"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "number"
+            },
+            "field_1": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "field_0"
+          ]
+        }
+      ]
+    }
+  },
+  "required": [
+    "field_0",
+    "field_2",
+    "field_3"
+  ]
+}

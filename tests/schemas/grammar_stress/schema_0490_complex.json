@@ -1,0 +1,56 @@
+{
+  "oneOf": [
+    {
+      "type": "number",
+      "minimum": 41,
+      "maximum": 482
+    },
+    {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "boolean"
+        },
+        "field_1": {
+          "type": "number"
+        },
+        "field_2": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "string",
+              "pattern": "^[0-9]{3}-[0-9]{4}$"
+            },
+            "field_1": {
+              "type": "integer"
+            },
+            "field_2": {
+              "type": "object",
+              "properties": {
+                "field_0": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "required": [
+            "field_1"
+          ]
+        },
+        "field_3": {
+          "type": "integer"
+        },
+        "field_4": {
+          "type": "number",
+          "minimum": 88,
+          "maximum": 897
+        }
+      },
+      "required": [
+        "field_2",
+        "field_3",
+        "field_4"
+      ]
+    }
+  ]
+}

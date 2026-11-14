@@ -154,6 +154,7 @@ int main(void) {
     int compute_count = ethervox_compute_tools_register_all(&registry);
     printf("  ✓ Compute tools: %d registered\n", compute_count);
     
+#if ETHERVOX_FEATURE_FILE_TOOLS
     // File tools
     ethervox_file_tools_config_t file_config;
     const char* home = getenv("HOME");
@@ -171,6 +172,9 @@ int main(void) {
     if (ethervox_path_config_init(&path_config, &memory) == 0) {
         ethervox_path_config_register(&registry, &path_config);
     }
+#else
+    int file_count = 0;
+#endif
     
     // System info tools
     int system_count = 0;
@@ -179,12 +183,16 @@ int main(void) {
         printf("  ✓ System info tools: %d registered\n", system_count);
     }
     
+#if ETHERVOX_FEATURE_FILE_TOOLS
     // Startup prompt tools
     int startup_count = 0;
     if (ethervox_startup_prompt_tools_register(&registry) == 0) {
         startup_count = 2;
         printf("  ✓ Startup prompt tools: %d registered\n", startup_count);
     }
+#else
+    int startup_count = 0;
+#endif
     
     // Context tools
     int context_count = 0;
@@ -196,7 +204,7 @@ int main(void) {
     // Voice tools
     ethervox_voice_session_t voice_session;
     int voice_count = 0;
-    if (ethervox_voice_tools_init(&voice_session, &memory) == 0) {
+    if (ethervox_voice_tools_init(&voice_session, &memory, NULL) == 0) {
         if (ethervox_voice_tools_register(&registry, &voice_session) == 0) {
             voice_count = 1;
             printf("  ✓ Voice tools: %d registered\n", voice_count);

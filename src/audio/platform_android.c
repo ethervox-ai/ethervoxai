@@ -4,14 +4,14 @@
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
  *
- * This file is part of EthervoxAI, licensed under CC BY-NC-SA 4.0.
+ * This file is part of EthervoxAI. Proprietary and confidential. See LICENSE.
  * You are free to share and adapt this work under the following terms:
  * - Attribution: Credit the original authors
- * - NonCommercial: Not for commercial use
+ * - Proprietary: internal use only, see LICENSE
  * - ShareAlike: Distribute under same license
  *
- * For full license terms, see: https://creativecommons.org/licenses/by-nc-sa/4.0/
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * For full license terms, see: LICENSE
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include <stdio.h>
@@ -56,32 +56,6 @@ typedef struct {
   float* capture_buffer;
   size_t capture_buffer_size;
 } aaudio_data_t;
-
-static aaudio_result_t aaudio_data_callback(AAudioStream* stream, void* user_data,
-                                            void* audio_data, int32_t num_frames) {
-  ethervox_audio_runtime_t* runtime = (ethervox_audio_runtime_t*)user_data;
-  (void)stream;
-  
-  if (!runtime || !audio_data) {
-    return AAUDIO_CALLBACK_RESULT_CONTINUE;
-  }
-
-  // Process audio data if callback is set
-  if (runtime->on_audio_data) {
-    ethervox_audio_buffer_t buffer;
-    buffer.data = (float*)audio_data;
-    buffer.size = (uint32_t)num_frames;
-    buffer.channels = runtime->config.channels;
-    
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    buffer.timestamp_us = (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
-    
-    runtime->on_audio_data(&buffer, runtime->user_data);
-  }
-
-  return AAUDIO_CALLBACK_RESULT_CONTINUE;
-}
 
 static void aaudio_error_callback(AAudioStream* stream, void* user_data, aaudio_result_t error) {
   (void)stream;
@@ -132,9 +106,38 @@ static int aaudio_start_capture(ethervox_audio_runtime_t* runtime) {
   AAudioStreamBuilder_setBufferCapacityInFrames(builder, (int32_t)runtime->config.buffer_size);
   AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
   AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_EXCLUSIVE);
-  AAudioStreamBuilder_setUsage(builder, AAUDIO_USAGE_VOICE_COMMUNICATION);
+  // NOTE: no AAudioStreamBuilder_setUsage() call here - that function is
+  // documented ("the intended use case for the OUTPUT stream") as an
+  // output-only property and is a no-op on an INPUT-direction builder like
+  // this one (confirmed via aaudio/AAudio.h). The property that actually
+  // matters for an input stream is the input preset below.
+  //
+  // config.enable_echo_cancellation (set by callers - see
+  // voice_conversation.c's barge_in_enabled wiring) selects
+  // AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION, which enables the platform's
+  // built-in AEC/NS/AGC pipeline (the same one VoIP apps use) so the mic
+  // doesn't pick up this device's own TTS output during full-duplex
+  // barge-in. Otherwise we explicitly request VOICE_RECOGNITION (AAudio's
+  // own default if this call is omitted) to keep today's plain
+  // dictation-quality capture unchanged for Mode 2 / non-barge-in sessions.
+  // Real-world effectiveness depends on OEM/HAL AEC quality and needs
+  // on-device testing (see plan.md Open Question 1) - this only requests
+  // the platform's best available echo suppression, it doesn't guarantee it.
+  AAudioStreamBuilder_setInputPreset(builder, runtime->config.enable_echo_cancellation
+                                                   ? AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION
+                                                   : AAUDIO_INPUT_PRESET_VOICE_RECOGNITION);
   AAudioStreamBuilder_setContentType(builder, AAUDIO_CONTENT_TYPE_SPEECH);
-  AAudioStreamBuilder_setDataCallback(builder, aaudio_data_callback, runtime);
+  // NOTE: no AAudioStreamBuilder_setDataCallback() here - this driver uses
+  // the blocking-read model (aaudio_read_audio() below calls
+  // AAudioStream_read() directly, as ethervox_audio_read() callers expect).
+  // AAudio's own docs are explicit that "you cannot call
+  // AAudioStream_write() or AAudioStream_read() on the same stream that has
+  // an active data callback" - registering one here (as this code
+  // previously did, alongside a data callback whose runtime->on_audio_data
+  // is never actually set by any caller) put the stream in callback mode
+  // and made every subsequent AAudioStream_read() call in this file invalid,
+  // silently breaking capture on real devices. Keep only the error
+  // callback, which does not have this restriction.
   AAudioStreamBuilder_setErrorCallback(builder, aaudio_error_callback, runtime);
 
   result = AAudioStreamBuilder_openStream(builder, &audio_data->input_stream);

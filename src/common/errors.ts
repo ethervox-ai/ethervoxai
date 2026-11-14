@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+// SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
 
 /**
  * Base error class for EthervoxAI

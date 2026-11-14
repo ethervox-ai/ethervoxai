@@ -1,9 +1,19 @@
 /**
  * @file stt_core.c
- * @brief Core Speech-to-Text implementation
+ * @brief Core Speech-to-Text dispatcher for EthervoxAI
+ *
+ * Dispatches to the Granite Speech backend (src/stt/granite_speech_backend.c)
+ * for both supported variants:
+ *   - ETHERVOX_STT_BACKEND_GRANITE_SPEECH       (BASE - Modes 1 & 4)
+ *   - ETHERVOX_STT_BACKEND_GRANITE_SPEECH_PLUS  (PLUS - Mode 2, speaker-attributed)
+ *
+ * Both variants share one backend implementation - the variant only changes
+ * which prompt is used (ASR vs SAA), selected at init time from
+ * runtime->config.backend. Whisper and Vosk have been removed entirely, not
+ * deprecated - no backward-compat path exists for them.
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * Licensed under CC BY-NC-SA 4.0
+ * Proprietary and confidential. See LICENSE.
  */
 
 #include <stdio.h>
@@ -14,22 +24,31 @@
 #include "ethervox/error.h"
 #include "ethervox/logging.h"
 
-// Default configuration - use Whisper as default since it's implemented
+// Default configuration - BASE variant (punctuated ASR, used by Modes 1 & 4).
+// Callers that need Mode 2 (transcription) must explicitly request
+// ETHERVOX_STT_BACKEND_GRANITE_SPEECH_PLUS and supply model_path/mmproj_path
+// for the Plus GGUF pair.
 ethervox_stt_config_t ethervox_stt_get_default_config(void) {
-  ethervox_stt_config_t config = {.backend = ETHERVOX_STT_BACKEND_WHISPER,
-                                  .model_path = NULL,
-                                  .language = "auto",
-                                  .sample_rate = 16000,
-                                  .enable_partial_results = true,
-                                  .enable_punctuation = true,
-                                  .vad_threshold = 0.5f,
-                                  .translate_to_english = false};  // Transcribe in original language by default
+  ethervox_stt_config_t config = {
+      .backend = ETHERVOX_STT_BACKEND_GRANITE_SPEECH,
+      .model_path = NULL,
+      .mmproj_path = NULL,
+      .language = "en",
+      .sample_rate = 16000,  // Fixed by Granite Speech's Conformer encoder
+      .enable_partial_results = false,  // Granite Speech transcribes whole utterances, not streaming partials
+      .enable_punctuation = true,       // BASE variant only - PLUS trades punctuation for SAA
+      .vad_threshold = 0.5f,
+      .translate_to_english = false,
+      .prefix_text = NULL,
+      .max_transcript_tokens = 0,  // 0 = backend picks a variant-appropriate default
+      .n_gpu_layers = 0,
+  };
   return config;
 }
 
 // Initialize STT engine
 ethervox_result_t ethervox_stt_init(ethervox_stt_runtime_t* runtime, const ethervox_stt_config_t* config) {
-  ETHERVOX_CHECK_PTR(runtime); 
+  ETHERVOX_CHECK_PTR(runtime);
 
   memset(runtime, 0, sizeof(ethervox_stt_runtime_t));
 
@@ -39,15 +58,27 @@ ethervox_result_t ethervox_stt_init(ethervox_stt_runtime_t* runtime, const ether
     if (config->model_path) {
       runtime->config.model_path = strdup(config->model_path);
     }
+    if (config->mmproj_path) {
+      runtime->config.mmproj_path = strdup(config->mmproj_path);
+    }
     if (config->language) {
       runtime->config.language = strdup(config->language);
+    }
+    if (config->prefix_text) {
+      runtime->config.prefix_text = strdup(config->prefix_text);
     }
   } else {
     runtime->config = ethervox_stt_get_default_config();
   }
 
-  // Allocate audio accumulator (5 seconds)
-  runtime->accumulator_size = runtime->config.sample_rate * 5;
+  // Allocate audio accumulator. Granite Speech transcribes whole utterances
+  // (not a streaming/partial-result engine), so this buffer holds the entire
+  // captured segment: 5s for Mode 1/4 (BASE, single conversational turn), or
+  // up to the ~60s chunk size used for Mode 2 (PLUS, incremental decoding).
+  // Size generously for the PLUS case; BASE callers simply use less of it.
+  const uint32_t accumulator_seconds =
+      (runtime->config.backend == ETHERVOX_STT_BACKEND_GRANITE_SPEECH_PLUS) ? 60 : 30;
+  runtime->accumulator_size = runtime->config.sample_rate * accumulator_seconds;
   runtime->audio_accumulator = (float*)calloc(runtime->accumulator_size, sizeof(float));
   if (!runtime->audio_accumulator) {
     return ETHERVOX_ERROR_OUT_OF_MEMORY;
@@ -55,25 +86,21 @@ ethervox_result_t ethervox_stt_init(ethervox_stt_runtime_t* runtime, const ether
 
   // Initialize backend
   switch (runtime->config.backend) {
-    case ETHERVOX_STT_BACKEND_VOSK: {
-      ethervox_result_t result = ethervox_stt_vosk_init(runtime);
+    case ETHERVOX_STT_BACKEND_GRANITE_SPEECH:
+    case ETHERVOX_STT_BACKEND_GRANITE_SPEECH_PLUS: {
+      ethervox_result_t result = ethervox_stt_granite_speech_init(runtime);
       if (ethervox_is_error(result)) {
         free(runtime->audio_accumulator);
+        runtime->audio_accumulator = NULL;
         return result;
       }
       break;
     }
 
-    case ETHERVOX_STT_BACKEND_WHISPER:
-      ethervox_result_t result = ethervox_stt_whisper_init(runtime);
-      if (ethervox_is_error(result)) {
-        free(runtime->audio_accumulator);
-        return result;
-      }
-      break;
-
     default:
+      ETHERVOX_LOG_ERROR("Unknown STT backend: %d", runtime->config.backend);
       free(runtime->audio_accumulator);
+      runtime->audio_accumulator = NULL;
       return ETHERVOX_ERROR_NOT_SUPPORTED;
   }
 
@@ -91,21 +118,18 @@ ethervox_result_t ethervox_stt_start(ethervox_stt_runtime_t* runtime) {
   runtime->is_processing = true;
   runtime->accumulator_write_pos = 0;
 
-  // Delegate to backend-specific start
   switch (runtime->config.backend) {
-    case ETHERVOX_STT_BACKEND_WHISPER:
-      return ethervox_stt_whisper_start(runtime);
-    
-    case ETHERVOX_STT_BACKEND_VOSK:
-      return ethervox_stt_vosk_start(runtime);
-    
+    case ETHERVOX_STT_BACKEND_GRANITE_SPEECH:
+    case ETHERVOX_STT_BACKEND_GRANITE_SPEECH_PLUS:
+      return ethervox_stt_granite_speech_start(runtime);
+
     default:
       ETHERVOX_LOG_ERROR("Unknown STT backend: %d", runtime->config.backend);
       return ETHERVOX_ERROR_NOT_SUPPORTED;
   }
 }
 
-// Process audio
+// Process audio (accumulates; Granite Speech has no incremental/partial path)
 ethervox_result_t ethervox_stt_process(ethervox_stt_runtime_t* runtime,
                          const ethervox_audio_buffer_t* audio_buffer,
                          ethervox_stt_result_t* result) {
@@ -118,35 +142,31 @@ ethervox_result_t ethervox_stt_process(ethervox_stt_runtime_t* runtime,
 
   memset(result, 0, sizeof(ethervox_stt_result_t));
 
-  // Delegate to backend-specific processing
   switch (runtime->config.backend) {
-    case ETHERVOX_STT_BACKEND_WHISPER:
-      return ethervox_stt_whisper_process(runtime, audio_buffer, result);
-    
-    case ETHERVOX_STT_BACKEND_VOSK:
-      return ethervox_stt_vosk_process(runtime, audio_buffer, result);
-    
+    case ETHERVOX_STT_BACKEND_GRANITE_SPEECH:
+    case ETHERVOX_STT_BACKEND_GRANITE_SPEECH_PLUS:
+      return ethervox_stt_granite_speech_process(runtime, audio_buffer, result);
+
     default:
       ETHERVOX_LOG_ERROR("Unknown STT backend: %d", runtime->config.backend);
       return ETHERVOX_ERROR_NOT_SUPPORTED;
   }
 }
 
-// Finalize and get final result
+// Finalize and get final result - this is where Granite Speech actually runs
+// inference: the audio accumulated since ethervox_stt_start() is tokenized
+// (via mtmd) together with the variant's prompt and decoded to text.
 ethervox_result_t ethervox_stt_finalize(ethervox_stt_runtime_t* runtime, ethervox_stt_result_t* result) {
   ETHERVOX_CHECK_PTR(runtime);
   ETHERVOX_CHECK_PTR(result);
 
   memset(result, 0, sizeof(ethervox_stt_result_t));
 
-  // Delegate to backend-specific finalize
   switch (runtime->config.backend) {
-    case ETHERVOX_STT_BACKEND_WHISPER:
-      return ethervox_stt_whisper_finalize(runtime, result);
-    
-    case ETHERVOX_STT_BACKEND_VOSK:
-      return ethervox_stt_vosk_finalize(runtime, result);
-    
+    case ETHERVOX_STT_BACKEND_GRANITE_SPEECH:
+    case ETHERVOX_STT_BACKEND_GRANITE_SPEECH_PLUS:
+      return ethervox_stt_granite_speech_finalize(runtime, result);
+
     default:
       ETHERVOX_LOG_ERROR("Unknown STT backend: %d", runtime->config.backend);
       return ETHERVOX_ERROR_NOT_SUPPORTED;
@@ -162,16 +182,12 @@ void ethervox_stt_stop(ethervox_stt_runtime_t* runtime) {
   runtime->is_processing = false;
   runtime->accumulator_write_pos = 0;
 
-  // Delegate to backend-specific stop
   switch (runtime->config.backend) {
-    case ETHERVOX_STT_BACKEND_WHISPER:
-      ethervox_stt_whisper_stop(runtime);
+    case ETHERVOX_STT_BACKEND_GRANITE_SPEECH:
+    case ETHERVOX_STT_BACKEND_GRANITE_SPEECH_PLUS:
+      ethervox_stt_granite_speech_stop(runtime);
       break;
-    
-    case ETHERVOX_STT_BACKEND_VOSK:
-      ethervox_stt_vosk_stop(runtime);
-      break;
-    
+
     default:
       break;
   }
@@ -199,25 +215,34 @@ void ethervox_stt_cleanup(ethervox_stt_runtime_t* runtime) {
 
   if (runtime->audio_accumulator) {
     free(runtime->audio_accumulator);
+    runtime->audio_accumulator = NULL;
   }
 
-  // Delegate to backend-specific cleanup
-  if (runtime->config.backend == ETHERVOX_STT_BACKEND_WHISPER) {
-    ethervox_stt_whisper_cleanup(runtime);
-  } else if (runtime->config.backend == ETHERVOX_STT_BACKEND_VOSK) {
-    ethervox_stt_vosk_cleanup(runtime);
-  } else if (runtime->backend_context) {
-    // Other backend cleanup
-    free(runtime->backend_context);
-    runtime->backend_context = NULL;
+  switch (runtime->config.backend) {
+    case ETHERVOX_STT_BACKEND_GRANITE_SPEECH:
+    case ETHERVOX_STT_BACKEND_GRANITE_SPEECH_PLUS:
+      ethervox_stt_granite_speech_cleanup(runtime);
+      break;
+
+    default:
+      if (runtime->backend_context) {
+        free(runtime->backend_context);
+        runtime->backend_context = NULL;
+      }
+      break;
   }
 
   if (runtime->config.model_path) {
     free((void*)runtime->config.model_path);
   }
-
+  if (runtime->config.mmproj_path) {
+    free((void*)runtime->config.mmproj_path);
+  }
   if (runtime->config.language) {
     free((void*)runtime->config.language);
+  }
+  if (runtime->config.prefix_text) {
+    free((void*)runtime->config.prefix_text);
   }
 
   runtime->is_initialized = false;
@@ -225,7 +250,11 @@ void ethervox_stt_cleanup(ethervox_stt_runtime_t* runtime) {
 }
 
 /**
- * Set language (hot-switch without re-init)
+ * Set language (hot-switch without re-init).
+ *
+ * Granite Speech does not require per-language re-initialization the way
+ * Whisper did (it is multilingual within one checkpoint), so this simply
+ * updates the config's language hint used to construct the next prompt.
  */
 ethervox_result_t ethervox_stt_set_language(ethervox_stt_runtime_t* runtime, const char* language) {
   ETHERVOX_CHECK_PTR(runtime);
@@ -233,29 +262,16 @@ ethervox_result_t ethervox_stt_set_language(ethervox_stt_runtime_t* runtime, con
     ETHERVOX_LOG_ERROR("STT runtime not initialized");
     return ETHERVOX_ERROR_NOT_INITIALIZED;
   }
-  
+
   if (!language) {
     ETHERVOX_LOG_ERROR("Language is NULL");
     return ETHERVOX_ERROR_INVALID_ARGUMENT;
   }
-  
-  // Update config
-  runtime->config.language = language;
-  
-  // Delegate to backend-specific language switching
-  switch (runtime->config.backend) {
-    case ETHERVOX_STT_BACKEND_WHISPER: {
-      extern ethervox_result_t ethervox_stt_whisper_set_language(ethervox_stt_runtime_t* runtime, const char* language);
-      return ethervox_stt_whisper_set_language(runtime, language);
-    }
-    
-    case ETHERVOX_STT_BACKEND_VOSK:
-      // TODO: Implement Vosk language switching
-      ETHERVOX_LOG_ERROR("Language hot-switching not yet implemented for Vosk backend");
-      return ETHERVOX_ERROR_NOT_IMPLEMENTED;
-    
-    default:
-      ETHERVOX_LOG_ERROR("Unknown STT backend: %d", runtime->config.backend);
-      return ETHERVOX_ERROR_NOT_SUPPORTED;
+
+  if (runtime->config.language) {
+    free((void*)runtime->config.language);
   }
+  runtime->config.language = strdup(language);
+
+  return ETHERVOX_SUCCESS;
 }

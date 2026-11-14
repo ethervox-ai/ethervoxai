@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CC-BY-NC-SA-4.0
 #include "ethervox/logging.h"
+#include "test_utils.h"
 #include "ethervox/error.h"
-#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -10,13 +10,6 @@
 static int tests_run = 0;
 static int tests_passed = 0;
 
-#define RUN_TEST(test_func) do { \
-    printf("Running %s...\n", #test_func); \
-    tests_run++; \
-    test_func(); \
-    tests_passed++; \
-    printf("  ✓ %s passed\n", #test_func); \
-} while(0)
 
 // =============================================================================
 // Basic Error Code Tests
@@ -24,80 +17,80 @@ static int tests_passed = 0;
 
 static void test_error_string_all_codes(void) {
     // Test all general errors
-    assert(strcmp(ethervox_error_string(ETHERVOX_SUCCESS), "Success") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_GENERIC), "Generic error") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_NULL_POINTER), "NULL pointer") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_INVALID_ARGUMENT), "Invalid argument") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_OUT_OF_MEMORY), "Out of memory") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_NOT_INITIALIZED), "Not initialized") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_ALREADY_INITIALIZED), "Already initialized") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_TIMEOUT), "Timeout") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_NOT_SUPPORTED), "Not supported") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_BUFFER_TOO_SMALL), "Buffer too small") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_NOT_IMPLEMENTED), "Not implemented") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_FAILED), "Operation failed") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_NOT_FOUND), "Not found") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_SUCCESS), "Success") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_GENERIC), "Generic error") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_NULL_POINTER), "NULL pointer") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_INVALID_ARGUMENT), "Invalid argument") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_OUT_OF_MEMORY), "Out of memory") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_NOT_INITIALIZED), "Not initialized") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_ALREADY_INITIALIZED), "Already initialized") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_TIMEOUT), "Timeout") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_NOT_SUPPORTED), "Not supported") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_BUFFER_TOO_SMALL), "Buffer too small") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_NOT_IMPLEMENTED), "Not implemented") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_FAILED), "Operation failed") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_NOT_FOUND), "Not found") == 0);
     
     // Test platform errors
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_PLATFORM_INIT), "Platform initialization failed") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_HAL_NOT_FOUND), "HAL not found") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_GPIO_FAILURE), "GPIO operation failed") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_HARDWARE_NOT_AVAILABLE), "Hardware not available") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_PLATFORM_INIT), "Platform initialization failed") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_HAL_NOT_FOUND), "HAL not found") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_GPIO_FAILURE), "GPIO operation failed") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_HARDWARE_NOT_AVAILABLE), "Hardware not available") == 0);
     
     // Test audio errors
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_AUDIO_INIT), "Audio initialization failed") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_AUDIO_DEVICE_NOT_FOUND), "Audio device not found") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_AUDIO_FORMAT_UNSUPPORTED), "Audio format unsupported") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_AUDIO_BUFFER_OVERFLOW), "Audio buffer overflow") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_AUDIO_BUFFER_UNDERFLOW), "Audio buffer underflow") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_AUDIO_DEVICE_BUSY), "Audio device busy") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_AUDIO_INIT), "Audio initialization failed") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_AUDIO_DEVICE_NOT_FOUND), "Audio device not found") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_AUDIO_FORMAT_UNSUPPORTED), "Audio format unsupported") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_AUDIO_BUFFER_OVERFLOW), "Audio buffer overflow") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_AUDIO_BUFFER_UNDERFLOW), "Audio buffer underflow") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_AUDIO_DEVICE_BUSY), "Audio device busy") == 0);
     
     // Test STT errors
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_STT_INIT), "STT initialization failed") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_STT_MODEL_NOT_FOUND), "STT model not found") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_STT_PROCESSING), "STT processing failed") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_STT_INIT), "STT initialization failed") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_STT_MODEL_NOT_FOUND), "STT model not found") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_STT_PROCESSING), "STT processing failed") == 0);
     
     // Test wake word errors
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_WAKEWORD_INIT), "Wake word initialization failed") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_WAKEWORD_MODEL_NOT_FOUND), "Wake word model not found") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_WAKEWORD_INIT), "Wake word initialization failed") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_WAKEWORD_MODEL_NOT_FOUND), "Wake word model not found") == 0);
     
     // Test plugin errors
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_PLUGIN_NOT_FOUND), "Plugin not found") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_PLUGIN_INIT), "Plugin initialization failed") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_PLUGIN_EXECUTION), "Plugin execution failed") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_PLUGIN_MAX_REACHED), "Maximum plugins reached") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_PLUGIN_NOT_FOUND), "Plugin not found") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_PLUGIN_INIT), "Plugin initialization failed") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_PLUGIN_EXECUTION), "Plugin execution failed") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_PLUGIN_MAX_REACHED), "Maximum plugins reached") == 0);
     
     // Test network errors
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_NETWORK), "Network error") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_API_CALL), "API call failed") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_API_RESPONSE), "Invalid API response") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_API_RATE_LIMIT), "API rate limit exceeded") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_NETWORK), "Network error") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_API_CALL), "API call failed") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_API_RESPONSE), "Invalid API response") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_API_RATE_LIMIT), "API rate limit exceeded") == 0);
     
     // Test file I/O errors
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_FILE_NOT_FOUND), "File not found") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_FILE_READ), "File read error") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_FILE_WRITE), "File write error") == 0);
-    assert(strcmp(ethervox_error_string(ETHERVOX_ERROR_FILE_PERMISSION), "File permission denied") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_FILE_NOT_FOUND), "File not found") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_FILE_READ), "File read error") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_FILE_WRITE), "File write error") == 0);
+    CHECK(strcmp(ethervox_error_string(ETHERVOX_ERROR_FILE_PERMISSION), "File permission denied") == 0);
     
     // Test unknown error code
     const char* unknown = ethervox_error_string((ethervox_result_t)(-9999));
-    assert(strcmp(unknown, "Unknown error") == 0);
+    CHECK(strcmp(unknown, "Unknown error") == 0);
 }
 
 static void test_is_success_error(void) {
     // Test success case
-    assert(ethervox_is_success(ETHERVOX_SUCCESS) == true);
-    assert(ethervox_is_error(ETHERVOX_SUCCESS) == false);
+    CHECK(ethervox_is_success(ETHERVOX_SUCCESS) == true);
+    CHECK(ethervox_is_error(ETHERVOX_SUCCESS) == false);
     
     // Test various error codes
-    assert(ethervox_is_success(ETHERVOX_ERROR_NULL_POINTER) == false);
-    assert(ethervox_is_error(ETHERVOX_ERROR_NULL_POINTER) == true);
+    CHECK(ethervox_is_success(ETHERVOX_ERROR_NULL_POINTER) == false);
+    CHECK(ethervox_is_error(ETHERVOX_ERROR_NULL_POINTER) == true);
     
-    assert(ethervox_is_success(ETHERVOX_ERROR_AUDIO_INIT) == false);
-    assert(ethervox_is_error(ETHERVOX_ERROR_AUDIO_INIT) == true);
+    CHECK(ethervox_is_success(ETHERVOX_ERROR_AUDIO_INIT) == false);
+    CHECK(ethervox_is_error(ETHERVOX_ERROR_AUDIO_INIT) == true);
     
-    assert(ethervox_is_success(ETHERVOX_ERROR_FILE_NOT_FOUND) == false);
-    assert(ethervox_is_error(ETHERVOX_ERROR_FILE_NOT_FOUND) == true);
+    CHECK(ethervox_is_success(ETHERVOX_ERROR_FILE_NOT_FOUND) == false);
+    CHECK(ethervox_is_error(ETHERVOX_ERROR_FILE_NOT_FOUND) == true);
 }
 
 // =============================================================================
@@ -116,13 +109,13 @@ static void test_error_context_basic(void) {
     );
     
     const ethervox_error_context_t* ctx = ethervox_error_get_context();
-    assert(ctx != NULL);
-    assert(ctx->code == ETHERVOX_ERROR_INVALID_ARGUMENT);
-    assert(strcmp(ctx->message, "Test error message") == 0);
-    assert(strcmp(ctx->file, "test_error.c") == 0);
-    assert(ctx->line == 42);
-    assert(strcmp(ctx->function, "test_function") == 0);
-    assert(ctx->timestamp_ms > 0);  // Should have a timestamp
+    CHECK(ctx != NULL);
+    CHECK(ctx->code == ETHERVOX_ERROR_INVALID_ARGUMENT);
+    CHECK(strcmp(ctx->message, "Test error message") == 0);
+    CHECK(strcmp(ctx->file, "test_error.c") == 0);
+    CHECK(ctx->line == 42);
+    CHECK(strcmp(ctx->function, "test_function") == 0);
+    CHECK(ctx->timestamp_ms > 0);  // Should have a timestamp
 }
 
 static void test_error_context_clear(void) {
@@ -136,17 +129,17 @@ static void test_error_context_clear(void) {
     );
     
     const ethervox_error_context_t* ctx = ethervox_error_get_context();
-    assert(ctx->code == ETHERVOX_ERROR_AUDIO_INIT);
+    CHECK(ctx->code == ETHERVOX_ERROR_AUDIO_INIT);
     
     // Clear it
     ethervox_error_clear();
     ctx = ethervox_error_get_context();
-    assert(ctx->code == ETHERVOX_SUCCESS);
-    assert(ctx->message == NULL);
-    assert(ctx->file == NULL);
-    assert(ctx->line == 0);
-    assert(ctx->function == NULL);
-    assert(ctx->timestamp_ms == 0);
+    CHECK(ctx->code == ETHERVOX_SUCCESS);
+    CHECK(ctx->message == NULL);
+    CHECK(ctx->file == NULL);
+    CHECK(ctx->line == 0);
+    CHECK(ctx->function == NULL);
+    CHECK(ctx->timestamp_ms == 0);
 }
 
 static void test_error_context_null_message(void) {
@@ -162,9 +155,9 @@ static void test_error_context_null_message(void) {
     );
     
     const ethervox_error_context_t* ctx = ethervox_error_get_context();
-    assert(ctx->code == ETHERVOX_ERROR_GENERIC);
-    assert(ctx->message == NULL);
-    assert(ctx->file != NULL);
+    CHECK(ctx->code == ETHERVOX_ERROR_GENERIC);
+    CHECK(ctx->message == NULL);
+    CHECK(ctx->file != NULL);
 }
 
 static void test_error_context_overwrite(void) {
@@ -189,10 +182,10 @@ static void test_error_context_overwrite(void) {
     );
     
     const ethervox_error_context_t* ctx = ethervox_error_get_context();
-    assert(ctx->code == ETHERVOX_ERROR_STT_INIT);
-    assert(strcmp(ctx->message, "Second error") == 0);
-    assert(strcmp(ctx->file, "file2.c") == 0);
-    assert(ctx->line == 200);
+    CHECK(ctx->code == ETHERVOX_ERROR_STT_INIT);
+    CHECK(strcmp(ctx->message, "Second error") == 0);
+    CHECK(strcmp(ctx->file, "file2.c") == 0);
+    CHECK(ctx->line == 200);
 }
 
 // =============================================================================
@@ -209,16 +202,16 @@ static void test_check_ptr_macro(void) {
     
     // Valid pointer should succeed
     ethervox_result_t result = helper_check_ptr("valid");
-    assert(ethervox_is_success(result));
+    CHECK(ethervox_is_success(result));
     
     // NULL pointer should fail
     result = helper_check_ptr(NULL);
-    assert(result == ETHERVOX_ERROR_NULL_POINTER);
+    CHECK(result == ETHERVOX_ERROR_NULL_POINTER);
     
     const ethervox_error_context_t* ctx = ethervox_error_get_context();
-    assert(ctx->code == ETHERVOX_ERROR_NULL_POINTER);
-    assert(ctx->message != NULL);
-    assert(strstr(ctx->message, "NULL") != NULL);
+    CHECK(ctx->code == ETHERVOX_ERROR_NULL_POINTER);
+    CHECK(ctx->message != NULL);
+    CHECK(strstr(ctx->message, "NULL") != NULL);
 }
 
 static ethervox_result_t helper_return_error(void) {
@@ -229,11 +222,11 @@ static void test_return_error_macro(void) {
     ethervox_error_clear();
     
     ethervox_result_t result = helper_return_error();
-    assert(result == ETHERVOX_ERROR_TIMEOUT);
+    CHECK(result == ETHERVOX_ERROR_TIMEOUT);
     
     const ethervox_error_context_t* ctx = ethervox_error_get_context();
-    assert(ctx->code == ETHERVOX_ERROR_TIMEOUT);
-    assert(strcmp(ctx->message, "Operation timed out") == 0);
+    CHECK(ctx->code == ETHERVOX_ERROR_TIMEOUT);
+    CHECK(strcmp(ctx->message, "Operation timed out") == 0);
 }
 
 static ethervox_result_t helper_level3(void) {
@@ -254,12 +247,12 @@ static void test_check_propagation(void) {
     ethervox_error_clear();
     
     ethervox_result_t result = helper_level1();
-    assert(result == ETHERVOX_ERROR_FILE_NOT_FOUND);
+    CHECK(result == ETHERVOX_ERROR_FILE_NOT_FOUND);
     
     // Context should be from level3 where error was set
     const ethervox_error_context_t* ctx = ethervox_error_get_context();
-    assert(ctx->code == ETHERVOX_ERROR_FILE_NOT_FOUND);
-    assert(strcmp(ctx->message, "File missing") == 0);
+    CHECK(ctx->code == ETHERVOX_ERROR_FILE_NOT_FOUND);
+    CHECK(strcmp(ctx->message, "File missing") == 0);
 }
 
 static ethervox_result_t helper_early_success(void) {
@@ -272,7 +265,7 @@ static void test_check_success_cases(void) {
     ethervox_error_clear();
     
     ethervox_result_t result = helper_early_success();
-    assert(ethervox_is_success(result));
+    CHECK(ethervox_is_success(result));
 }
 
 // =============================================================================
@@ -304,26 +297,26 @@ static void test_pipeline_error_propagation(void) {
     
     // Success case
     ethervox_result_t result = init_pipeline_simulation(false, false);
-    assert(ethervox_is_success(result));
+    CHECK(ethervox_is_success(result));
     
     // Audio failure
     ethervox_error_clear();
     result = init_pipeline_simulation(true, false);
-    assert(result == ETHERVOX_ERROR_AUDIO_INIT);
+    CHECK(result == ETHERVOX_ERROR_AUDIO_INIT);
     const ethervox_error_context_t* ctx = ethervox_error_get_context();
-    assert(ctx->code == ETHERVOX_ERROR_AUDIO_INIT);
+    CHECK(ctx->code == ETHERVOX_ERROR_AUDIO_INIT);
     
     // STT failure (audio succeeds)
     ethervox_error_clear();
     result = init_pipeline_simulation(false, true);
-    assert(result == ETHERVOX_ERROR_STT_MODEL_NOT_FOUND);
+    CHECK(result == ETHERVOX_ERROR_STT_MODEL_NOT_FOUND);
     ctx = ethervox_error_get_context();
-    assert(ctx->code == ETHERVOX_ERROR_STT_MODEL_NOT_FOUND);
+    CHECK(ctx->code == ETHERVOX_ERROR_STT_MODEL_NOT_FOUND);
     
     // Audio failure should prevent STT from running
     ethervox_error_clear();
     result = init_pipeline_simulation(true, true);
-    assert(result == ETHERVOX_ERROR_AUDIO_INIT);  // Should fail at audio step
+    CHECK(result == ETHERVOX_ERROR_AUDIO_INIT);  // Should fail at audio step
 }
 
 // =============================================================================
@@ -342,11 +335,11 @@ static void test_multiple_errors_sequence(void) {
         );
         
         const ethervox_error_context_t* ctx = ethervox_error_get_context();
-        assert(ctx->line == i);
+        CHECK(ctx->line == i);
         
         ethervox_error_clear();
         ctx = ethervox_error_get_context();
-        assert(ctx->code == ETHERVOX_SUCCESS);
+        CHECK(ctx->code == ETHERVOX_SUCCESS);
     }
 }
 
@@ -368,7 +361,7 @@ static void test_long_error_message(void) {
     );
     
     const ethervox_error_context_t* ctx = ethervox_error_get_context();
-    assert(ctx->message == long_message);  // Should store pointer as-is
+    CHECK(ctx->message == long_message);  // Should store pointer as-is
 }
 
 static void test_error_set_macro(void) {
@@ -377,11 +370,11 @@ static void test_error_set_macro(void) {
     ETHERVOX_ERROR_SET(ETHERVOX_ERROR_BUFFER_TOO_SMALL, "Buffer insufficient");
     
     const ethervox_error_context_t* ctx = ethervox_error_get_context();
-    assert(ctx->code == ETHERVOX_ERROR_BUFFER_TOO_SMALL);
-    assert(strcmp(ctx->message, "Buffer insufficient") == 0);
-    assert(ctx->file != NULL);
-    assert(ctx->line > 0);
-    assert(ctx->function != NULL);
+    CHECK(ctx->code == ETHERVOX_ERROR_BUFFER_TOO_SMALL);
+    CHECK(strcmp(ctx->message, "Buffer insufficient") == 0);
+    CHECK(ctx->file != NULL);
+    CHECK(ctx->line > 0);
+    CHECK(ctx->function != NULL);
 }
 
 // =============================================================================
@@ -390,7 +383,7 @@ static void test_error_set_macro(void) {
 
 static void test_logging_integration(void) {
     ethervox_log_set_level(ETHERVOX_LOG_LEVEL_DEBUG);
-    assert(ethervox_log_get_level() == ETHERVOX_LOG_LEVEL_DEBUG);
+    CHECK(ethervox_log_get_level() == ETHERVOX_LOG_LEVEL_DEBUG);
     
     // Test logging at various levels
     ETHERVOX_LOG_DEBUG("Debug message test");
@@ -445,22 +438,22 @@ static void test_realistic_initialization(void) {
     
     // Success case
     ethervox_result_t result = init_system("config.json", "model.bin");
-    assert(ethervox_is_success(result));
+    CHECK(ethervox_is_success(result));
     
     // NULL config
     ethervox_error_clear();
     result = init_system(NULL, "model.bin");
-    assert(result == ETHERVOX_ERROR_NULL_POINTER);
+    CHECK(result == ETHERVOX_ERROR_NULL_POINTER);
     
     // Empty config path
     ethervox_error_clear();
     result = init_system("", "model.bin");
-    assert(result == ETHERVOX_ERROR_INVALID_ARGUMENT);
+    CHECK(result == ETHERVOX_ERROR_INVALID_ARGUMENT);
     
     // Invalid model
     ethervox_error_clear();
     result = init_system("config.json", "invalid.model");
-    assert(result == ETHERVOX_ERROR_FILE_NOT_FOUND);
+    CHECK(result == ETHERVOX_ERROR_FILE_NOT_FOUND);
 }
 
 // =============================================================================

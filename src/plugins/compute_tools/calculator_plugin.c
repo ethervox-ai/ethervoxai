@@ -9,10 +9,12 @@
  * - Parentheses for order of operations
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/compute_tools.h"
+#include "ethervox/tool_catalogue.h"
+#include "compute_tools_catalogue.h"
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -291,22 +293,21 @@ static int calculator_execute(const char* args_json, char** result, char** error
 }
 
 static ethervox_tool_t calculator_tool = {
-    .name = "calculator_compute",
-    .description = "Compute ANY math calculation - use for all arithmetic, don't calculate mentally. Supports +, -, *, /, ^, sqrt, abs, parentheses.",
-    .parameters_json_schema = 
-        "{\"type\":\"object\","
-        "\"properties\":{"
-        "\"expression\":{\"type\":\"string\",\"description\":\"Mathematical expression to evaluate\"},"
-        "\"decimal_places\":{\"type\":\"integer\",\"description\":\"Number of decimal places (0-15, default: 2)\",\"default\":2}"
-        "},"
-        "\"required\":[\"expression\"]}",
+    .test_scenario = "Calculate 157 times 43",
     .execute = calculator_execute,
     .is_deterministic = true,
     .requires_confirmation = false,
     .is_stateful = false,
     .estimated_latency_ms = 0.5f
 };
+static bool calculator_tool_loaded = false;
 
 const ethervox_tool_t* ethervox_tool_calculator(void) {
+    if (!calculator_tool_loaded) {
+        ethervox_result_t r = ethervox_tool_catalogue_load(
+            ETHERVOX_CATALOGUE_COMPUTE_TOOLS_JSON, "calculator_compute",
+            ethervox_tool_catalogue_build_profile(), &calculator_tool);
+        calculator_tool_loaded = ethervox_is_success(r);
+    }
     return &calculator_tool;
 }

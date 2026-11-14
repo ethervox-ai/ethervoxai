@@ -7,7 +7,7 @@
  * confidence threshold is met.
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #ifndef ETHERVOX_GOVERNOR_H
@@ -18,9 +18,12 @@
 #include <stdint.h>
 #include <time.h>
 
+#include "cancel_token.h"
 #include "chat_template.h"
 #include "error.h"
 #include "ethervox/error.h"
+#include "ethervox/event_stream.h"
+#include "ethervox/memory_tools.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,11 +67,17 @@ typedef struct {
    * @param language Language code ("en", "de", "es", "zh") or NULL for auto-detect
    * @param wait_for_response If true, open microphone after speaking
    * @param allow_interrupt If true, user can interrupt by speaking
+   * @param speaker_id Emotion-mapped TTS speaker/voice selector (see
+   *        src/plugins/conversation_tools/speak.c's emotion->speaker_id
+   *        table), or -1 if the tool call didn't specify an emotion.
+   *        Desktop/Piper-only: pass to ethervox_tts_set_speaker_id() before
+   *        synthesizing. Platform-native TTS (Android/iOS) has no speaker
+   *        concept - implementations there should ignore this parameter.
    * @param user_data Typically the conversation session
    * @return ETHERVOX_SUCCESS or error code
    */
   ethervox_result_t (*on_speak)(const char* text, const char* language, bool wait_for_response,
-                                bool allow_interrupt, void* user_data);
+                                bool allow_interrupt, int speaker_id, void* user_data);
 
   /**
    * Called when LLM invokes "listen" tool
@@ -140,6 +149,7 @@ typedef struct {
   char name[64];                      // Tool name (e.g., "calculator_compute")
   char description[256];              // Human-readable description
   char parameters_json_schema[1024];  // JSON schema for parameters
+  char test_scenario[512];            // Test prompt that should trigger this tool
 
   ethervox_tool_execute_fn execute;  // Execution function
 
@@ -224,6 +234,17 @@ typedef enum {
 } ethervox_governor_status_t;
 
 /**
+ * Generation finish reasons (aligned with OpenAI API)
+ */
+#define ETHERVOX_FINISH_STOP "stop"                // Stop sequence encountered
+#define ETHERVOX_FINISH_LENGTH "length"            // Max tokens reached
+#define ETHERVOX_FINISH_TOOL_CALLS "tool_calls"    // Tool call detected
+#define ETHERVOX_FINISH_CONTENT_FILTER "content_filter"  // Content policy violated
+#define ETHERVOX_FINISH_REPETITION "repetition"    // Repetition loop detected
+#define ETHERVOX_FINISH_EOG "eog"                  // End-of-generation token
+#define ETHERVOX_FINISH_GRAMMAR_DEADLOCK "grammar_deadlock"  // Grammar constraint impossible to satisfy
+
+/**
  * Confidence metrics from LLM response
  */
 typedef struct {
@@ -245,11 +266,15 @@ typedef enum {
   ETHERVOX_GOVERNOR_EVENT_CONFIDENCE_UPDATE,    // Confidence level changed
   ETHERVOX_GOVERNOR_EVENT_CONTEXT_SUMMARIZING,  // Context being summarized before clearing
   ETHERVOX_GOVERNOR_EVENT_CONTEXT_CLEARED,      // Context cleared, summary stored in memory
+  ETHERVOX_GOVERNOR_EVENT_CONTEXT_RESTORING,    // Restoring conversation context after clear
   ETHERVOX_GOVERNOR_EVENT_MANIFEST_LOADING,     // Manifest system initializing
   ETHERVOX_GOVERNOR_EVENT_MANIFEST_READY,       // Manifest loaded successfully (optimal state)
   ETHERVOX_GOVERNOR_EVENT_MANIFEST_FALLBACK_LEVEL_1,  // Binary manifest one-liners (good fallback)
   ETHERVOX_GOVERNOR_EVENT_MANIFEST_FALLBACK_LEVEL_2,  // LLM-only mode (degraded, suggest
                                                       // optimization)
+  ETHERVOX_GOVERNOR_EVENT_TOOL_CALL_REQUESTED,        // Mutating host tool awaiting user
+                                                      // confirmation (ADR-0007) - message is
+                                                      // "<tool_name>: <arguments_json>"
   ETHERVOX_GOVERNOR_EVENT_COMPLETE                    // Final answer ready
 } ethervox_governor_event_type_t;
 
@@ -265,11 +290,32 @@ typedef void (*ethervox_governor_progress_callback)(ethervox_governor_event_type
                                                     const char* message, void* user_data);
 
 /**
+ * Tool confirmation callback (ADR-0007 "Preview -> Approve -> Apply", host tools only).
+ *
+ * Called synchronously on the generation thread when the model requests a host tool
+ * registered with `is_mutating = true`. The core blocks on this call - it is the host's
+ * job to show a confirmation UI and return promptly; a slow host makes the whole
+ * conversation appear to hang.
+ *
+ * If no callback is registered, mutating host tools are denied by default (fail closed -
+ * ADR-0007 requires an explicit approval path, not an implicit one).
+ *
+ * @param tool_name Name of the tool being requested
+ * @param arguments_json JSON-encoded arguments (valid for the callback's duration only)
+ * @param user_data User data passed to ethervox_governor_set_tool_confirmation_callback
+ * @return true to execute the tool, false to deny
+ */
+typedef bool (*ethervox_tool_confirmation_callback)(const char* tool_name,
+                                                     const char* arguments_json,
+                                                     void* user_data);
+
+/**
  * System prompt loading mode
  */
 typedef enum {
-  ETHERVOX_GOVERNOR_MODE_FULL,    // Full prompt with all tools (slower load, full capabilities)
-  ETHERVOX_GOVERNOR_MODE_MINIMAL  // Brief prompt without tools (fast load, limited capabilities)
+  ETHERVOX_GOVERNOR_MODE_FULL,      // Full prompt with all tools (slower load, full capabilities)
+  ETHERVOX_GOVERNOR_MODE_MINIMAL,   // Brief prompt without tools (fast load, limited capabilities)
+  ETHERVOX_GOVERNOR_MODE_FINETUNED  // Basic instructions only (model trained on tools, skip tool list)
 } ethervox_governor_system_prompt_mode_t;
 
 /**
@@ -299,6 +345,24 @@ typedef struct {
  * Governor state (opaque)
  */
 typedef struct ethervox_governor ethervox_governor_t;
+
+/**
+ * Opaque model pool handle (forward declaration for governor integration)
+ */
+typedef struct ethervox_model_pool ethervox_model_pool_t;
+
+/**
+ * Register the tool confirmation callback used for mutating host tools
+ * (ADR-0007 "Preview -> Approve -> Apply").
+ *
+ * @param governor Governor instance
+ * @param callback Callback to invoke, or NULL to clear (mutating tools then always deny)
+ * @param user_data Opaque pointer passed back to the callback
+ */
+void ethervox_governor_set_tool_confirmation_callback(
+    ethervox_governor_t* governor,
+    ethervox_tool_confirmation_callback callback,
+    void* user_data);
 
 // ============================================================================
 // Tool Registry Functions
@@ -350,7 +414,7 @@ void ethervox_tool_registry_cleanup(ethervox_tool_registry_t* registry);
  *
  * @param governor Output: Governor instance (caller must free with cleanup)
  * @param config Governor configuration (NULL for defaults)
- * @param registry Tool registry
+ * @param tool_registry Tool registry
  * @return 0 on success, negative on error
  */
 ethervox_result_t ethervox_governor_init(ethervox_governor_t** governor,
@@ -375,6 +439,7 @@ typedef bool (*ethervox_load_progress_callback)(const char* stage, float progres
  * @param governor Governor instance
  * @param model_path Path to GGUF model file
  * @param cache_dir Directory to store/load KV cache (can be NULL to disable caching)
+ * @param cancel_token Optional cancellation token (can be NULL)
  * @param progress_callback Optional progress callback (can be NULL)
  * @param user_data User data for progress callback (can be NULL)
  * @return 0 on success, negative on error
@@ -382,8 +447,77 @@ typedef bool (*ethervox_load_progress_callback)(const char* stage, float progres
 ethervox_result_t ethervox_governor_load_model(ethervox_governor_t* governor,
                                                const char* model_path,
                                                const char* cache_dir,
+                                               ethervox_cancel_token_t* cancel_token,
                                                ethervox_load_progress_callback progress_callback,
                                                void* user_data);
+
+/**
+ * Load the Governor model with audio (Granite Speech) decode support
+ * attached, for the unified voice-model architecture (Mode 1 voice screen).
+ * See docs/UNIFIED_VOICE_MODEL_ARCHITECTURE.md for full design rationale.
+ *
+ * Identical to ethervox_governor_load_model() except:
+ *  - Also loads mmproj_path via mtmd_init_from_file() and attaches the
+ *    resulting mtmd_context to the Governor, enabling
+ *    ethervox_governor_transcribe_audio().
+ *  - Uses ctx_params.n_seq_max = 3 instead of 2 (adds a dedicated ASR
+ *    scratch sequence - see docs/UNIFIED_VOICE_MODEL_ARCHITECTURE.md
+ *    section 2.2). Context size budget is planned per 3-way split
+ *    (MIN_CONTEXT_FOR_AUDIO_MODE), not the existing 2-way split.
+ *  - model_path and mmproj_path must point at the SAME Granite Speech Plus
+ *    GGUF pair used to load Granite Speech elsewhere (Mode 1/2/4) - this is
+ *    a hard requirement, not validated at runtime beyond mtmd's own
+ *    mtmd_support_audio() check.
+ *
+ * @param governor Governor instance
+ * @param model_path Path to Granite Speech Plus GGUF (LLM decoder + Conformer weights)
+ * @param mmproj_path Path to companion mmproj GGUF (QFormer audio projector)
+ * @param cache_dir Directory to store/load KV cache (can be NULL to disable caching)
+ * @param cancel_token Optional cancellation token (can be NULL)
+ * @param progress_callback Optional progress callback (can be NULL)
+ * @param user_data User data for progress callback (can be NULL)
+ * @return ETHERVOX_SUCCESS on success, negative error code otherwise
+ */
+ethervox_result_t ethervox_governor_load_model_with_audio(
+    ethervox_governor_t* governor,
+    const char* model_path,
+    const char* mmproj_path,
+    const char* cache_dir,
+    ethervox_cancel_token_t* cancel_token,
+    ethervox_load_progress_callback progress_callback,
+    void* user_data);
+
+/**
+ * Transcribe one utterance's worth of accumulated audio using the
+ * Governor's own loaded model (must have been loaded via
+ * ethervox_governor_load_model_with_audio()). Runs entirely on the
+ * dedicated ASR scratch sequence (seq 2) - never touches the conversation
+ * (seq 0) or system-prompt-master (seq 1) sequences, so this can be called
+ * at any point without corrupting Governor chat state, including mid
+ * multi-turn conversation.
+ *
+ * @param governor Governor instance (must have been loaded with
+ *   ethervox_governor_load_model_with_audio - returns
+ *   ETHERVOX_ERROR_NOT_INITIALIZED otherwise)
+ * @param samples Raw float32 PCM audio samples, 16kHz mono (Granite
+ *   Speech's fixed encoder rate)
+ * @param n_samples Number of samples in `samples`
+ * @param out_text Output: malloc'd transcript string (caller must free),
+ *   set to NULL on failure
+ * @return ETHERVOX_SUCCESS on success, negative error code otherwise
+ */
+ethervox_result_t ethervox_governor_transcribe_audio(
+    ethervox_governor_t* governor,
+    const float* samples,
+    uint32_t n_samples,
+    char** out_text);
+
+/**
+ * @return true if this Governor instance was loaded via
+ *   ethervox_governor_load_model_with_audio() and still has its mtmd
+ *   context attached (i.e. ethervox_governor_transcribe_audio() is usable).
+ */
+bool ethervox_governor_has_audio_support(ethervox_governor_t* governor);
 
 /**
  * Unload the Governor model to free memory
@@ -430,21 +564,67 @@ float ethervox_governor_get_kv_cache_usage(ethervox_governor_t* governor, int32_
 char* ethervox_governor_get_kv_cache_contents(ethervox_governor_t* governor);
 
 /**
+ * Get system prompt content that was processed during initialization
+ * Useful for debugging tool availability and prompt construction
+ *
+ * @param governor Governor instance
+ * @return Malloc'd string containing system prompt text (caller must free), or NULL if model not loaded
+ */
+char* ethervox_governor_get_system_prompt_content(ethervox_governor_t* governor);
+
+/**
+ * Get model file path from governor
+ *
+ * @param governor Governor instance
+ * @return Model path string (empty string if not loaded, never NULL)
+ */
+const char* ethervox_governor_get_model_path(struct ethervox_governor* governor);
+
+/**
+ * Get llama model pointer from governor (for internal use)
+ *
+ * @param governor Governor instance
+ * @return llama_model pointer, or NULL if not loaded
+ */
+struct llama_model* ethervox_governor_get_llm_model(ethervox_governor_t* governor);
+
+/**
+ * Get llama context pointer from governor (for internal use)
+ *
+ * @param governor Governor instance
+ * @return llama_context pointer, or NULL if not loaded
+ */
+struct llama_context* ethervox_governor_get_llm_context(ethervox_governor_t* governor);
+
+/**
+ * Get current KV cache position
+ *
+ * @param governor Governor instance
+ * @return Current KV position, or -1 if not loaded
+ */
+int32_t ethervox_governor_get_kv_pos(ethervox_governor_t* governor);
+
+/**
  * Execute user query with tool orchestration
  *
  * @param governor Governor instance
  * @param user_query User's natural language query
+ * @param cancel_token Optional cancellation token (can be NULL)
  * @param response Output: Final response (caller must free)
  * @param error Output: Error message if failed (caller must free)
  * @param metrics Output: Confidence metrics (optional, can be NULL)
  * @param progress_callback Progress callback for UI updates (optional, can be NULL)
+ * @param event_callback Structured event callback (optional, can be NULL)
  * @param token_callback Token-by-token streaming callback (optional, can be NULL)
  * @param user_data User data passed to callbacks (optional, can be NULL)
  * @return Governor status
  */
 ethervox_governor_status_t ethervox_governor_execute(
-    ethervox_governor_t* governor, const char* user_query, char** response, char** error,
+    ethervox_governor_t* governor, const char* user_query,
+    ethervox_cancel_token_t* cancel_token,
+    char** response, char** error,
     ethervox_confidence_metrics_t* metrics, ethervox_governor_progress_callback progress_callback,
+    ethervox_event_cb event_callback,
     void (*token_callback)(const char* token, void* user_data), void* user_data);
 
 /**
@@ -457,18 +637,23 @@ ethervox_governor_status_t ethervox_governor_execute(
  * @param user_query User's natural language query
  * @param exec_context Execution context (input source, capabilities, callbacks) - can be NULL for
  * legacy behavior
+ * @param cancel_token Optional cancellation token (can be NULL)
  * @param response Output: Final response (caller must free)
  * @param error Output: Error message if failed (caller must free)
  * @param metrics Output: Confidence metrics (optional, can be NULL)
  * @param progress_callback Progress callback for UI updates (optional, can be NULL)
+ * @param event_callback Structured event callback (optional, can be NULL)
  * @param token_callback Token-by-token streaming callback (optional, can be NULL)
  * @param user_data User data passed to callbacks (optional, can be NULL)
  * @return Governor status
  */
 ethervox_governor_status_t ethervox_governor_execute_with_context(
     ethervox_governor_t* governor, const char* user_query,
-    const ethervox_execution_context_t* exec_context, char** response, char** error,
+    const ethervox_execution_context_t* exec_context,
+    ethervox_cancel_token_t* cancel_token,
+    char** response, char** error,
     ethervox_confidence_metrics_t* metrics, ethervox_governor_progress_callback progress_callback,
+    ethervox_event_cb event_callback,
     void (*token_callback)(const char* token, void* user_data), void* user_data);
 /**
  * Get iteration count from last execution (for debugging)
@@ -501,6 +686,28 @@ ethervox_result_t ethervox_governor_summarize_and_clear_cache(ethervox_governor_
                                                               bool force_clear);
 
 /**
+ * Manually summarize the live conversation and move the summary into the conversation cache
+ *
+ * Generates an LLM summary of the current conversation_history, clears the conversation
+ * region of the KV cache (system prompt is preserved), decodes the summary back into that
+ * now-empty region so the model is immediately "warm" with the condensed context, resets
+ * conversation_history, and persists the summary text to memory_store (if provided) tagged
+ * "context_summary". Unlike ethervox_governor_summarize_and_clear_cache, this leaves the
+ * cache loaded with the summary rather than deferring reload to the next generation.
+ *
+ * @param governor Governor instance
+ * @param memory_store Optional memory store to persist the summary text to (may be NULL)
+ * @param summary_out Output buffer for the generated summary text
+ * @param summary_size Size of summary_out
+ * @return ETHERVOX_SUCCESS on success (summary_out is empty if there was nothing to summarize)
+ */
+ethervox_result_t ethervox_governor_summarize_conversation_to_cache(
+    ethervox_governor_t* governor,
+    ethervox_memory_store_t* memory_store,
+    char* summary_out,
+    size_t summary_size);
+
+/**
  * Enable or disable tool call execution
  * When disabled, tool calls in LLM responses will be extracted but not executed.
  * This is useful for optimization processes that need raw tool call templates.
@@ -515,6 +722,23 @@ void ethervox_governor_set_tool_execution(ethervox_governor_t* governor, bool en
  */
 void ethervox_governor_cleanup(ethervox_governor_t* governor);
 
+/**
+ * Set model pool for governor (N6.2a-core integration)
+ * 
+ * Configures the governor to load models through the specified pool instead of
+ * direct llama.cpp calls. Pool is a weak reference (not owned by governor).
+ * 
+ * Only Android calls this; iOS/Workspace leave pool=NULL for legacy behavior.
+ * 
+ * @param governor Governor instance
+ * @param pool Model pool (NULL = restore legacy direct-loading behavior)
+ * @return ETHERVOX_SUCCESS or error code
+ */
+ethervox_result_t ethervox_governor_set_model_pool(
+    ethervox_governor_t* governor,
+    ethervox_model_pool_t* pool
+);
+
 // ============================================================================
 // Default Configuration
 // ============================================================================
@@ -527,7 +751,7 @@ static inline ethervox_governor_config_t ethervox_governor_default_config(void) 
       .timeout_seconds = 30,
       .max_tokens_per_response = 192,  // Conservative limit for voice assistant responses (was 2048 - too verbose)
       .gpu_layers = 999,     // Full GPU offload by default (overridden by settings)
-      .context_size = 768,   // Optimized for mobile (was 8192 - too high for 350M models)
+      .context_size = 16384, // Increased for multi-sequence KV cache (n_seq_max=3: 16384/3=5461 per seq, needed for 4101-token system prompt)
       .n_threads = 8,        // 8 threads by default (overridden by settings)
       .temperature = 0.7f,   // Balanced creativity (overridden by settings)
       .system_prompt_mode = ETHERVOX_GOVERNOR_MODE_FULL,  // Default to full capabilities

@@ -3,10 +3,11 @@
  * @brief Model download and status checking for all EthervoxAI models
  *
  * Provides unified interface for checking model availability and downloading
- * models for Governor LLM, Whisper STT, Vosk STT, and Piper TTS.
+ * models for Governor LLM, Granite Speech ASR (BASE + PLUS variants), and
+ * Piper TTS (desktop only).
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * Licensed under CC BY-NC-SA 4.0
+ * Proprietary and confidential. See LICENSE.
  */
 
 #ifndef ETHERVOX_MODEL_DOWNLOADER_H
@@ -25,11 +26,11 @@ extern "C" {
  * @brief Model types supported by EthervoxAI
  */
 typedef enum {
-    ETHERVOX_MODEL_TYPE_GOVERNOR,      // Governor LLM (GGUF format)
-    ETHERVOX_MODEL_TYPE_WHISPER,       // Whisper STT (ggml format)
-    ETHERVOX_MODEL_TYPE_VOSK,          // Vosk STT (model directory)
-    ETHERVOX_MODEL_TYPE_PIPER,         // Piper TTS (.onnx format)
-    ETHERVOX_MODEL_TYPE_WAKE_TEMPLATE  // Wake word template (raw audio)
+    ETHERVOX_MODEL_TYPE_GOVERNOR,           // Governor LLM (GGUF format)
+    ETHERVOX_MODEL_TYPE_GRANITE_SPEECH,     // Granite Speech BASE ASR (GGUF + mmproj pair) - Modes 1 & 4
+    ETHERVOX_MODEL_TYPE_GRANITE_SPEECH_PLUS,// Granite Speech PLUS ASR (GGUF + mmproj pair) - Mode 2 (SAA)
+    ETHERVOX_MODEL_TYPE_PIPER,              // Piper TTS (.onnx format, desktop only)
+    ETHERVOX_MODEL_TYPE_WAKE_TEMPLATE       // Wake word template (raw audio)
 } ethervox_model_type_t;
 
 /**
@@ -191,20 +192,20 @@ bool ethervox_model_verify(
 ethervox_model_status_t ethervox_model_governor_status(const char* model_name);
 
 /**
- * @brief Check Whisper STT status
+ * @brief Check Granite Speech BASE ASR status (Modes 1 & 4)
  * 
- * @param model_name Model name (e.g., "ggml-base.en.bin", NULL for default)
+ * @param model_name Model name (e.g., "granite-speech-4.1-2b.Q4_K_M.gguf"), NULL for default
  * @return Model status
  */
-ethervox_model_status_t ethervox_model_whisper_status(const char* model_name);
+ethervox_model_status_t ethervox_model_granite_speech_status(const char* model_name);
 
 /**
- * @brief Check Vosk STT status
+ * @brief Check Granite Speech PLUS ASR status (Mode 2, speaker-attributed)
  * 
- * @param model_name Model name (e.g., "vosk-model-small-en-us-0.15", NULL for default)
+ * @param model_name Model name (e.g., "granite-speech-4.1-2b-plus.Q4_K_M.gguf"), NULL for default
  * @return Model status
  */
-ethervox_model_status_t ethervox_model_vosk_status(const char* model_name);
+ethervox_model_status_t ethervox_model_granite_speech_plus_status(const char* model_name);
 
 /**
  * @brief Check Piper TTS status

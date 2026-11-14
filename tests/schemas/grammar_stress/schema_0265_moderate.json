@@ -1,0 +1,42 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "oneOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ]
+    },
+    "field_1": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "field_2": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 9
+    },
+    "field_3": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 47
+    }
+  },
+  "required": [
+    "field_2",
+    "field_3"
+  ]
+}

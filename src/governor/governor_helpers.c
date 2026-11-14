@@ -3,7 +3,7 @@
  * @brief Implementation of clean, testable helper functions
  *
  * Copyright (c) 2024-2026 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "governor_helpers.h"
@@ -242,7 +242,8 @@ kv_decode_result_t kv_cache_decode_tokens(
     }
     
     // Create batch
-    llama_batch batch = llama_batch_init(n_tokens, 0, 1);
+    int n_seq_max = llama_n_seq_max(ctx);
+    llama_batch batch = llama_batch_init(n_tokens, 0, n_seq_max);
     batch.n_tokens = n_tokens;
     
     for (int i = 0; i < n_tokens; i++) {

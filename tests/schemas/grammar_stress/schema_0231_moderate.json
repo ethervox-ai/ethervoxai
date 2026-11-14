@@ -1,0 +1,36 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "field_0": {
+        "type": "string"
+      },
+      "field_1": {
+        "type": "object",
+        "properties": {
+          "field_0": {
+            "type": "number"
+          },
+          "field_1": {
+            "type": "string"
+          },
+          "field_2": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "field_0",
+          "field_1"
+        ]
+      },
+      "field_2": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "field_0"
+    ]
+  },
+  "minItems": 1
+}

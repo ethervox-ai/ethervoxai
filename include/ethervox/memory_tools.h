@@ -6,7 +6,7 @@
  * allowing the LLM to maintain long-term context across sessions.
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #ifndef ETHERVOX_MEMORY_TOOLS_H
@@ -135,7 +135,11 @@ void ethervox_memory_cleanup(ethervox_memory_store_t* store);
 
 /**
  * TOOL: memory_store - Save a fact/event to memory
- * 
+ *
+ * Honours secret mode: while ethervox_memory_get_privacy_mode() is true nothing is stored, the call
+ * still returns ETHERVOX_SUCCESS (so the assistant's flow is not disrupted) and *memory_id_out is 0.
+ * Use ethervox_memory_store_add_always() for configuration records that must persist.
+ *
  * @param store Memory store
  * @param text Content to remember
  * @param tags Array of category tags
@@ -146,6 +150,20 @@ void ethervox_memory_cleanup(ethervox_memory_store_t* store);
  * @return ETHERVOX_SUCCESS on success, error code on failure
  */
 ethervox_result_t ethervox_memory_store_add(
+    ethervox_memory_store_t* store,
+    const char* text,
+    const char* tags[],
+    uint32_t tag_count,
+    float importance,
+    bool is_user_message,
+    uint64_t* memory_id_out
+);
+
+/**
+ * Like ethervox_memory_store_add(), but ignores secret mode. For configuration records the application
+ * itself needs to persist (for example user-defined paths), never for conversation content.
+ */
+ethervox_result_t ethervox_memory_store_add_always(
     ethervox_memory_store_t* store,
     const char* text,
     const char* tags[],

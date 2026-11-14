@@ -1,0 +1,131 @@
+{
+  "oneOf": [
+    {
+      "type": "number",
+      "minimum": 52,
+      "maximum": 313
+    },
+    {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "string"
+        },
+        "field_1": {
+          "type": "number",
+          "minimum": 28,
+          "maximum": 119
+        },
+        "field_2": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "number"
+            },
+            "field_1": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 25
+              }
+            },
+            "field_2": {
+              "type": "object",
+              "properties": {
+                "field_0": {
+                  "type": "string",
+                  "enum": [
+                    "option_0",
+                    "option_1",
+                    "option_2"
+                  ]
+                }
+              }
+            }
+          },
+          "required": [
+            "field_2"
+          ]
+        },
+        "field_3": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "maxItems": 38
+        }
+      },
+      "required": [
+        "field_0",
+        "field_2",
+        "field_3"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field_0": {
+                "type": "string"
+              }
+            }
+          },
+          "maxItems": 36
+        },
+        "field_1": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 37
+            },
+            {
+              "type": "object",
+              "properties": {
+                "field_0": {
+                  "type": "string",
+                  "enum": [
+                    "option_0",
+                    "option_1",
+                    "option_2",
+                    "option_3",
+                    "option_4",
+                    "option_5",
+                    "option_6"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "field_2": {
+          "type": "string"
+        },
+        "field_3": {
+          "type": "boolean"
+        },
+        "field_4": {
+          "type": "integer"
+        },
+        "field_5": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field_0",
+        "field_2",
+        "field_3",
+        "field_5"
+      ]
+    }
+  ]
+}

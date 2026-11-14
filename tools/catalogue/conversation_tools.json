@@ -1,0 +1,46 @@
+[
+  {
+    "name": "speak",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "TTS audio output with language and emotion control. Use for voice responses. CRITICAL: Call this tool sentence-by-sentence. Split responses into individual sentences for natural speech flow. Never send multiple sentences in one call - break them up for better prosody and interruption support. ALWAYS specify language parameter (en/de/es/zh) to match the user's language - this is critical for proper voice selection. Languages: en (English), de (German), es (Spanish), zh (Chinese). Emotions: neutral, happy, sad, calm, excited. wait_for_response=true auto-opens mic after speaking. allow_interrupt=true lets user interrupt. Degrades to text in CLI mode.",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "description": "The text to speak aloud" },
+        "language": { "type": "string", "enum": ["en", "de", "es", "zh"], "description": "Language code for TTS voice (en=English, de=German, es=Spanish, zh=Chinese). If omitted, auto-detects from text." },
+        "emotion": { "type": "string", "enum": ["neutral", "happy", "sad", "calm", "excited", "professional", "friendly", "serious", "enthusiastic", "somber", "soothing", "energetic", "formal", "warm", "grave"], "description": "Voice emotion/style to use (default: neutral). For system prompts use: neutral, happy, sad, calm, excited." },
+        "wait_for_response": { "type": "boolean", "description": "If true, automatically open microphone after speaking to listen for user's response (turn-taking)" },
+        "allow_interrupt": { "type": "boolean", "description": "If true, user can interrupt by speaking during playback (default: true)" }
+      },
+      "required": ["text"]
+    }
+  },
+  {
+    "name": "listen",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Capture speech input (English/Chinese/German). Use for clarifications/multi-turn. Waits timeout_ms for user speech. Returns transcript or null on timeout. Not available in CLI mode.",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "timeout_ms": { "type": "integer", "description": "Maximum time to wait for user input in milliseconds (default: 5000, range: 1000-30000)" },
+        "prompt_hint": { "type": "string", "description": "Optional hint about what you're waiting for (e.g., 'waiting for your answer...')" }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "listen_and_summarize",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Start or stop voice recording with Granite Speech STT transcription and speaker detection. Call with {\"action\":\"start\"} to begin recording (user will use /stoptranscribe command to end), or {\"action\":\"stop\"} to get the final transcript with speaker labels. Transcript will be automatically stored in memory.",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "enum": ["start", "stop", "status"], "description": "Action to perform: start recording, stop and get transcript, or check status" }
+      },
+      "required": ["action"]
+    }
+  }
+]

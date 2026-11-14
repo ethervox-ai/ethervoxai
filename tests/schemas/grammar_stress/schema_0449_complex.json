@@ -1,0 +1,124 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field_0": {
+            "type": "boolean"
+          },
+          "field_1": {
+            "type": "number"
+          },
+          "field_2": {
+            "type": "string"
+          },
+          "field_3": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "field_0",
+          "field_1",
+          "field_2",
+          "field_3"
+        ]
+      },
+      "minItems": 2
+    },
+    "field_1": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "number"
+          }
+        ]
+      }
+    },
+    "field_2": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 85,
+        "maximum": 693
+      }
+    },
+    "field_3": {
+      "type": "number",
+      "minimum": 58,
+      "maximum": 252
+    },
+    "field_4": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "field_1": {
+          "type": "string"
+        },
+        "field_2": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "boolean"
+            },
+            "field_1": {
+              "type": "integer"
+            }
+          }
+        },
+        "field_3": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "string"
+            },
+            "field_1": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "field_0",
+            "field_1"
+          ]
+        },
+        "field_4": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "field_5": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          }
+        }
+      },
+      "required": [
+        "field_1",
+        "field_2",
+        "field_4",
+        "field_5"
+      ]
+    }
+  },
+  "required": [
+    "field_3",
+    "field_4"
+  ]
+}

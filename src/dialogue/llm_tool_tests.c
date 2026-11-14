@@ -12,7 +12,7 @@
  * These tests ensure prompts are working and the model isn't hallucinating.
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include <ctype.h>
@@ -328,8 +328,10 @@ static const char* signal_name(int sig) {
       return "SIGFPE (Floating Point Exception)";
     case SIGILL:
       return "SIGILL (Illegal Instruction)";
+#ifdef SIGBUS  // not defined on Windows
     case SIGBUS:
       return "SIGBUS (Bus Error)";
+#endif
     default:
       return "Unknown Signal";
   }
@@ -422,7 +424,9 @@ static void install_crash_handlers(void) {
   signal(SIGABRT, crash_handler);
   signal(SIGFPE, crash_handler);
   signal(SIGILL, crash_handler);
+#ifdef SIGBUS
   signal(SIGBUS, crash_handler);
+#endif
   signal(SIGINT, interrupt_handler);  // Ctrl+C handler
 }
 
@@ -431,7 +435,9 @@ static void remove_crash_handlers(void) {
   signal(SIGABRT, SIG_DFL);
   signal(SIGFPE, SIG_DFL);
   signal(SIGILL, SIG_DFL);
+#ifdef SIGBUS
   signal(SIGBUS, SIG_DFL);
+#endif
   signal(SIGINT, SIG_DFL);
 }
 
@@ -507,7 +513,7 @@ static void test_llm_memory_add(ethervox_governor_t* governor) {
   report_debug("Executing query: %s", query);
 
   ethervox_governor_status_t status = ethervox_governor_execute(
-      governor, query, &response, &error, NULL, track_tool_progress, NULL, NULL);
+      governor, query, NULL, &response, &error, NULL, track_tool_progress, NULL, NULL, NULL);
 
   report_debug("Governor status: %d", status);
   if (response) {
@@ -563,8 +569,8 @@ static void test_llm_memory_search(ethervox_governor_t* governor) {
   char* setup_error = NULL;
 
   LLM_TEST_INFO("Setup: \"%s\"", setup_query);
-  ethervox_governor_execute(governor, setup_query, &setup_response, &setup_error, NULL,
-                            track_tool_progress, NULL, NULL);
+  ethervox_governor_execute(governor, setup_query, NULL, &setup_response, &setup_error, NULL,
+                            track_tool_progress, NULL, NULL, NULL);
   if (setup_response)
     free(setup_response);
   if (setup_error)
@@ -595,7 +601,7 @@ static void test_llm_memory_search(ethervox_governor_t* governor) {
       "Memory should contain 'blue' from setup query (stored in persistent DB, not context)");
 
   ethervox_governor_status_t status = ethervox_governor_execute(
-      governor, query, &response, &error, NULL, track_tool_progress, NULL, NULL);
+      governor, query, NULL, &response, &error, NULL, track_tool_progress, NULL, NULL, NULL);
 
   report_debug("Governor status: %d", status);
   if (response)
@@ -652,7 +658,7 @@ static void test_llm_calculator(ethervox_governor_t* governor) {
   report_debug("Executing query: %s", query);
 
   ethervox_governor_status_t status = ethervox_governor_execute(
-      governor, query, &response, &error, NULL, track_tool_progress, NULL, NULL);
+      governor, query, NULL, &response, &error, NULL, track_tool_progress, NULL, NULL, NULL);
 
   report_debug("Governor status: %d", status);
   if (response)
@@ -714,7 +720,7 @@ static void test_llm_memory_correction(ethervox_governor_t* governor) {
   report_debug("Executing query: %s", query);
 
   ethervox_governor_status_t status = ethervox_governor_execute(
-      governor, query, &response, &error, NULL, track_tool_progress, NULL, NULL);
+      governor, query, NULL, &response, &error, NULL, track_tool_progress, NULL, NULL, NULL);
 
   report_debug("Governor status: %d", status);
   if (response)
@@ -770,7 +776,7 @@ static void test_llm_memory_tags(ethervox_governor_t* governor) {
   char* error = NULL;
 
   LLM_TEST_INFO("Setup: \"%s\"", setup_query);
-  ethervox_governor_execute(governor, setup_query, &response, &error, NULL, track_tool_progress,
+  ethervox_governor_execute(governor, setup_query, NULL, &response, &error, NULL, track_tool_progress, NULL,
                             NULL, NULL);
   if (response)
     free(response);
@@ -787,7 +793,7 @@ static void test_llm_memory_tags(ethervox_governor_t* governor) {
   report_debug("Executing query: %s", query);
 
   ethervox_governor_status_t status = ethervox_governor_execute(
-      governor, query, &response, &error, NULL, track_tool_progress, NULL, NULL);
+      governor, query, NULL, &response, &error, NULL, track_tool_progress, NULL, NULL, NULL);
 
   report_debug("Governor status: %d", status);
   if (response)
@@ -843,7 +849,7 @@ static void test_llm_multi_tool(ethervox_governor_t* governor) {
   report_debug("Executing query: %s", query);
 
   ethervox_governor_status_t status = ethervox_governor_execute(
-      governor, query, &response, &error, NULL, track_tool_progress, NULL, NULL);
+      governor, query, NULL, &response, &error, NULL, track_tool_progress, NULL, NULL, NULL);
 
   report_debug("Governor status: %d", status);
   if (response)
@@ -938,7 +944,7 @@ static void test_llm_model_lifecycle(const char* model_path) {
 
   // Test 2: Load model
   LLM_TEST_INFO("Loading model: %s", model_path);
-  if (ethervox_governor_load_model(test_governor, model_path, NULL, NULL, NULL) != 0) {
+  if (ethervox_governor_load_model(test_governor, model_path, NULL, NULL, NULL, NULL) != 0) {
     LLM_TEST_FAIL("Failed to load model");
     ethervox_governor_cleanup(test_governor);
     ethervox_tool_registry_cleanup(&test_registry);
@@ -958,7 +964,7 @@ static void test_llm_model_lifecycle(const char* model_path) {
   report_debug("Executing lifecycle test query: %s", test_query);
 
   ethervox_governor_status_t status = ethervox_governor_execute(
-      test_governor, test_query, &response, &error, NULL, NULL, NULL, NULL);
+      test_governor, test_query, NULL, &response, &error, NULL, NULL, NULL, NULL, NULL);
 
   report_debug("Lifecycle test status: %d", status);
   if (response)
@@ -1099,7 +1105,7 @@ static void test_llm_long_runtime(ethervox_governor_t* governor) {
 
     // Execute query with crash protection
     ethervox_governor_status_t status =
-        ethervox_governor_execute(governor, query, &response, &error, NULL, NULL, NULL, NULL);
+        ethervox_governor_execute(governor, query, NULL, &response, &error, NULL, NULL, NULL, NULL, NULL);
 
     report_debug("Stress test query #%d status: %d", total_queries + 1, status);
     if (response)
@@ -1229,7 +1235,7 @@ static void test_context_window_management(ethervox_governor_t* governor) {
     char* error = NULL;
 
     ethervox_governor_status_t status =
-        ethervox_governor_execute(governor, query, &response, &error, NULL, NULL, NULL, NULL);
+        ethervox_governor_execute(governor, query, NULL, &response, &error, NULL, NULL, NULL, NULL, NULL);
 
     report_debug("Context test turn %d status: %d", i + 1, status);
     if (response)
@@ -1290,7 +1296,7 @@ static void test_llm_startup_prompt_tools(ethervox_governor_t* governor) {
   LLM_TEST_INFO("Setup: \"%s\"", read_query);
 
   ethervox_governor_status_t status = ethervox_governor_execute(
-      governor, read_query, &response, &error, NULL, track_tool_progress, NULL, NULL);
+      governor, read_query, NULL, &response, &error, NULL, track_tool_progress, NULL, NULL, NULL);
 
   if (status == ETHERVOX_GOVERNOR_SUCCESS) {
     if (was_tool_called("startup_prompt_read")) {
@@ -1322,8 +1328,8 @@ static void test_llm_startup_prompt_tools(ethervox_governor_t* governor) {
   LLM_TEST_INFO("Query: \"%s\"", write_query);
   report_debug("Executing query: %s", write_query);
 
-  status = ethervox_governor_execute(governor, write_query, &response, &error, NULL,
-                                     track_tool_progress, NULL, NULL);
+  status = ethervox_governor_execute(governor, write_query, NULL, &response, &error, NULL,
+                                     track_tool_progress, NULL, NULL, NULL);
 
   report_debug("Governor status: %d", status);
   if (response)
@@ -1370,8 +1376,8 @@ static void test_llm_startup_prompt_tools(ethervox_governor_t* governor) {
   const char* verify_query = "What is the current startup prompt?";
   LLM_TEST_INFO("Verify: \"%s\"", verify_query);
 
-  status = ethervox_governor_execute(governor, verify_query, &response, &error, NULL,
-                                     track_tool_progress, NULL, NULL);
+  status = ethervox_governor_execute(governor, verify_query, NULL, &response, &error, NULL,
+                                     track_tool_progress, NULL, NULL, NULL);
 
   if (status == ETHERVOX_GOVERNOR_SUCCESS) {
     if (response && strstr(response, "EthervoxAI Test Assistant")) {
@@ -1403,8 +1409,8 @@ static void test_llm_startup_prompt_tools(ethervox_governor_t* governor) {
     snprintf(restore_query, sizeof(restore_query), "Restore the startup prompt to: %s",
              original_prompt);
 
-    status = ethervox_governor_execute(governor, restore_query, &response, &error, NULL,
-                                       track_tool_progress, NULL, NULL);
+    status = ethervox_governor_execute(governor, restore_query, NULL, &response, &error, NULL,
+                                       track_tool_progress, NULL, NULL, NULL);
 
     if (status == ETHERVOX_GOVERNOR_SUCCESS && was_tool_called("startup_prompt_update")) {
       LLM_TEST_PASS("Original startup prompt restored");
@@ -1622,7 +1628,7 @@ void run_llm_tool_tests(ethervox_governor_t* governor, ethervox_memory_store_t* 
   char* test_response = NULL;
   char* test_error = NULL;
   ethervox_governor_status_t test_status = ethervox_governor_execute(
-      governor, test_query, &test_response, &test_error, NULL, track_tool_progress, NULL, NULL);
+      governor, test_query, NULL, &test_response, &test_error, NULL, track_tool_progress, NULL, NULL, NULL);
 
   if (test_status == ETHERVOX_GOVERNOR_SUCCESS ||
       test_status == ETHERVOX_GOVERNOR_NEED_CLARIFICATION) {

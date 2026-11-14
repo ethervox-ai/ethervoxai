@@ -10,8 +10,8 @@
  */
 
 #include "ethervox/memory_tools.h"
+#include "test_utils.h"
 #include "ethervox/error.h"
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,15 +20,15 @@ void test_privacy_mode_toggle(void) {
     printf("Testing privacy mode toggle...\n");
     
     // Initially should be disabled (normal mode)
-    assert(ethervox_memory_get_privacy_mode() == false);
+    CHECK(ethervox_memory_get_privacy_mode() == false);
     
     // Enable secret mode
     ethervox_memory_set_privacy_mode(true);
-    assert(ethervox_memory_get_privacy_mode() == true);
+    CHECK(ethervox_memory_get_privacy_mode() == true);
     
     // Disable secret mode
     ethervox_memory_set_privacy_mode(false);
-    assert(ethervox_memory_get_privacy_mode() == false);
+    CHECK(ethervox_memory_get_privacy_mode() == false);
     
     printf("  ✓ Privacy mode toggle works\n");
 }
@@ -46,8 +46,8 @@ void test_secret_mode_prevents_logging(void) {
     ethervox_memory_set_privacy_mode(false);
     int result = ethervox_memory_store_add(&store, "Normal mode message",
                                           tags, 2, 0.8f, true, &memory_id);
-    assert(result == 0);
-    assert(store.entry_count == 1);
+    CHECK(result == 0);
+    CHECK(store.entry_count == 1);
     
     // Enable secret mode
     ethervox_memory_set_privacy_mode(true);
@@ -57,15 +57,15 @@ void test_secret_mode_prevents_logging(void) {
                                       tags, 2, 0.8f, true, &memory_id);
     
     // Should succeed (to not disrupt LLM flow) but not actually store
-    assert(result == 0);
+    CHECK(result == 0);
     
     // Memory count should still be 1 (secret message not stored)
-    assert(store.entry_count == 1);
+    CHECK(store.entry_count == 1);
     
     // Verify only the normal mode message is present
     const ethervox_memory_entry_t* entry;
-    assert(ethervox_memory_get_by_id(&store, 0, &entry) == 0);
-    assert(strcmp(entry->text, "Normal mode message") == 0);
+    CHECK(ethervox_memory_get_by_id(&store, 0, &entry) == 0);
+    CHECK(strcmp(entry->text, "Normal mode message") == 0);
     
     // Restore normal mode
     ethervox_memory_set_privacy_mode(false);
@@ -85,22 +85,22 @@ void test_secret_mode_state_restoration(void) {
     
     // Save original state (should be false)
     bool original_state = ethervox_memory_get_privacy_mode();
-    assert(original_state == false);
+    CHECK(original_state == false);
     
     // Enable secret mode temporarily
     ethervox_memory_set_privacy_mode(true);
     
     // Add memory in secret mode (should not be stored)
     ethervox_memory_store_add(&store, "Secret message", tags, 1, 0.5f, true, &id);
-    assert(store.entry_count == 0);
+    CHECK(store.entry_count == 0);
     
     // Restore original state
     ethervox_memory_set_privacy_mode(original_state);
-    assert(ethervox_memory_get_privacy_mode() == false);
+    CHECK(ethervox_memory_get_privacy_mode() == false);
     
     // Now add in normal mode (should be stored)
     ethervox_memory_store_add(&store, "Normal message", tags, 1, 0.5f, true, &id);
-    assert(store.entry_count == 1);
+    CHECK(store.entry_count == 1);
     
     ethervox_memory_cleanup(&store);
     printf("  ✓ Secret mode state restoration works\n");
@@ -119,7 +119,7 @@ void test_secret_mode_search_behavior(void) {
     ethervox_memory_set_privacy_mode(false);
     ethervox_memory_store_add(&store, "Normal memory 1", tags, 1, 0.8f, true, &id);
     ethervox_memory_store_add(&store, "Normal memory 2", tags, 1, 0.7f, true, &id);
-    assert(store.entry_count == 2);
+    CHECK(store.entry_count == 2);
     
     // Enable secret mode
     ethervox_memory_set_privacy_mode(true);
@@ -129,18 +129,18 @@ void test_secret_mode_search_behavior(void) {
     uint32_t count = 0;
     
     ethervox_memory_search(&store, "Normal", NULL, 0, 10, &results, &count);
-    assert(count == 2);
+    CHECK(count == 2);
     free(results);
     
     // Try to add a memory in secret mode
     ethervox_memory_store_add(&store, "Secret search test", tags, 1, 0.9f, true, &id);
     
     // Memory count should still be 2 (secret one not added)
-    assert(store.entry_count == 2);
+    CHECK(store.entry_count == 2);
     
     // Search again - should only find the original 2
     ethervox_memory_search(&store, "memory", NULL, 0, 10, &results, &count);
-    assert(count == 2);
+    CHECK(count == 2);
     free(results);
     
     // Restore normal mode
@@ -170,8 +170,8 @@ void test_secret_mode_tool_execution(void) {
                                           tags, 1, 0.5f, false, &id);
     
     // Should succeed (tool doesn't fail) but not actually store
-    assert(result == 0);
-    assert(store.entry_count == 0);
+    CHECK(result == 0);
+    CHECK(store.entry_count == 0);
     
     // Disable secret mode
     ethervox_memory_set_privacy_mode(false);
@@ -179,8 +179,8 @@ void test_secret_mode_tool_execution(void) {
     // Now tool execution should store
     result = ethervox_memory_store_add(&store, "Tool result in normal mode",
                                       tags, 1, 0.5f, false, &id);
-    assert(result == 0);
-    assert(store.entry_count == 1);
+    CHECK(result == 0);
+    CHECK(store.entry_count == 1);
     
     ethervox_memory_cleanup(&store);
     printf("  ✓ Secret mode tool execution works\n");
@@ -199,7 +199,7 @@ void test_secret_mode_multiple_toggles(void) {
     for (int i = 0; i < 10; i++) {
         bool enable = (i % 2 == 0);
         ethervox_memory_set_privacy_mode(enable);
-        assert(ethervox_memory_get_privacy_mode() == enable);
+        CHECK(ethervox_memory_get_privacy_mode() == enable);
         
         // Try to store
         char msg[64];
@@ -208,7 +208,7 @@ void test_secret_mode_multiple_toggles(void) {
     }
     
     // Should have 5 entries (odd iterations had secret mode off)
-    assert(store.entry_count == 5);
+    CHECK(store.entry_count == 5);
     
     // Verify correct messages were stored (odd indices: 1, 3, 5, 7, 9)
     for (uint32_t i = 0; i < store.entry_count; i++) {
@@ -220,7 +220,7 @@ void test_secret_mode_multiple_toggles(void) {
         sscanf(entry->text, "Message %d", &msg_num);
         
         // Should be odd numbers only
-        assert(msg_num % 2 == 1);
+        CHECK(msg_num % 2 == 1);
     }
     
     // Ensure we're in normal mode at the end

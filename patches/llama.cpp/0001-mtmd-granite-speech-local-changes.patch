@@ -1,0 +1,103 @@
+diff --git a/tools/mtmd/clip-impl.h b/tools/mtmd/clip-impl.h
+index 701dde5c6..dcc4621c8 100644
+--- a/tools/mtmd/clip-impl.h
++++ b/tools/mtmd/clip-impl.h
+@@ -69,6 +69,10 @@
+ #define KEY_A_PROJ_WINDOW_SIZE     "clip.audio.projector.window_size"
+ #define KEY_A_PROJ_DOWNSAMPLE_RATE "clip.audio.projector.downsample_rate"
+ #define KEY_A_PROJ_HEAD_COUNT      "clip.audio.projector.head_count"
++// audio feature-layer concat (Granite Speech Plus's cat_hidden_layers): mirrors
++// KEY_FEATURE_LAYER's vision equivalent, used to concat an intermediate encoder
++// layer's output with the final layer's output before the projector.
++#define KEY_A_FEATURE_LAYER        "clip.audio.feature_layer"
+ 
+ 
+ //
+diff --git a/tools/mtmd/clip-model.h b/tools/mtmd/clip-model.h
+index 391e9fc8e..f38cfcdf3 100644
+--- a/tools/mtmd/clip-model.h
++++ b/tools/mtmd/clip-model.h
+@@ -98,6 +98,9 @@ struct clip_hparams {
+     int32_t audio_proj_window_size     = 0;
+     int32_t audio_proj_downsample_rate = 0;
+     int32_t audio_proj_head_count      = 0;
++    // granite-speech-plus: intermediate encoder layer(s) whose output is concatenated
++    // with the final layer's output (feature-dim) before the projector.
++    std::unordered_set<int32_t> audio_feature_layer;
+ 
+     // audio-to-mel preprocessor params
+     int32_t audio_chunk_len   = -1; // in seconds
+diff --git a/tools/mtmd/clip.cpp b/tools/mtmd/clip.cpp
+index f35ae9fe3..d6ddca791 100644
+--- a/tools/mtmd/clip.cpp
++++ b/tools/mtmd/clip.cpp
+@@ -1520,6 +1520,15 @@ struct clip_model_loader {
+                         get_u32(KEY_A_PROJ_WINDOW_SIZE,     hparams.audio_proj_window_size);
+                         get_u32(KEY_A_PROJ_DOWNSAMPLE_RATE, hparams.audio_proj_downsample_rate);
+                         get_u32(KEY_A_PROJ_HEAD_COUNT,      hparams.audio_proj_head_count);
++
++                        // Granite Speech Plus (cat_hidden_layers): projector's cross-attention
++                        // K/V expect the encoder output concatenated with one or more
++                        // intermediate layer outputs (feature dim), per clip.audio.feature_layer.
++                        std::vector<int> audio_feature_layer;
++                        get_arr_int(KEY_A_FEATURE_LAYER, audio_feature_layer, false);
++                        for (auto & l : audio_feature_layer) {
++                            hparams.audio_feature_layer.insert(l);
++                        }
+                     } break;
+                 case PROJECTOR_TYPE_JANUS_PRO:
+                     {
+diff --git a/tools/mtmd/models/granite-speech.cpp b/tools/mtmd/models/granite-speech.cpp
+index c7e3794a4..3315f243a 100644
+--- a/tools/mtmd/models/granite-speech.cpp
++++ b/tools/mtmd/models/granite-speech.cpp
+@@ -31,10 +31,23 @@ ggml_cgraph * clip_graph_granite_speech::build() {
+     cur = ggml_add(ctx0, cur, model.inp_proj_b);
+     cb(cur, "inp_linear", -1);
+ 
++    // Granite Speech Plus (cat_hidden_layers): capture the configured intermediate
++    // layer's output (llava.cpp's vision_feature_layer convention - captured BEFORE
++    // layer `il` runs, i.e. after `il` layers have already completed) to concat with
++    // the final encoder output before the projector. See
++    // /memories/repo/ethervoxai-android-granite-speech-plus-crash.md for the
++    // confirmed reference (transformers' GraniteSpeechPlusCTCEncoder.forward()).
++    const auto & audio_feature_layer = hparams.audio_feature_layer;
++    std::vector<ggml_tensor *> feature_layer_stack;
++
+     for (int il = 0; il < n_layer; il++) {
+         const auto & layer = model.layers[il];
+         auto * residual = cur;
+ 
++        if (audio_feature_layer.find(il) != audio_feature_layer.end()) {
++            feature_layer_stack.push_back(cur);
++        }
++
+         // ffn1 (half-step)
+         {
+             auto * ffn1 = build_norm(cur, layer.ff_norm_w, layer.ff_norm_b,
+@@ -182,6 +195,16 @@ ggml_cgraph * clip_graph_granite_speech::build() {
+ 
+     cb(cur, "encoder_out", -1);
+ 
++    // Concat captured intermediate layer(s) with the final output, in capture order,
++    // matching torch.cat([*exported_hidden_states, hidden_states], dim=-1).
++    if (!feature_layer_stack.empty()) {
++        for (auto * captured : feature_layer_stack) {
++            cur = ggml_concat(ctx0, captured, cur, 0);
++        }
++        cb(cur, "encoder_out_cat", -1);
++    }
++    const int enc_embd = n_embd * (int(feature_layer_stack.size()) + 1);
++
+     // QFormer projector
+     {
+         const int window_size     = hparams.audio_proj_window_size;
+@@ -197,7 +220,7 @@ ggml_cgraph * clip_graph_granite_speech::build() {
+             cur = ggml_pad(ctx0, cur, 0, padded_proj - n_frames, 0, 0);
+         }
+ 
+-        ggml_tensor * enc_windows = ggml_reshape_3d(ctx0, cur, n_embd, window_size, nblocks_proj);
++        ggml_tensor * enc_windows = ggml_reshape_3d(ctx0, cur, enc_embd, window_size, nblocks_proj);
+ 
+         ggml_tensor * queries = build_norm(model.qf_proj_query,
+             model.qf_proj_norm_w, model.qf_proj_norm_b,

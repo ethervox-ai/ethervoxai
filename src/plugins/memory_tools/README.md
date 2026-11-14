@@ -274,6 +274,6 @@ ethervox_memory_init(&memory, "my-session-id", "/var/ethervox/sessions");
 ## License
 
 Copyright (c) 2024-2025 EthervoxAI Team  
-SPDX-License-Identifier: CC-BY-NC-SA-4.0
+SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
 
-This file is part of EthervoxAI, licensed under CC BY-NC-SA 4.0.
+This file is part of EthervoxAI. Proprietary and confidential. See LICENSE.

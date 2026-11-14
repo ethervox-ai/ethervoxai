@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20
+    }
+  },
+  "required": [
+    "field_0"
+  ]
+}

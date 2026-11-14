@@ -1,0 +1,19 @@
+[
+  {
+    "name": "unit_convert",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Convert between scientific and engineering units. Supports: temperature (celsius/fahrenheit/kelvin/rankine), length (meter/km/mile/foot/inch/yard/etc), mass (kg/gram/pound/ounce/ton/stone/etc), volume (liter/gallon/quart/pint/cup/ml/etc), speed (m/s/km/h/mph/knot/mach/etc), pressure (pascal/bar/psi/atm/torr/mmHg/etc), energy (joule/calorie/kWh/BTU/eV/etc), power (watt/hp/BTU/h/etc), area (m\u00b2/km\u00b2/acre/hectare/sq ft/etc), data (byte/KB/MB/GB/bit/etc). Example: Convert 100 celsius to fahrenheit, or 5 miles to kilometers. Always provide value, from_unit, and to_unit.",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "value": { "type": "number", "description": "The numeric value to convert" },
+        "from": { "type": "string", "description": "Source unit (e.g., 'celsius', 'mile', 'kg')" },
+        "from_unit": { "type": "string", "description": "Source unit (alternative to 'from')" },
+        "to": { "type": "string", "description": "Target unit (e.g., 'fahrenheit', 'km', 'pound')" },
+        "to_unit": { "type": "string", "description": "Target unit (alternative to 'to')" }
+      },
+      "required": ["value"]
+    }
+  }
+]

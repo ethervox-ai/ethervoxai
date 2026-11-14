@@ -4,11 +4,13 @@
  * @brief Context management tool registration and wrapper
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/context_tools.h"
 #include "ethervox/config.h"
+#include "ethervox/tool_catalogue.h"
+#include "context_tools_catalogue.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -188,42 +190,15 @@ ethervox_result_t register_context_manage_tool(
     // This will be set externally or we need a different approach
     
     ethervox_tool_t tool = {
-        .name = "context_manage",
-        .description = "Manage context window when running low on space. "
-                      "CRITICAL: You MUST call this when context usage exceeds 80%. "
-                      "Choose action based on situation: summarize_old (best - preserves info), "
-                      "shift_window (fast - drops old), prune_unimportant (selective).",
-        .parameters_json_schema = 
-            "{"
-            "\"type\": \"object\","
-            "\"properties\": {"
-            "  \"action\": {"
-            "    \"type\": \"string\","
-            "    \"enum\": [\"summarize_old\", \"shift_window\", \"prune_unimportant\"],"
-            "    \"description\": \"Management action to perform\""
-            "  },"
-            "  \"keep_last_n_turns\": {"
-            "    \"type\": \"integer\","
-            "    \"minimum\": 5,"
-            "    \"maximum\": 50,"
-            "    \"default\": 10,"
-            "    \"description\": \"Number of recent turns to keep verbatim\""
-            "  },"
-            "  \"summary_detail\": {"
-            "    \"type\": \"string\","
-            "    \"enum\": [\"brief\", \"moderate\", \"detailed\"],"
-            "    \"default\": \"moderate\","
-            "    \"description\": \"Summary detail level\""
-            "  }"
-            "},"
-            "\"required\": [\"action\"]"
-            "}",
+        .test_scenario = "Manage the conversation context",
         .execute = context_manage_execute,
         .is_deterministic = false,
         .requires_confirmation = false,
         .is_stateful = true,
         .estimated_latency_ms = 500.0f
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_CONTEXT_TOOLS_JSON, "context_manage",
+        ethervox_tool_catalogue_build_profile(), &tool);
     
     return ethervox_tool_registry_add(registry, &tool);
 }

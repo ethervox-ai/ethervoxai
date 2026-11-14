@@ -5,7 +5,7 @@
  * Cross-platform TUI settings interface using ncurses (macOS/Linux) or PDCurses (Windows).
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/settings_menu.h"
@@ -14,9 +14,8 @@
 #include "ethervox/settings.h"
 #include "ethervox/logging.h"
 #include "ethervox/governor.h"
-#include "ethervox/tts.h"
+#include "ethervox/tts_host.h"
 #include "ethervox/audio.h"
-#include "../tts/phonemizer/pronunciation_overrides.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -558,122 +557,15 @@ static int action_select_tts_voice(void* data) {
             
             // Handle arrow keys and commands
             if (strlen(input) == 0 || strcmp(input, "\n") == 0 || strcmp(input, " ") == 0) {
-                // ENTER or SPACE: test current voice
+                // ENTER or SPACE: test current voice (REMOVED - TASK-C1.0)
                 voice_option_t* test_voice = &voices[selected_idx];
                 
-                printf("\n🔊 Testing: %s\n", test_voice->display_name);
-                printf("   \"%s\"\n\n", test_voice->test_sentence);
-                
-                // Build model path for test
-                char test_model_path[512];
-                const char* home = getenv("HOME");
-                if (home) {
-                    snprintf(test_model_path, sizeof(test_model_path),
-                            "%s/.ethervox/models/piper/%s", home, test_voice->model_filename);
-                    
-                    // Create TTS context with test model
-                    ethervox_tts_config_t test_config = {
-                        .backend = ETHERVOX_TTS_BACKEND_PIPER,
-                        .model_path = test_model_path,
-                        .sample_rate = 16000,
-                        .channels = 1,
-                        .speaking_rate = settings->tts.speed,
-                        .phoneme_variance = settings->tts.phoneme_variance,
-                        .prosody_variance = settings->tts.prosody_variance
-                    };
-                    
-                    ethervox_tts_context_t* test_tts = ethervox_tts_create(&test_config);
-                    if (test_tts) {
-                        printf("Model: %s\n", test_voice->model_filename);
-                        printf("Expected language: %s\n", test_voice->lang_code);
-                        printf("Synthesizing audio...\n");
-                        
-                        ethervox_tts_audio_t audio = {0};
-                        ethervox_result_t result = ethervox_tts_synthesize_text(test_tts, test_voice->test_sentence, &audio);
-                        
-                        if (ethervox_is_success(result) && audio.samples && audio.sample_count > 0) {
-                            printf("Playing %zu samples (%d Hz)...\n", audio.sample_count, audio.sample_rate);
-                            
-                            // Initialize audio runtime for playback
-                            ethervox_audio_runtime_t audio_runtime = {0};
-                            ethervox_audio_config_t audio_config = {
-                                .sample_rate = audio.sample_rate,
-                                .channels = audio.channels,
-                                .bits_per_sample = 16,
-                                .buffer_size = 1024,
-                                .enable_noise_suppression = false,
-                                .enable_echo_cancellation = false
-                            };
-                            
-                            // Register platform driver before initializing
-                            if (ethervox_audio_register_platform_driver(&audio_runtime) == 0 &&
-                                ethervox_audio_init(&audio_runtime, &audio_config) == 0) {
-                                // Convert float samples to int16_t for playback
-                                int16_t* int16_samples = (int16_t*)malloc(audio.sample_count * sizeof(int16_t));
-                                if (int16_samples) {
-                                    // Find peak amplitude for normalization (Piper's approach)
-                                    float max_abs_value = 0.01f;  // Minimum to avoid division by zero
-                                    for (size_t i = 0; i < audio.sample_count; i++) {
-                                        float abs_value = fabsf(audio.samples[i]);
-                                        if (abs_value > max_abs_value) {
-                                            max_abs_value = abs_value;
-                                        }
-                                    }
-                                    
-                                    // Calculate scaling factor to use full 16-bit range
-                                    float audio_scale = 32767.0f / max_abs_value;
-                                    printf("[Audio] Normalizing with scale factor: %.2f (peak: %.4f)\n", 
-                                           audio_scale, max_abs_value);
-                                    
-                                    // Convert with normalization
-                                    for (size_t i = 0; i < audio.sample_count; i++) {
-                                        float scaled = audio.samples[i] * audio_scale;
-                                        // Clamp to int16 range
-                                        if (scaled > 32767.0f) scaled = 32767.0f;
-                                        if (scaled < -32768.0f) scaled = -32768.0f;
-                                        int16_samples[i] = (int16_t)scaled;
-                                    }
-                                    
-                                    // Create audio buffer for playback
-                                    ethervox_audio_buffer_t play_buffer = {
-                                        .data = (float*)int16_samples,
-                                        .size = audio.sample_count * sizeof(int16_t),
-                                        .channels = audio.channels,
-                                        .timestamp_us = 0
-                                    };
-                                    
-                                    int play_result = audio_runtime.driver.write_audio(&audio_runtime, &play_buffer);
-                                    if (play_result == 0) {
-                                        printf("[OK] Audio played successfully\n");
-                                        // Wait for audio to finish playing
-                                        usleep((audio.sample_count * 1000000) / audio.sample_rate + 500000);
-                                    } else {
-                                        printf("⚠ Failed to play audio (error %d)\n", play_result);
-                                    }
-                                    
-                                    free(int16_samples);
-                                } else {
-                                    printf("⚠ Failed to allocate audio conversion buffer\n");
-                                }
-                                
-                                ethervox_audio_cleanup(&audio_runtime);
-                            } else {
-                                printf("⚠ Failed to initialize audio for playback\n");
-                            }
-                            
-                            ethervox_tts_audio_free(&audio);
-                        } else {
-                            printf("⚠ Failed to synthesize test sentence (error %d)\n", result);
-                            printf("   Check that model exists: %s\n", test_model_path);
-                        }
-                        ethervox_tts_destroy(test_tts);
-                    } else {
-                        printf("⚠ Failed to initialize TTS for testing\n");
-                        printf("   Model: %s\n", test_model_path);
-                    }
-                } else {
-                    printf("⚠ Cannot determine model path (HOME not set)\n");
-                }
+                printf("\n🔊 Voice Testing No Longer Available\n");
+                printf("   Selected: %s\n", test_voice->display_name);
+                printf("   Test sentence: \"%s\"\n\n", test_voice->test_sentence);
+                printf("Piper TTS has been removed. TTS is now handled via platform-specific\n");
+                printf("implementations (AVSpeechSynthesizer, android.speech.tts, etc.).\n");
+                printf("Voice testing must be done through the platform's TTS settings.\n");
                 
                 printf("\nPress Enter to continue...");
                 fgets(input, sizeof(input), stdin);
@@ -795,68 +687,15 @@ static int action_select_tts_voice(void* data) {
                     printf("   \"%s\"\n\n", test_voice->test_sentence);
                     
                     // Build model path for test (reuse the code above)
-                    char test_model_path[512];
-                    const char* home = getenv("HOME");
-                    if (home) {
-                        snprintf(test_model_path, sizeof(test_model_path),
-                                "%s/.ethervox/models/piper/%s", home, test_voice->model_filename);
-                        
-                        ethervox_tts_config_t test_config = {
-                            .backend = ETHERVOX_TTS_BACKEND_PIPER,
-                            .model_path = test_model_path,
-                            .sample_rate = 16000,
-                            .channels = 1,
-                            .speaking_rate = settings->tts.speed,
-                            .phoneme_variance = settings->tts.phoneme_variance,
-                            .prosody_variance = settings->tts.prosody_variance
-                        };
-                        
-                        ethervox_tts_context_t* test_tts = ethervox_tts_create(&test_config);
-                        if (test_tts) {
-                            ethervox_tts_audio_t audio = {0};
-                            ethervox_result_t result = ethervox_tts_synthesize_text(test_tts, test_voice->test_sentence, &audio);
-                            
-                            if (result == 0 && audio.samples && audio.sample_count > 0) {
-                                ethervox_audio_runtime_t audio_runtime = {0};
-                                ethervox_audio_config_t audio_config = {
-                                    .sample_rate = audio.sample_rate,
-                                    .channels = audio.channels,
-                                    .bits_per_sample = 16,
-                                    .buffer_size = 1024
-                                };
-                                
-                                if (ethervox_audio_register_platform_driver(&audio_runtime) == 0 &&
-                                    ethervox_audio_init(&audio_runtime, &audio_config) == 0) {
-                                    int16_t* int16_samples = (int16_t*)malloc(audio.sample_count * sizeof(int16_t));
-                                    if (int16_samples) {
-                                        float max_abs_value = 0.01f;
-                                        for (size_t i = 0; i < audio.sample_count; i++) {
-                                            float abs_value = fabsf(audio.samples[i]);
-                                            if (abs_value > max_abs_value) max_abs_value = abs_value;
-                                        }
-                                        float audio_scale = 32767.0f / max_abs_value;
-                                        for (size_t i = 0; i < audio.sample_count; i++) {
-                                            float scaled = audio.samples[i] * audio_scale;
-                                            if (scaled > 32767.0f) scaled = 32767.0f;
-                                            if (scaled < -32768.0f) scaled = -32768.0f;
-                                            int16_samples[i] = (int16_t)scaled;
-                                        }
-                                        ethervox_audio_buffer_t play_buffer = {
-                                            .data = (float*)int16_samples,
-                                            .size = audio.sample_count * sizeof(int16_t),
-                                            .channels = audio.channels
-                                        };
-                                        audio_runtime.driver.write_audio(&audio_runtime, &play_buffer);
-                                        usleep((audio.sample_count * 1000000) / audio.sample_rate + 500000);
-                                        free(int16_samples);
-                                    }
-                                    ethervox_audio_cleanup(&audio_runtime);
-                                }
-                                ethervox_tts_audio_free(&audio);
-                            }
-                            ethervox_tts_destroy(test_tts);
-                        }
-                    }
+                    // Voice testing removed (TASK-C1.0)
+                    printf("\n⚠️  Voice testing via Piper TTS is no longer available.\n");
+                    printf("TTS is now handled via platform-specific implementations.\n");
+                    printf("Use your platform's TTS settings to test voices.\n\n");
+                    printf("Selected: %s\n", test_voice->display_name);
+                    printf("Test sentence: \"%s\"\n", test_voice->test_sentence);
+                    
+                    printf("\nPress Enter to continue...");
+                    getchar();
                     printf("\nPress Enter to continue...");
                     fgets(input, sizeof(input), stdin);
                 } else {
@@ -916,35 +755,20 @@ static int action_view_info(void* data) {
     return ETHERVOX_SUCCESS;
 }
 
-// Action: Reset pronunciation overrides
+// Action: Reset pronunciation overrides - REMOVED (TASK-C1.0, phonemizer deleted)
+// TTS is now handled via ethervox_tts_host_t
 static int action_reset_pronunciation(void* data) {
+    (void)data;
     cleanup_display();
     
     printf("\n+===================================================================+\n");
-    printf("|               RESET PRONUNCIATION OVERRIDES                   |\n");
+    printf("|          PRONUNCIATION TRAINING NO LONGER AVAILABLE            |\n");
     printf("+===================================================================+\n\n");
     
-    printf("⚠️  This will delete all trained pronunciation corrections.\n");
-    printf("   This action cannot be undone!\n\n");
+    printf("The phonemizer and pronunciation training have been removed.\n");
+    printf("TTS is now handled via platform-specific implementations.\n\n");
     
-    printf("Are you sure you want to reset? (type 'yes' to confirm): ");
-    char confirm[32];
-    if (fgets(confirm, sizeof(confirm), stdin)) {
-        confirm[strcspn(confirm, "\n")] = 0;  // Remove newline
-        
-        if (strcmp(confirm, "yes") == 0) {
-            printf("\nResetting pronunciation overrides...\n");
-            if (pronunciation_overrides_reset() == 0) {
-                printf("\n✅ Reset complete!\n");
-            } else {
-                printf("\n❌ Reset failed (some files may not exist)\n");
-            }
-        } else {
-            printf("\n❌ Reset cancelled\n");
-        }
-    }
-    
-    printf("\nPress Enter to continue...");
+    printf("Press Enter to continue...");
     getchar();
     
     init_display();

@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "number"
+    },
+    "field_1": {
+      "type": "integer"
+    },
+    "field_2": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "field_0"
+  ]
+}

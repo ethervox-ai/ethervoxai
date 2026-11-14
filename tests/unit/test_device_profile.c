@@ -9,8 +9,8 @@
  */
 
 #include "ethervox/device_profile.h"
+#include "test_utils.h"
 #include "ethervox/logging.h"
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -39,8 +39,8 @@ static void test_cpu_cores(void) {
     int cores = ethervox_device_profile_get_cpu_cores();
     
     // Should return reasonable values (1-64 cores)
-    assert(cores >= 1);
-    assert(cores <= 64);
+    CHECK(cores >= 1);
+    CHECK(cores <= 64);
     
     printf("  ✓ Detected %d CPU cores\n", cores);
 }
@@ -55,8 +55,8 @@ static void test_ram_detection(void) {
     long total_ram_mb = ethervox_device_profile_get_total_ram_mb();
     
     // Should return reasonable values (512MB - 64GB)
-    assert(total_ram_mb >= 512);
-    assert(total_ram_mb <= 65536);
+    CHECK(total_ram_mb >= 512);
+    CHECK(total_ram_mb <= 65536);
     
     printf("  ✓ Detected %ld MB total RAM\n", total_ram_mb);
 }
@@ -71,8 +71,8 @@ static void test_device_tier(void) {
     int tier = ethervox_device_profile_get_tier();
     
     // Should return valid tier (0-3)
-    assert(tier >= 0);
-    assert(tier <= 3);
+    CHECK(tier >= 0);
+    CHECK(tier <= 3);
     
     const char* tier_names[] = {"LOW", "MEDIUM", "HIGH", "ULTRA"};
     printf("  ✓ Device classified as: %s tier\n", tier_names[tier]);
@@ -88,8 +88,8 @@ static void test_optimal_threads(void) {
     int threads = ethervox_device_profile_get_optimal_threads();
     
     // Should return reasonable thread count (2-6)
-    assert(threads >= 2);
-    assert(threads <= 6);
+    CHECK(threads >= 2);
+    CHECK(threads <= 6);
     
     printf("  ✓ Optimal threads: %d\n", threads);
 }
@@ -104,7 +104,7 @@ static void test_optimal_batch_size(void) {
     int batch = ethervox_device_profile_get_optimal_batch_size();
     
     // Should return valid batch sizes (256, 512, or 1024)
-    assert(batch == 256 || batch == 512 || batch == 1024);
+    CHECK(batch == 256 || batch == 512 || batch == 1024);
     
     printf("  ✓ Optimal batch size: %d\n", batch);
 }
@@ -119,7 +119,7 @@ static void test_optimal_kv_cache_type(void) {
     int kv_type = ethervox_device_profile_get_optimal_kv_cache_type();
     
     // Should return valid GGML type (1=F16, 7=Q8_0, 8=Q4_0)
-    assert(kv_type == 1 || kv_type == 7 || kv_type == 8);
+    CHECK(kv_type == 1 || kv_type == 7 || kv_type == 8);
     
     const char* type_names[] = {"", "F16", "", "", "", "", "", "Q8_0", "Q4_0"};
     printf("  ✓ Optimal KV cache type: %s (enum %d)\n", 
@@ -136,7 +136,7 @@ static void test_flash_attention(void) {
     bool flash = ethervox_device_profile_should_use_flash_attention();
     
     // Should return boolean
-    assert(flash == true || flash == false);
+    CHECK(flash == true || flash == false);
     
     printf("  ✓ Flash attention: %s\n", flash ? "ENABLED" : "DISABLED");
 }
@@ -158,24 +158,24 @@ static void test_tier_consistency(void) {
     // Verify tier-specific expectations
     switch (tier) {
         case 0:  // LOW
-            assert(threads == 2);
-            assert(batch == 256);
-            assert(flash == false);
+            CHECK(threads == 2);
+            CHECK(batch == 256);
+            CHECK(flash == false);
             break;
         case 1:  // MEDIUM
-            assert(threads == 4);
-            assert(batch == 512);
-            assert(flash == true);
+            CHECK(threads == 4);
+            CHECK(batch == 512);
+            CHECK(flash == true);
             break;
         case 2:  // HIGH
-            assert(threads == 4);
-            assert(batch == 1024);
-            assert(flash == true);
+            CHECK(threads == 4);
+            CHECK(batch == 1024);
+            CHECK(flash == true);
             break;
         case 3:  // ULTRA
-            assert(threads == 6);
-            assert(batch == 1024);
-            assert(flash == true);
+            CHECK(threads == 6);
+            CHECK(batch == 1024);
+            CHECK(flash == true);
             break;
     }
     
@@ -199,8 +199,8 @@ static void test_reinit_safety(void) {
     int tier3 = ethervox_device_profile_get_tier();
     
     // Should return same values
-    assert(tier1 == tier2);
-    assert(tier2 == tier3);
+    CHECK(tier1 == tier2);
+    CHECK(tier2 == tier3);
     
     printf("  ✓ Re-initialization is safe and idempotent\n");
 }
@@ -219,12 +219,12 @@ static void test_settings_appropriateness(void) {
     int batch = ethervox_device_profile_get_optimal_batch_size();
     
     // Threads should not exceed CPU cores
-    assert(threads <= cores);
+    CHECK(threads <= cores);
     
     // Batch size should be reasonable for RAM
     // 1024 batch needs ~2GB RAM during processing
     if (ram_mb < 4096) {
-        assert(batch <= 512);  // Low/medium RAM should use smaller batches
+        CHECK(batch <= 512);  // Low/medium RAM should use smaller batches
     }
     
     printf("  ✓ Settings are appropriate for detected hardware\n");

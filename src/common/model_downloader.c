@@ -3,7 +3,7 @@
  * @brief Model download and status checking implementation
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * Licensed under CC BY-NC-SA 4.0
+ * Proprietary and confidential. See LICENSE.
  */
 
 #include "ethervox/model_downloader.h"
@@ -13,7 +13,7 @@
 #include "ethervox/platform_utils.h"
 #include "ethervox/error.h"
 
-#if HAVE_LIBCURL
+#if HAVE_LIBCURL && ETHERVOX_FEATURE_HTTP
 #include "ethervox/platform_http.h"
 #endif
 
@@ -49,8 +49,8 @@ static const model_definition_t GOVERNOR_MODELS[] = {
     {
         "granite-4.0-h-1b-Q4_K_M.gguf",
         "IBM Granite 4.0 1B (Recommended) - 4-bit quantized, very fast, compact",
-        "https://huggingface.co/bartowski/granite-4.0-h-1b-GGUF/resolve/main/granite-4.0-h-1b-Q4_K_M.gguf",
-        900000000,  // ~900MB
+        "https://huggingface.co/ibm-granite/granite-4.0-h-1b-GGUF/resolve/main/granite-4.0-h-1b-Q4_K_M.gguf",
+        901162208,  // ~901MB (official IBM model, matches asset pack)
         true
     },
     {
@@ -69,53 +69,49 @@ static const model_definition_t GOVERNOR_MODELS[] = {
     }
 };
 
-// Whisper STT models
-static const model_definition_t WHISPER_MODELS[] = {
+// Granite Speech ASR models (BASE variant - Modes 1 & 4, punctuated ASR/AST).
+// Ships as a (model, mmproj) GGUF pair - both entries marked is_default so the
+// "download recommended models" flow fetches both in one pass, mirroring how
+// PIPER_MODELS below already pairs an .onnx model with its .onnx.json config.
+static const model_definition_t GRANITE_SPEECH_MODELS[] = {
     {
-        "ggml-tiny.bin",
-        "Whisper Tiny Multilingual (Default) - Very fast, compact, 99 languages",
-        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
-        74000000,  // ~74MB
+        "granite-speech-4.1-2b.Q4_K_M.gguf",
+        "IBM Granite Speech 4.1 2B (Recommended) - punctuated ASR + translation",
+        "https://huggingface.co/ibm-granite/granite-speech-4.1-2b-GGUF/resolve/main/granite-speech-4.1-2b.Q4_K_M.gguf",
+        1200000000,  // ~1.2GB
         true
     },
     {
-        "ggml-base.en.bin",
-        "Whisper Base English - Fast, accurate for English",
-        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin",
-        74000000,  // ~74MB
-        false
-    },
-    {
-        "ggml-small.en.bin",
-        "Whisper Small English - Better accuracy, slower",
-        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin",
-        244000000,  // ~244MB
-        false
-    },
-    {
-        "ggml-base.bin",
-        "Whisper Base Multilingual - Supports 99 languages",
-        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
-        74000000,  // ~74MB
-        false
+        "mmproj-granite-speech-4.1-2b-Q4_K_M.gguf",
+        "IBM Granite Speech 4.1 2B mmproj (audio projector) - required companion file",
+        "https://huggingface.co/ibm-granite/granite-speech-4.1-2b-GGUF/resolve/main/mmproj-granite-speech-4.1-2b-Q4_K_M.gguf",
+        300000000,  // ~300MB
+        true
     }
 };
 
-// Vosk STT models
-static const model_definition_t VOSK_MODELS[] = {
+// Granite Speech PLUS models (Mode 2 - Speaker-Attributed ASR, replaces
+// Whisper AND any separate diarization heuristic). Same (model, mmproj) pair
+// pattern as GRANITE_SPEECH_MODELS above.
+static const model_definition_t GRANITE_SPEECH_PLUS_MODELS[] = {
     {
-        "vosk-model-small-en-us-0.15",
-        "Vosk Small English US (Recommended) - Fast, lightweight",
-        "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip",
-        40000000,  // ~40MB
+        // Remote name is dash-separated ("...-plus-Q4_K_M.gguf") - see docs/MODELS.md §3, the
+        // filename trap. Local name (this struct's first field) stays dot-separated to match the
+        // hardcoded paths this same file, voice_tools.c and ethervox_android_core.c all use.
+        "granite-speech-4.1-2b-plus.Q4_K_M.gguf",
+        "IBM Granite Speech 4.1 2B Plus (Recommended) - speaker-attributed ASR (SAA)",
+        "https://huggingface.co/ibm-granite/granite-speech-4.1-2b-plus-GGUF/resolve/main/granite-speech-4.1-2b-plus-Q4_K_M.gguf?download=true",
+        1024458752,  // 977 MB - see docs/MODELS.md §2 and ModelConfig.kt's sizeMB
         true
     },
     {
-        "vosk-model-en-us-0.22",
-        "Vosk Large English US - Best accuracy, larger size",
-        "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip",
-        1800000000,  // ~1.8GB
-        false
+        // Remote name is the repo's actual "mmproj-model-f16.gguf", not a per-model name - see
+        // docs/MODELS.md §3. Local name (this struct's first field) is our own convention.
+        "mmproj-granite-speech-4.1-2b-plus-Q4_K_M.gguf",
+        "IBM Granite Speech 4.1 2B Plus mmproj (audio projector) - required companion file",
+        "https://huggingface.co/ibm-granite/granite-speech-4.1-2b-plus-GGUF/resolve/main/mmproj-model-f16.gguf?download=true",
+        1168113664,  // 1114 MB - larger than the model itself, see docs/MODELS.md §2
+        true
     }
 };
 
@@ -138,8 +134,8 @@ static const model_definition_t PIPER_MODELS[] = {
 };
 
 #define GOVERNOR_MODEL_COUNT (sizeof(GOVERNOR_MODELS) / sizeof(GOVERNOR_MODELS[0]))
-#define WHISPER_MODEL_COUNT (sizeof(WHISPER_MODELS) / sizeof(WHISPER_MODELS[0]))
-#define VOSK_MODEL_COUNT (sizeof(VOSK_MODELS) / sizeof(VOSK_MODELS[0]))
+#define GRANITE_SPEECH_MODEL_COUNT (sizeof(GRANITE_SPEECH_MODELS) / sizeof(GRANITE_SPEECH_MODELS[0]))
+#define GRANITE_SPEECH_PLUS_MODEL_COUNT (sizeof(GRANITE_SPEECH_PLUS_MODELS) / sizeof(GRANITE_SPEECH_PLUS_MODELS[0]))
 #define PIPER_MODEL_COUNT (sizeof(PIPER_MODELS) / sizeof(PIPER_MODELS[0]))
 
 // ============================================================================
@@ -159,13 +155,13 @@ static const model_definition_t* get_model_definition(
             models = GOVERNOR_MODELS;
             count = GOVERNOR_MODEL_COUNT;
             break;
-        case ETHERVOX_MODEL_TYPE_WHISPER:
-            models = WHISPER_MODELS;
-            count = WHISPER_MODEL_COUNT;
+        case ETHERVOX_MODEL_TYPE_GRANITE_SPEECH:
+            models = GRANITE_SPEECH_MODELS;
+            count = GRANITE_SPEECH_MODEL_COUNT;
             break;
-        case ETHERVOX_MODEL_TYPE_VOSK:
-            models = VOSK_MODELS;
-            count = VOSK_MODEL_COUNT;
+        case ETHERVOX_MODEL_TYPE_GRANITE_SPEECH_PLUS:
+            models = GRANITE_SPEECH_PLUS_MODELS;
+            count = GRANITE_SPEECH_PLUS_MODEL_COUNT;
             break;
         case ETHERVOX_MODEL_TYPE_PIPER:
             models = PIPER_MODELS;
@@ -202,11 +198,6 @@ static const model_definition_t* get_model_definition(
 static bool file_exists(const char* path) {
     struct stat st;
     return stat(path, &st) == 0 && S_ISREG(st.st_mode);
-}
-
-static bool dir_exists(const char* path) {
-    struct stat st;
-    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
 }
 
 static uint64_t get_file_size(const char* path) {
@@ -314,11 +305,11 @@ ethervox_model_status_t ethervox_model_check_status(
         case ETHERVOX_MODEL_TYPE_GOVERNOR:
             subdir = ETHERVOX_GOVERNOR_SUBDIR;
             break;
-        case ETHERVOX_MODEL_TYPE_WHISPER:
-            subdir = ETHERVOX_WHISPER_SUBDIR;
+        case ETHERVOX_MODEL_TYPE_GRANITE_SPEECH:
+            subdir = ETHERVOX_GRANITE_SPEECH_SUBDIR;
             break;
-        case ETHERVOX_MODEL_TYPE_VOSK:
-            subdir = ETHERVOX_VOSK_SUBDIR;
+        case ETHERVOX_MODEL_TYPE_GRANITE_SPEECH_PLUS:
+            subdir = ETHERVOX_GRANITE_SPEECH_SUBDIR;  // Shares a subdir with BASE (see config.h)
             break;
         case ETHERVOX_MODEL_TYPE_PIPER:
             subdir = ETHERVOX_PIPER_SUBDIR;
@@ -345,23 +336,11 @@ ethervox_model_status_t ethervox_model_check_status(
         return ETHERVOX_MODEL_STATUS_NOT_FOUND;
     }
     
-    // Check if model exists
-    bool exists = false;
-    uint64_t size = 0;
-    
-    if (type == ETHERVOX_MODEL_TYPE_VOSK) {
-        // Vosk models are directories
-        exists = dir_exists(model_path);
-        if (exists) {
-            size = get_dir_size(model_path);
-        }
-    } else {
-        // Other models are files
-        exists = file_exists(model_path);
-        if (exists) {
-            size = get_file_size(model_path);
-        }
-    }
+    // Check if model exists (all current model types are single files -
+    // Vosk's directory-based models were the only exception and have been
+    // removed along with Vosk itself)
+    bool exists = file_exists(model_path);
+    uint64_t size = exists ? get_file_size(model_path) : 0;
     
     ETHERVOX_LOG_DEBUG("Model check: path=%s, exists=%d, size=%llu", model_path, exists, (unsigned long long)size);
     
@@ -384,7 +363,7 @@ ethervox_model_status_t ethervox_model_check_status(
         return ETHERVOX_MODEL_STATUS_NOT_FOUND;
     }
     
-    // Check if size matches expected (within 10% tolerance for zip extraction)
+    // Check if size matches expected (within 10% tolerance)
     ethervox_model_status_t status = ETHERVOX_MODEL_STATUS_FOUND;
     if (def && def->size_bytes > 0) {
         uint64_t min_size = (uint64_t)(def->size_bytes * 0.9);
@@ -392,8 +371,7 @@ ethervox_model_status_t ethervox_model_check_status(
         
         if (size < min_size) {
             status = ETHERVOX_MODEL_STATUS_INCOMPLETE;
-        } else if (size > max_size && type != ETHERVOX_MODEL_TYPE_VOSK) {
-            // Vosk directories can be larger due to extraction
+        } else if (size > max_size) {
             status = ETHERVOX_MODEL_STATUS_CORRUPT;
         }
     }
@@ -449,13 +427,13 @@ ethervox_result_t ethervox_model_list(
             defs = GOVERNOR_MODELS;
             def_count = GOVERNOR_MODEL_COUNT;
             break;
-        case ETHERVOX_MODEL_TYPE_WHISPER:
-            defs = WHISPER_MODELS;
-            def_count = WHISPER_MODEL_COUNT;
+        case ETHERVOX_MODEL_TYPE_GRANITE_SPEECH:
+            defs = GRANITE_SPEECH_MODELS;
+            def_count = GRANITE_SPEECH_MODEL_COUNT;
             break;
-        case ETHERVOX_MODEL_TYPE_VOSK:
-            defs = VOSK_MODELS;
-            def_count = VOSK_MODEL_COUNT;
+        case ETHERVOX_MODEL_TYPE_GRANITE_SPEECH_PLUS:
+            defs = GRANITE_SPEECH_PLUS_MODELS;
+            def_count = GRANITE_SPEECH_PLUS_MODEL_COUNT;
             break;
         case ETHERVOX_MODEL_TYPE_PIPER:
             defs = PIPER_MODELS;
@@ -490,7 +468,12 @@ int ethervox_model_download(
 ) {
     (void)progress_callback;
     (void)user_data;
-    
+
+#if !ETHERVOX_FEATURE_DOWNLOADER
+    ETHERVOX_LOG_ERROR("Model downloading is disabled in this build (ETHERVOX_FEATURE_DOWNLOADER=OFF)");
+    ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_FEATURE_DISABLED, "Model downloading is disabled in this build");
+#endif
+
     const model_definition_t* def = get_model_definition(type, model_name, NULL);
     if (!def) {
         ETHERVOX_LOG_ERROR("Unknown model: %s", model_name ? model_name : "(default)");
@@ -508,8 +491,8 @@ int ethervox_model_download(
     const char* subdir = "";
     switch (type) {
         case ETHERVOX_MODEL_TYPE_GOVERNOR: subdir = "governor"; break;
-        case ETHERVOX_MODEL_TYPE_WHISPER: subdir = "whisper"; break;
-        case ETHERVOX_MODEL_TYPE_VOSK: subdir = "vosk"; break;
+        case ETHERVOX_MODEL_TYPE_GRANITE_SPEECH: subdir = ETHERVOX_GRANITE_SPEECH_SUBDIR; break;
+        case ETHERVOX_MODEL_TYPE_GRANITE_SPEECH_PLUS: subdir = ETHERVOX_GRANITE_SPEECH_SUBDIR; break;
         case ETHERVOX_MODEL_TYPE_PIPER: subdir = "piper"; break;
         case ETHERVOX_MODEL_TYPE_WAKE_TEMPLATE: subdir = "wake_templates"; break;
     }
@@ -525,16 +508,7 @@ int ethervox_model_download(
     char output_path[1024];
     snprintf(output_path, sizeof(output_path), "%s/%s", model_dir, def->name);
     
-    // Check if this is a Vosk ZIP model (not yet supported)
-    if (type == ETHERVOX_MODEL_TYPE_VOSK && strstr(def->url, ".zip")) {
-        ETHERVOX_LOG_ERROR("Vosk models require manual extraction (ZIP support not yet implemented)");
-        ETHERVOX_LOG_INFO("Please download and extract manually:");
-        ETHERVOX_LOG_INFO("  1. Download: %s", def->url);
-        ETHERVOX_LOG_INFO("  2. Extract to: %s/", model_dir);
-        ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_NOT_IMPLEMENTED, "ZIP extraction not implemented - please extract manually");
-    }
-    
-#if HAVE_LIBCURL
+#if HAVE_LIBCURL && ETHERVOX_FEATURE_HTTP
     // Use native C HTTP download
     ETHERVOX_LOG_INFO("Downloading %s...", def->name);
     ETHERVOX_LOG_DEBUG("URL: %s", def->url);
@@ -590,8 +564,8 @@ ethervox_result_t ethervox_model_delete(
     const char* subdir = "";
     switch (type) {
         case ETHERVOX_MODEL_TYPE_GOVERNOR: subdir = "governor"; break;
-        case ETHERVOX_MODEL_TYPE_WHISPER: subdir = "whisper"; break;
-        case ETHERVOX_MODEL_TYPE_VOSK: subdir = "vosk"; break;
+        case ETHERVOX_MODEL_TYPE_GRANITE_SPEECH: subdir = ETHERVOX_GRANITE_SPEECH_SUBDIR; break;
+        case ETHERVOX_MODEL_TYPE_GRANITE_SPEECH_PLUS: subdir = ETHERVOX_GRANITE_SPEECH_SUBDIR; break;
         case ETHERVOX_MODEL_TYPE_PIPER: subdir = "piper"; break;
         case ETHERVOX_MODEL_TYPE_WAKE_TEMPLATE: subdir = "wake_templates"; break;
     }
@@ -599,20 +573,12 @@ ethervox_result_t ethervox_model_delete(
     char model_path[1024];
     snprintf(model_path, sizeof(model_path), "%s/%s/%s", base_dir, subdir, model_name);
     
-    if (type == ETHERVOX_MODEL_TYPE_VOSK) {
-        // Delete directory recursively using C function
-        ethervox_result_t result = platform_rmdir_recursive(model_path);
-        if (ethervox_is_error(result)) {
-            ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_FILE_DELETE_FAILED, "Failed to delete model directory");
-        }
-        return ETHERVOX_SUCCESS;
-    } else {
-        // Delete file
-        if (unlink(model_path) != 0) {
-            ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_FILE_DELETE_FAILED, "Failed to delete model file");
-        }
-        return ETHERVOX_SUCCESS;
+    // All current model types are single files (Vosk's directory-based
+    // models were the only exception and have been removed with Vosk itself)
+    if (unlink(model_path) != 0) {
+        ETHERVOX_RETURN_ERROR(ETHERVOX_ERROR_FILE_DELETE_FAILED, "Failed to delete model file");
     }
+    return ETHERVOX_SUCCESS;
 }
 
 bool ethervox_model_verify(
@@ -629,28 +595,16 @@ bool ethervox_model_verify(
         return false;
     }
     
-    if (type == ETHERVOX_MODEL_TYPE_VOSK) {
-        // Vosk models should be directories with specific structure
-        if (!S_ISDIR(st.st_mode)) {
-            return false;
-        }
-        
-        // Check for required files
-        char conf_path[1024];
-        snprintf(conf_path, sizeof(conf_path), "%s/conf/mfcc.conf", model_path);
-        if (!file_exists(conf_path)) {
-            return false;
-        }
-    } else {
-        // Other models should be files
-        if (!S_ISREG(st.st_mode)) {
-            return false;
-        }
-        
-        // Check minimum size (1KB)
-        if (st.st_size < 1024) {
-            return false;
-        }
+    (void)type;
+    // All current model types are single files (Vosk's directory-based
+    // models were the only exception and have been removed with Vosk itself)
+    if (!S_ISREG(st.st_mode)) {
+        return false;
+    }
+    
+    // Check minimum size (1KB)
+    if (st.st_size < 1024) {
+        return false;
     }
     
     return true;
@@ -664,12 +618,12 @@ ethervox_model_status_t ethervox_model_governor_status(const char* model_name) {
     return ethervox_model_check_status(ETHERVOX_MODEL_TYPE_GOVERNOR, model_name, NULL);
 }
 
-ethervox_model_status_t ethervox_model_whisper_status(const char* model_name) {
-    return ethervox_model_check_status(ETHERVOX_MODEL_TYPE_WHISPER, model_name, NULL);
+ethervox_model_status_t ethervox_model_granite_speech_status(const char* model_name) {
+    return ethervox_model_check_status(ETHERVOX_MODEL_TYPE_GRANITE_SPEECH, model_name, NULL);
 }
 
-ethervox_model_status_t ethervox_model_vosk_status(const char* model_name) {
-    return ethervox_model_check_status(ETHERVOX_MODEL_TYPE_VOSK, model_name, NULL);
+ethervox_model_status_t ethervox_model_granite_speech_plus_status(const char* model_name) {
+    return ethervox_model_check_status(ETHERVOX_MODEL_TYPE_GRANITE_SPEECH_PLUS, model_name, NULL);
 }
 
 ethervox_model_status_t ethervox_model_piper_status(const char* model_name) {
@@ -706,8 +660,8 @@ const char* ethervox_model_status_string(ethervox_model_status_t status) {
 const char* ethervox_model_type_string(ethervox_model_type_t type) {
     switch (type) {
         case ETHERVOX_MODEL_TYPE_GOVERNOR: return "Governor LLM";
-        case ETHERVOX_MODEL_TYPE_WHISPER: return "Whisper STT";
-        case ETHERVOX_MODEL_TYPE_VOSK: return "Vosk STT";
+        case ETHERVOX_MODEL_TYPE_GRANITE_SPEECH: return "Granite Speech (BASE)";
+        case ETHERVOX_MODEL_TYPE_GRANITE_SPEECH_PLUS: return "Granite Speech (PLUS)";
         case ETHERVOX_MODEL_TYPE_PIPER: return "Piper TTS";
         case ETHERVOX_MODEL_TYPE_WAKE_TEMPLATE: return "Wake Template";
         default: return "Unknown";

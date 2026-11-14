@@ -7,10 +7,10 @@
  */
 
 #include <stdio.h>
+#include "test_utils.h"
 #include "ethervox/error.h"
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <math.h>
 
 #include "ethervox/wake_word.h"
@@ -53,13 +53,13 @@ static int test_wake_word_init(void) {
     config.sample_rate = SAMPLE_RATE;
     
     int result = ethervox_wake_init(&runtime, &config);
-    assert(result == 0);
-    assert(runtime.is_initialized == true);
-    assert(runtime.config.sample_rate == SAMPLE_RATE);
-    assert(strcmp(runtime.config.wake_word, "hey ethervox") == 0);
+    CHECK(result == 0);
+    CHECK(runtime.is_initialized == true);
+    CHECK(runtime.config.sample_rate == SAMPLE_RATE);
+    CHECK(strcmp(runtime.config.wake_word, "hey ethervox") == 0);
     
     ethervox_wake_cleanup(&runtime);
-    assert(runtime.is_initialized == false);
+    CHECK(runtime.is_initialized == false);
     
     printf("PASS\n");
     return ETHERVOX_SUCCESS;
@@ -76,7 +76,7 @@ static int test_wake_word_silence(void) {
     
     ethervox_wake_config_t config = ethervox_wake_get_default_config();
     int result = ethervox_wake_init(&runtime, &config);
-    assert(result == 0);
+    CHECK(result == 0);
     
     // Process silence
     float audio[1600]; // 100ms at 16kHz
@@ -95,7 +95,7 @@ static int test_wake_word_silence(void) {
         buffer.timestamp_us = i * 100000; // 100ms increments
         result = ethervox_wake_process(&runtime, &buffer, &wake_result);
         // Should not detect wake word in silence
-        assert(wake_result.detected == false);
+        CHECK(wake_result.detected == false);
     }
     
     ethervox_wake_cleanup(&runtime);
@@ -115,7 +115,7 @@ static int test_wake_word_noise(void) {
     
     ethervox_wake_config_t config = ethervox_wake_get_default_config();
     int result = ethervox_wake_init(&runtime, &config);
-    assert(result == 0);
+    CHECK(result == 0);
     
     // Process noise
     float audio[1600];
@@ -131,7 +131,7 @@ static int test_wake_word_noise(void) {
         buffer.timestamp_us = i * 100000;
         result = ethervox_wake_process(&runtime, &buffer, &wake_result);
         // Should not trigger on random noise
-        assert(wake_result.detected == false);
+        CHECK(wake_result.detected == false);
     }
     
     ethervox_wake_cleanup(&runtime);
@@ -149,11 +149,11 @@ static int test_wake_word_config(void) {
     ethervox_wake_config_t config = ethervox_wake_get_default_config();
     
     // Verify defaults
-    assert(config.sample_rate == 16000);
-    assert(config.sensitivity >= 0.0f && config.sensitivity <= 1.0f);
-    assert(strlen(config.wake_word) > 0);
+    CHECK(config.sample_rate == 16000);
+    CHECK(config.sensitivity >= 0.0f && config.sensitivity <= 1.0f);
+    CHECK(strlen(config.wake_word) > 0);
     // Note: use_template field may have been removed from config
-    // assert(config.use_template == false); // No template by default
+    // CHECK(config.use_template == false); // No template by default
     
     printf("PASS\n");
     return ETHERVOX_SUCCESS;
@@ -168,14 +168,16 @@ static int test_wake_word_errors(void) {
     ethervox_wake_runtime_t runtime;
     memset(&runtime, 0, sizeof(runtime));
     
-    // NULL config
+    // NULL config selects the defaults (documented: "NULL for defaults")
     int result = ethervox_wake_init(&runtime, NULL);
-    assert(result != 0);
+    CHECK(result == 0);
+    ethervox_wake_cleanup(&runtime);
+    memset(&runtime, 0, sizeof(runtime));
     
     // Valid init
     ethervox_wake_config_t config = ethervox_wake_get_default_config();
     result = ethervox_wake_init(&runtime, &config);
-    assert(result == 0);
+    CHECK(result == 0);
     
     // NULL runtime on process
     ethervox_audio_buffer_t buffer;
@@ -187,15 +189,15 @@ static int test_wake_word_errors(void) {
     
     ethervox_wake_result_t wake_result;
     result = ethervox_wake_process(NULL, &buffer, &wake_result);
-    assert(result != 0);
+    CHECK(result != 0);
     
     // NULL buffer
     result = ethervox_wake_process(&runtime, NULL, &wake_result);
-    assert(result != 0);
+    CHECK(result != 0);
     
     // NULL result
     result = ethervox_wake_process(&runtime, &buffer, NULL);
-    assert(result != 0);
+    CHECK(result != 0);
     
     ethervox_wake_cleanup(&runtime);
     
@@ -214,7 +216,7 @@ static int test_wake_word_template(void) {
     
     ethervox_wake_config_t config = ethervox_wake_get_default_config();
     int result = ethervox_wake_init(&runtime, &config);
-    assert(result == 0);
+    CHECK(result == 0);
     
     // Record some audio samples as template
     float audio[1600];

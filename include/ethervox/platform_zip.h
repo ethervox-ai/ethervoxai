@@ -3,7 +3,7 @@
  * @brief Cross-platform ZIP extraction functionality using miniz
  *
  * Copyright (c) 2025 EthervoxAI
- * Licensed under CC BY-NC-SA 4.0
+ * Proprietary and confidential. See LICENSE.
  */
 
 #ifndef ETHERVOX_PLATFORM_ZIP_H

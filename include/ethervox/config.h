@@ -4,14 +4,14 @@
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
  *
- * This file is part of EthervoxAI, licensed under CC BY-NC-SA 4.0.
+ * This file is part of EthervoxAI. Proprietary and confidential. See LICENSE.
  * You are free to share and adapt this work under the following terms:
  * - Attribution: Credit the original authors
- * - NonCommercial: Not for commercial use
+ * - Proprietary: internal use only, see LICENSE
  * - ShareAlike: Distribute under same license
  *
- * For full license terms, see: https://creativecommons.org/licenses/by-nc-sa/4.0/
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * For full license terms, see: LICENSE
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #ifndef ETHERVOX_CONFIG_H
@@ -70,8 +70,8 @@ extern "C" {
 // Model type subdirectories (appended to ETHERVOX_MODELS_SUBDIR)
 // Used by model_downloader.c to organize models by type
 #define ETHERVOX_GOVERNOR_SUBDIR "governor"
-#define ETHERVOX_WHISPER_SUBDIR "whisper"
-#define ETHERVOX_VOSK_SUBDIR "vosk"
+#define ETHERVOX_GRANITE_SPEECH_SUBDIR "granite-speech"  // Shared by BASE and PLUS variants
+                                                          // (distinguished by filename, not subdir)
 #define ETHERVOX_PIPER_SUBDIR "piper"
 #define ETHERVOX_WAKE_TEMPLATE_SUBDIR "wake_templates"
 
@@ -299,6 +299,11 @@ extern "C" {
 #define ETHERVOX_GOVERNOR_MAX_ITERATIONS 10  // Maximum reasoning iterations
 #endif
 
+// Context restoration after KV cache clear
+#ifndef ETHERVOX_GOVERNOR_MAX_CONTEXT_RESTORE_TURNS
+#define ETHERVOX_GOVERNOR_MAX_CONTEXT_RESTORE_TURNS 10  // Max conversation turns to restore after clear
+#endif
+
 #ifndef ETHERVOX_GOVERNOR_TIMEOUT_SECONDS
 #define ETHERVOX_GOVERNOR_TIMEOUT_SECONDS 300  // Maximum execution time
 #endif
@@ -383,9 +388,7 @@ extern "C" {
 // Runtime debug mode control (can be toggled at runtime)
 extern int g_ethervox_debug_enabled;
 
-// C log callback for sending logs to Java/Kotlin debug window
-typedef void (*ethervox_log_callback_t)(int level, const char* tag, const char* message);
-extern ethervox_log_callback_t g_ethervox_log_callback;
+// Note: Log callback moved to logging.h for structured logging (C4.3)
 
 // Forward declare logging helper  
 void ethervox_log_with_callback(int level, const char* tag, const char* fmt, ...);

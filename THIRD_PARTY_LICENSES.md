@@ -79,35 +79,23 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"...
 ## Weather Data Source
 
 ### Open-Meteo Weather API
-- **License**: MIT License
+- **License (API data)**: Creative Commons Attribution 4.0 International (CC BY 4.0) — commercial
+  use is permitted, attribution is required. Verified directly against
+  https://open-meteo.com/en/licence (previous "MIT License" entry here was incorrect).
+- **License (Open-Meteo's own server source, not used by us)**: GNU AGPLv3 — this only binds
+  someone who runs/modifies Open-Meteo's own server software; it does not apply to us, since we
+  are only an HTTP client of their public API, not a redistributor of their source code.
 - **Purpose**: Weather forecast data for get_weather tool
 - **URL**: https://open-meteo.com
 - **API Documentation**: https://open-meteo.com/en/docs
-- **Copyright**: Copyright (c) 2022-2026 Patrick Zippenfenig
+- **Attribution text required by the license** (must be visibly reachable in-app, not just in
+  this file — see "Attribution in EthervoxAI" below):
+  ```
+  Weather data by Open-Meteo.com
+  ```
 
-```
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
-**Attribution in EthervoxAI**: Weather data provided by Open-Meteo (open-meteo.com)
+**Attribution in EthervoxAI**: shown in the Settings → About section of both the Android and iOS
+apps as a link to https://open-meteo.com, satisfying the CC BY 4.0 attribution requirement.
 
 **Data Sources**: Open-Meteo aggregates data from national weather services including:
 - DWD (Deutscher Wetterdienst - Germany)
@@ -215,6 +203,34 @@ Implements standard German phonological rules:
 - **Purpose**: Automatic speech recognition
 - **URL**: https://github.com/openai/whisper
 - **Attribution**: Copyright (c) 2022 OpenAI
+- **Status**: ⚠️ No longer part of the active architecture — replaced end-to-end by IBM Granite
+  Speech (see below) during the Granite Speech voice-integration rewrite. Still referenced by
+  legacy `ModelType` cases in both apps' model config files; MIT license means no legal conflict,
+  but this is stale/dead code that should be removed as a follow-up cleanup, not a licensing issue.
+
+### IBM Granite / Granite Speech Models
+- **License**: Apache License 2.0 — verified directly against Hugging Face model metadata
+  (`license:apache-2.0` tag on `ibm-granite/granite-speech-3.3-2b` and the Granite 4.x text
+  models); permissive, no restriction on commercial use.
+- **Purpose**: Governor (chat/tool-calling) LLM and Mode 1/4 voice conversation's
+  speech-recognition model (replacing Whisper above)
+- **URL**: https://huggingface.co/ibm-granite
+- **Download**: Users/app download GGUF conversions separately from Hugging Face
+- **Attribution**: Copyright (c) IBM Corporation
+
+### IBM Granite Docling Models
+- **License**: Apache License 2.0 — verified from Hugging Face model card
+  (`license:apache-2.0` tag on `ibm-granite/granite-docling-258M`)
+- **Purpose**: Document understanding and conversion — vision-language model for OCR, table
+  extraction, formula recognition, and structured document parsing (C3.1 multimodal API testing)
+- **URL**: https://huggingface.co/ibm-granite/granite-docling-258M
+- **Architecture**: Idefics3-based VLM with siglip2 vision encoder + Granite 165M LLM
+- **Status**: ⚠️ Architecture not yet supported by llama.cpp mtmd library (as of 2026-08-15).
+  See `docs/GRANITE_DOCLING_INVESTIGATION.md` for details.
+- **Download**: Model downloaded from Hugging Face, converted to GGUF format (f32) with mmproj
+- **Attribution**: Copyright (c) IBM Research
+- **Model Size**: ~656MB (text model) + ~374MB (vision encoder mmproj)
+- **Training Data**: SynthCodeNet, SynthFormulaNet, SynthChartNet, DoclingMatix (all Apache 2.0 / MIT)
 
 ### LLaMA Models
 - **License**: Various (depends on model)

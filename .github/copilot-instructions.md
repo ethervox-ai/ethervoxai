@@ -1,61 +1,78 @@
-## EthervoxAI — Copilot instructions for editing and codegen
+# EthervoxAI Core (Native C/C++) — Guidelines
 
-This file gives short, repo-specific guidance for AI coding assistants working on EthervoxAI.
+## Code Style
 
-Be concise. Prefer minimal, testable changes and cite the files below when referencing architecture.
+- **C/C++**: All functions use `ethervox_result_t` return type for error handling
+- **Error macros**: `ETHERVOX_CHECK_PTR()`, `ETHERVOX_RETURN_ERROR()`, `ETHERVOX_CHECK()`
+- **Always include**: `#include "ethervox/error.h"` in files using error handling
+- **Naming**: `ethervox_` prefix for public APIs, snake_case for functions/variables
+- Commercial license (CC BY-NC-SA 4.0) — avoid GPL/AGPL dependencies
 
-- Big picture
-  - Primary implementation: TypeScript/Node.js (root repository). Key directories and files: `README.md`, `docs/`, `implementations/`, `scripts/`.
-  - Multi-language targets: `implementations/python/`, `implementations/cpp/`, `implementations/micropython/`. Keep changes to cross-language interfaces in `specs/` or `specs/ethervoxai-protocol.md`.
-  - Main modules to inspect before edits: the modules listed in `README.md` under `src/modules/` (multilingualRuntime, localLLMStack, privacyDashboard, modelManager, inferenceEngine, platformDetector, crossPlatformAudio).
+## Architecture
 
-- Developer workflows (commands to run)
-  - Install deps: `npm install`
-  - Build core: `npm run build`
-  - Run demo: `npm run demo` (Windows-specific demo: `npm run demo:windows`)
-  - Audio tests: `npm run test:audio`
-  - Web/mobile UI builds are optional and require installing React/React Native separately (`npm run build:web`, `npm run build:mobile`). See README for details.
+**EthervoxAI Core**
+- Dialogue engine with intent detection and response generation
+- Pattern-based natural language processing
+- Context-aware conversation management
 
-- Project conventions and patterns
-  - The repo has one authoritative README that lists canonical module names and locations; prefer referencing it when adding or changing modules.
-  - **ESP32 source mirroring**: `esp32-project/src/` and `esp32-project/include/` are symlinks to `../src` and `../include`. Edit files in the root `src/` or `include/` directories only - changes automatically apply to both desktop and ESP32 builds. Do not duplicate .gitignore patterns for `esp32-project/`.
-  - Audio systems use a fallback chain; when modifying audio code, update `config/audio.json` and ensure `CrossPlatformAudioManager` fallback logic remains intact.
-  - Model management is centralized in `modelManager` (downloads, caching, compatibility). Changes that affect model files must preserve cache paths and compatibility checks.
-  - Hardware detection and optimization logic live in `platformDetector`. Avoid hard-coding performance tiers; use `platformDetector.getCapabilities()`.
+**JNI Bridge**
+- Kotlin ↔ C++ interop layer for Android
+- Type conversions between JVM and native types
 
-- Integration points & external dependencies
-  - Local model files and downloads: `modelManager` interacts with remote model sources and local cache directories. Keep download logic idempotent and resumable.
-  - Audio platform bindings: Windows SAPI, espeak, node-speaker, and play-sound are supported. For platform-specific code, prefer small wrappers under `scripts/` or `implementations/`.
-  - CI: workflows in `.github/workflows/` run build-and-test and code-quality checks. Expect unit tests and linting to run on PRs.
+**Audio Backend**
+- AAudio (API 26+) with OpenSL ES fallback
+- Hardware abstraction layer for Android devices
+- Audio systems use fallback chain; preserve fallback logic when modifying
 
-- Codegen / editing rules for AI agents
-  - Make the smallest change that satisfies the task. Preserve public APIs and TypeScript types unless asked to change them.
-  - Prefer to add unit tests for new behavior in `tests/` when feasible. Use `npm run test` and `npm run lint` locally.
-  - When touching multi-language implementations, only change the language-specific folders if the change is language-specific; otherwise, update shared `specs/` first.
-  - Do not add heavyweight dependencies (e.g., React) without documenting why and updating `README.md` installation steps.
-  - **Error handling (C/C++ code)**: All functions must use `ethervox_result_t` return type. See `.github/error-handling-reference.md` for:
-    - Quick reference of all 80+ error codes
-    - Usage of `ETHERVOX_CHECK_PTR()`, `ETHERVOX_RETURN_ERROR()`, `ETHERVOX_CHECK()` macros
-    - Migration patterns from `int` to `ethervox_result_t`
-    - Common error handling patterns
-    - **Always include**: `#include "ethervox/error.h"`
-    - **Migration status**: Track in `MIGRATION_CHECKLIST.md` (~7/150 files complete)
-  - **License compliance**: EthervoxAI is a commercial product licensed under CC BY-NC-SA 4.0. When adding new dependencies:
-    - Check license compatibility (MIT, Apache 2.0, BSD are typically fine)
-    - Avoid GPL/AGPL licenses that require derivative works to be open-source
-    - Document third-party licenses in `THIRD_PARTY_LICENSES.md`
-    - Flag any licensing concerns before adding dependencies
-    - Never commit API keys, tokens, or secrets to the repository
+See parent project [README.md](../../../../../README.md) for full architecture
 
-- Examples from the codebase (where to look)
-  - Hardware detection: see `platformDetector` usage in `README.md` examples and mirror its API when writing new optimizations.
-  - Model recommendations: use `modelManager.getRecommendedModels()` to obtain model lists rather than embedding names.
-  - Audio tests: `CrossPlatformAudioManager.testOutputMethods()` is the recommended test harness for audio changes.
+## Build
 
-- When unsure
-  - Consult `README.md` and files under `docs/` (especially `docs/modules/` if present) before making design-level changes.
-  - Run CI (`.github/workflows/`) locally by running `npm run build` and `npm run test` to catch lint/type errors.
+This module builds as part of the parent Android project via CMake:
 
-If anything here is unclear or you want more detail (e.g., list of actual `src/` files), tell me which area to expand and I'll iterate.
+```bash
+# From project root
+./gradlew assembleDebug
 
-Furthermore, you do not make "quick fixes" if there are correct solution that can be implemented with moderate effort. Always prefer correctness and maintainability over speed.
+# Clean native build
+./gradlew clean
+rm -rf ethervox_core/build/
+```
+
+## Conventions
+
+**Coding & Editing Rules**
+- Make the smallest change that satisfies the task
+- Preserve public APIs unless explicitly asked to change them
+- Prefer correctness and maintainability over speed — no "quick fixes" if correct solutions exist with moderate effort
+- Add unit tests for new behavior when feasible
+- For platform-specific code, prefer small wrappers rather than scattering platform checks
+
+**Error Handling (Migration ~7/150 files complete)**
+- All functions must return `ethervox_result_t`
+- Use error macros (`ETHERVOX_CHECK_PTR()`, `ETHERVOX_RETURN_ERROR()`, `ETHERVOX_CHECK()`)
+- Never use bare `int` returns for new code
+- See parent `.github/error-handling-reference.md` for full error code reference and migration patterns
+- Track migration progress in `MIGRATION_CHECKLIST.md`
+
+**Memory Management & JNI**
+- Clean up JNI local references explicitly
+- Use RAII patterns where applicable
+- Check null pointers before dereferencing
+- Cache field/method IDs for performance
+- Handle JNI exceptions immediately after calls
+- Release UTF strings after use
+
+**Hardware & Performance**
+- Hardware detection logic uses platform capabilities
+- Avoid hard-coding performance tiers
+- Model management handles downloads, caching, and compatibility
+- Keep download logic idempotent and resumable
+
+**License Compliance**
+- EthervoxAI is commercial (CC BY-NC-SA 4.0)
+- MIT, Apache 2.0, BSD licenses are typically fine to use, but need to be reviewed to ensure compatability.
+- Avoid GPL/AGPL licenses (require derivative works to be open-source)
+- Document third-party libraries in `docs/thirde_party_licenses.md`
+- Flag licensing concerns before adding dependencies
+- Never commit API keys, tokens, or secrets

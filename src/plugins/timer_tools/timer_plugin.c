@@ -10,10 +10,12 @@
  * - Canceling timers
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/timer_tools.h"
+#include "ethervox/tool_catalogue.h"
+#include "timer_tools_catalogue.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -327,16 +329,8 @@ static int timer_list_execute(const char* args_json, char** result, char** error
 
 // Tool definitions
 static ethervox_tool_t timer_create_tool = {
-    .name = "timer_create",
-    .description = "Create a timer with duration in seconds. Use for countdown timers (e.g., '5 minute timer', 'timer for 30 seconds')",
-    .parameters_json_schema = 
-        "{\"type\":\"object\","
-        "\"properties\":{"
-        "\"duration_seconds\":{\"type\":\"integer\",\"description\":\"Duration in seconds\"},"
-        "\"label\":{\"type\":\"string\",\"description\":\"Optional label/name for the timer\"}"
-        "},"
-        "\"required\":[\"duration_seconds\"]}",
-    .execute = timer_create_execute,
+    .test_scenario = "Set a timer for 5 minutes",
+        .execute = timer_create_execute,
     .is_deterministic = false,
     .requires_confirmation = false,
     .is_stateful = true,
@@ -344,15 +338,8 @@ static ethervox_tool_t timer_create_tool = {
 };
 
 static ethervox_tool_t timer_cancel_tool = {
-    .name = "timer_cancel",
-    .description = "Cancel an active timer by its ID",
-    .parameters_json_schema = 
-        "{\"type\":\"object\","
-        "\"properties\":{"
-        "\"timer_id\":{\"type\":\"integer\",\"description\":\"ID of timer to cancel\"}"
-        "},"
-        "\"required\":[\"timer_id\"]}",
-    .execute = timer_cancel_execute,
+    .test_scenario = "Cancel my timer",
+        .execute = timer_cancel_execute,
     .is_deterministic = false,
     .requires_confirmation = false,
     .is_stateful = true,
@@ -360,12 +347,8 @@ static ethervox_tool_t timer_cancel_tool = {
 };
 
 static ethervox_tool_t timer_list_tool = {
-    .name = "timer_list",
-    .description = "List all active timers and their remaining time",
-    .parameters_json_schema = 
-        "{\"type\":\"object\","
-        "\"properties\":{}}",
-    .execute = timer_list_execute,
+    .test_scenario = "What timers are running?",
+        .execute = timer_list_execute,
     .is_deterministic = false,
     .requires_confirmation = false,
     .is_stateful = true,
@@ -373,37 +356,46 @@ static ethervox_tool_t timer_list_tool = {
 };
 
 static ethervox_tool_t alarm_create_tool = {
-    .name = "alarm_create",
-    .description = "Create an alarm for a specific time (24-hour format). Use for wake-up alarms or reminders at specific times (e.g., 'wake me at 7am', 'alarm for 2:30pm')",
-    .parameters_json_schema = 
-        "{\"type\":\"object\","
-        "\"properties\":{"
-        "\"hour\":{\"type\":\"integer\",\"description\":\"Hour in 24-hour format (0-23)\"},"
-        "\"minute\":{\"type\":\"integer\",\"description\":\"Minute (0-59)\"},"
-        "\"label\":{\"type\":\"string\",\"description\":\"Optional label/name for the alarm\"}"
-        "},"
-        "\"required\":[\"hour\",\"minute\"]}",
-    .execute = alarm_create_execute,
+    .test_scenario = "Set an alarm for 7am tomorrow",
+        .execute = alarm_create_execute,
     .is_deterministic = false,
     .requires_confirmation = false,
     .is_stateful = true,
     .estimated_latency_ms = 1.0f
 };
+static bool timer_tools_loaded = false;
+
+static void load_timer_tools_catalogue_once(void) {
+    if (timer_tools_loaded) return;
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_TIMER_TOOLS_JSON, "timer_create",
+        ethervox_tool_catalogue_build_profile(), &timer_create_tool);
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_TIMER_TOOLS_JSON, "timer_cancel",
+        ethervox_tool_catalogue_build_profile(), &timer_cancel_tool);
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_TIMER_TOOLS_JSON, "timer_list",
+        ethervox_tool_catalogue_build_profile(), &timer_list_tool);
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_TIMER_TOOLS_JSON, "alarm_create",
+        ethervox_tool_catalogue_build_profile(), &alarm_create_tool);
+    timer_tools_loaded = true;
+}
 
 // Public API
 const ethervox_tool_t* ethervox_tool_timer_create(void) {
+    load_timer_tools_catalogue_once();
     return &timer_create_tool;
 }
 
 const ethervox_tool_t* ethervox_tool_timer_cancel(void) {
+    load_timer_tools_catalogue_once();
     return &timer_cancel_tool;
 }
 
 const ethervox_tool_t* ethervox_tool_timer_list(void) {
+    load_timer_tools_catalogue_once();
     return &timer_list_tool;
 }
 
 const ethervox_tool_t* ethervox_tool_alarm_create(void) {
+    load_timer_tools_catalogue_once();
     return &alarm_create_tool;
 }
 

@@ -14,7 +14,7 @@
  * SPDX-License-Identifier: CC-BY-NC-SA-4.0
  */
 
-#include <assert.h>
+#include "test_utils.h"
 #include "ethervox/error.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,12 +27,12 @@ void test_audio_default_config() {
 
   ethervox_audio_config_t config = ethervox_audio_get_default_config();
 
-  assert(config.sample_rate == ETHERVOX_AUDIO_SAMPLE_RATE);
-  assert(config.channels == 1);  // Mono by default
-  assert(config.bits_per_sample == 16);
-  assert(config.buffer_size == ETHERVOX_AUDIO_BUFFER_SIZE);
-  assert(config.enable_noise_suppression == true);
-  assert(config.enable_echo_cancellation == true);
+  CHECK(config.sample_rate == ETHERVOX_AUDIO_SAMPLE_RATE);
+  CHECK(config.channels == 1);  // Mono by default
+  CHECK(config.bits_per_sample == 16);
+  CHECK(config.buffer_size == ETHERVOX_AUDIO_BUFFER_SIZE);
+  CHECK(config.enable_noise_suppression == true);
+  CHECK(config.enable_echo_cancellation == true);
 
   printf("✓ Default audio configuration test passed\n");
 }
@@ -41,10 +41,10 @@ void test_audio_runtime_init() {
   printf("Testing ethervox_audio_init...\n");
 
   // Test null pointer handling
-  assert(ethervox_audio_init(NULL, NULL) == -1);
+  CHECK(ethervox_audio_init(NULL, NULL) == ETHERVOX_ERROR_NULL_POINTER);
 
   ethervox_audio_runtime_t runtime;
-  assert(ethervox_audio_init(&runtime, NULL) == -1);
+  CHECK(ethervox_audio_init(&runtime, NULL) == ETHERVOX_ERROR_NULL_POINTER);
 
   // Test with valid config
   ethervox_audio_config_t config = ethervox_audio_get_default_config();
@@ -71,9 +71,9 @@ void test_audio_buffer_operations() {
   buffer.timestamp_us = 12345;
 
   // Test buffer structure
-  assert(buffer.size == 1024);
-  assert(buffer.channels == 1);
-  assert(buffer.timestamp_us == 12345);
+  CHECK(buffer.size == 1024);
+  CHECK(buffer.channels == 1);
+  CHECK(buffer.timestamp_us == 12345);
 
   printf("✓ Audio buffer operations test passed\n");
 }
@@ -87,9 +87,9 @@ void test_language_detection_struct() {
   lang.confidence = 0.95f;
   lang.is_ambient = false;
 
-  assert(strcmp(lang.language_code, "en") == 0);
-  assert(lang.confidence == 0.95f);
-  assert(lang.is_ambient == false);
+  CHECK(strcmp(lang.language_code, "en") == 0);
+  CHECK(lang.confidence == 0.95f);
+  CHECK(lang.is_ambient == false);
 
   printf("✓ Language detection structure test passed\n");
 }

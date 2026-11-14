@@ -1,0 +1,112 @@
+[
+  {
+    "name": "workspace_list_objects",
+    "profiles": ["WORKSPACE"],
+    "description": "List all objects in the workspace (notes, files, folders). Use when user asks to list, show, or see objects. Returns JSON array of objects with id, title, type, tags.",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "description": "Object type filter: markdown-note, folder, file, code-snippet, web-link, conversation, image, or all", "default": "all" }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "workspace_search_objects",
+    "profiles": ["WORKSPACE"],
+    "description": "Search workspace for objects by title, content, or tags. Use when user asks to find, search for, or locate objects. Returns matching objects with similarity ranking.",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "query": { "type": "string", "description": "Search query text" }
+      },
+      "required": ["query"]
+    }
+  },
+  {
+    "name": "workspace_get_object",
+    "profiles": ["WORKSPACE"],
+    "description": "Get complete details of a specific object including content, metadata, connections, and files. Requires object_id.",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "object_id": { "type": "string", "description": "Object UUID" }
+      },
+      "required": ["object_id"]
+    }
+  },
+  {
+    "name": "workspace_create_note",
+    "profiles": ["WORKSPACE"],
+    "description": "CREATE a new graph node/object in the workspace (stored as a markdown note). Use this when the user asks to create/add a new 'node', 'object', 'note', or 'item' in the graph. Parameters: 'title' (string, required) - the node name/title, and 'content' (string, required) - node content in markdown format. Returns the newly created node's UUID. IMPORTANT: This creates a NEW standalone graph node. To add info to an EXISTING node, first search for it with workspace_search_objects, then use workspace_update_object.",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Node/object title/name" },
+        "content": { "type": "string", "description": "Node content in markdown format" },
+        "tags": { "type": "array", "description": "Optional tags list", "items": { "type": "string" } }
+      },
+      "required": ["title", "content"]
+    }
+  },
+  {
+    "name": "workspace_create_connection",
+    "profiles": ["WORKSPACE"],
+    "description": "Create a connection (edge) between two objects in the graph. Requires from_id and to_id. Optional label.",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "from_id": { "type": "string", "description": "Source object UUID" },
+        "to_id": { "type": "string", "description": "Target object UUID" },
+        "label": { "type": "string", "description": "Connection label" }
+      },
+      "required": ["from_id", "to_id"]
+    }
+  },
+  {
+    "name": "workspace_update_object",
+    "profiles": ["WORKSPACE"],
+    "description": "Update or append content to an EXISTING object in the workspace. Use when user wants to add information to an existing note, person, or object. First use workspace_search_objects to find the object_id, then call this to update its content. Parameters: 'object_id' (string, required), 'content' (string, required), 'append' (string, optional, 'true' or 'false', defaults to 'true'). When append=true, adds new content after existing content. When append=false, replaces entire content. Returns updated object details.",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "object_id": { "type": "string", "description": "UUID of object to update" },
+        "content": { "type": "string", "description": "New content to add or replace" },
+        "append": { "type": "string", "description": "Append (true) or replace (false) content", "default": "true" }
+      },
+      "required": ["object_id", "content"]
+    }
+  },
+  {
+    "name": "workspace_export_to_docx",
+    "profiles": ["WORKSPACE"],
+    "description": "Export a markdown note to Microsoft Word (.docx) format. Use this when the user asks to create a Word document, export to Word, or wants a .docx file. The system stores everything as markdown internally, but can export to Word format on demand. Parameters: 'object_id' (string, required). Returns the path to the generated .docx file. Requires pandoc to be installed on the system.",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "object_id": { "type": "string", "description": "UUID of the markdown note to export" }
+      },
+      "required": ["object_id"]
+    }
+  },
+  {
+    "name": "workspace_highlight_nodes",
+    "profiles": ["WORKSPACE"],
+    "description": "Highlight specific nodes in the graph visualization. Use this when the user searches for objects, asks to find or show specific items, or wants visual emphasis on certain nodes. This tool takes an array of node IDs and highlights them in the UI so the user can see them clearly. Combine with workspace_search_objects to first find nodes, then highlight the results. Parameters: 'node_ids' (array of strings, required). Returns success status and the count of highlighted nodes.",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "node_ids": { "type": "array", "description": "Array of node UUIDs to highlight in the graph", "items": { "type": "string" } }
+      },
+      "required": ["node_ids"]
+    }
+  }
+]

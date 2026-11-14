@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": {
+    "oneOf": [
+      {
+        "type": "string"
+      },
+      {
+        "type": "number"
+      },
+      {
+        "type": "integer"
+      }
+    ]
+  },
+  "maxItems": 17
+}

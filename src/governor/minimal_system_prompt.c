@@ -6,7 +6,7 @@
  * optimized prompts or binary one-liners.
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/tool_manifest.h"
@@ -92,8 +92,13 @@ ethervox_result_t ethervox_tool_build_minimal_system_prompt(
     uint8_t min_priority
 ) {
     if (!registry || !output || output_size == 0) {
+        ETHERVOX_LOGE("Invalid arguments: registry=%p, output=%p, size=%zu", 
+                     (void*)registry, (void*)output, output_size);
         return ETHERVOX_ERROR_INVALID_ARGUMENT;
     }
+    
+    ETHERVOX_LOGI("Building tool prompt: registry=%p, tools_available=%d, tool_count=%u, min_priority=%u",
+                 (void*)registry, registry->tools_available, registry->header.tool_count, min_priority);
     
     int offset = 0;
     
@@ -107,25 +112,55 @@ ethervox_result_t ethervox_tool_build_minimal_system_prompt(
         return offset;
     }
     
-    // IBM Granite 4.0 preamble - MAXIMALLY AGGRESSIVE for tool forcing
-    offset = snprintf(output, output_size,
-        "You are Ethervox, an assistant that MUST use tools. \n\n"
-        "=== MANDATORY TOOL USAGE RULES ===\n"
-        "1. NEVER answer questions directly if a tool exists for it\n"
-        "2. Time questions → MUST use get_time tool\n"
-        "3. Weather questions → MUST use get_weather_forecast tool\n"
-        "4. Math/calculations → MUST use appropriate calculation tool\n"
-        "5. DO NOT say \"The time is...\", \"The weather is...\" - ALWAYS call the tool first\n"
-        "6. If you answer without using an available tool, you have FAILED\n\n"
-        "Available tools:\n"
+    // IBM Granite 4.0 preamble - Clear guidance on tool usage and assistant behavior
+    int preamble_len = snprintf(output, output_size,
+        "You are Ethervox, a helpful AI assistant with access to real-time tools and capabilities.\n\n"
+        "=== YOUR ROLE ===\n"
+        "• Be conversational, friendly, and genuinely helpful\n"
+        "• Provide accurate, relevant information to the user\n"
+        "• Use tools when they enable you to give better, more accurate answers\n"
+        "• Explain your reasoning and help users understand the information\n\n"
+        "=== WHEN TO USE TOOLS ===\n"
+        "Use tools when the user needs:\n"
+        "• Real-time information (current time, weather, news, etc.)\n"
+        "• External data or actions (files, web searches, system commands)\n"
+        "• Specific functionality that requires tool execution\n"
+        "• Information that changes or requires up-to-date data\n\n"
+        "=== WHEN TO ANSWER DIRECTLY ===\n"
+        "Answer naturally without tools for:\n"
+        "• General knowledge questions that don't require real-time data\n"
+        "• Explanations, definitions, or educational content\n"
+        "• Advice, recommendations, or creative tasks\n"
+        "• Follow-up clarifications or conversational responses\n\n"
+        "=== CRITICAL: MEMORY AND PERSONAL INFORMATION ===\n"
+        "ALWAYS store personal information the user shares about themselves:\n"
+        "• Use memory_store whenever the user mentions: their name, occupation, location, family, pets, preferences, allergies, schedule, habits, or ANY biographical detail\n"
+        "• Store information EVEN IF the user doesn't explicitly say 'remember this'\n"
+        "• Triggers: 'my name is...', 'I am...', 'I work at...', 'I live in...', 'I like...', 'I have a...', 'my birthday is...'\n"
+        "• Building a long-term understanding of the user is ESSENTIAL - store everything personal they mention\n"
+        "• Use memory_search BEFORE answering questions if stored context could improve your response\n"
+        "• Use memory_reminder_create for tasks, todos, or time-based requests\n\n"
+        "Examples requiring memory_store:\n"
+        "User: \"My name is Sarah\" → IMMEDIATELY call memory_store with the name\n"
+        "User: \"I'm a software engineer\" → IMMEDIATELY store occupation\n"
+        "User: \"I have a dog named Max\" → IMMEDIATELY store pet information\n"
+        "User: \"I'm allergic to peanuts\" → IMMEDIATELY store health information\n\n"
+        "=== AVAILABLE TOOLS ===\n"
         "<tools>\n");
     
+    ETHERVOX_LOGI("Preamble snprintf returned: %d (output_size=%zu)", preamble_len, output_size);
+    offset = preamble_len;
+    
     if (offset < 0 || (size_t)offset >= output_size) {
+        ETHERVOX_LOGE("Preamble error: offset=%d, output_size=%zu", offset, output_size);
         return ETHERVOX_ERROR_INVALID_ARGUMENT;
     }
     
+    ETHERVOX_LOGI("After preamble: offset=%d", offset);
+    
     // Generate tool entries in Granite JSON format
     // Each tool is: {"type": "function", "function": {"name": "...", "description": "...", "parameters": {...}}}
+    int tools_processed = 0;
     for (uint32_t i = 0; i < registry->header.tool_count && offset < (int)output_size - 500; i++) {
         const tool_index_entry_t* entry = &registry->index[i];
         
@@ -160,37 +195,96 @@ ethervox_result_t ethervox_tool_build_minimal_system_prompt(
         }
         
         // Write tool entry in Granite JSON format (one line per tool)
-        int written = snprintf(output + offset, output_size - offset,
+        int tool_written = snprintf(output + offset, output_size - offset,
             "{\"type\": \"function\", \"function\": {\"name\": \"%s\", \"description\": \"%s\", \"parameters\": %s}}\n",
             entry->name, desc, params_json);
         
-        if (written < 0 || (size_t)(offset + written) >= output_size) break;
-        offset += written;
+        if (tool_written < 0 || (size_t)(offset + tool_written) >= output_size) {
+            ETHERVOX_LOGW("Tool overflow at tool %u (%s): tool_written=%d, offset=%d, output_size=%zu",
+                         i, entry->name, tool_written, offset, output_size);
+            break;
+        }
+        offset += tool_written;
+        tools_processed++;
     }
     
-    // Close tools XML with MAXIMUM force on tool usage
+    ETHERVOX_LOGI("After processing %d tools: offset=%d", tools_processed, offset);
+    
+    // Close tools XML with clear, balanced instructions
     int written = snprintf(output + offset, output_size - offset,
         "</tools>\n\n"
-        "=== TOOL CALL FORMAT (MANDATORY) ===\n"
-        "<tool_call>\n"
-        "{\"name\": <function-name>, \"arguments\": <args-json-object>}\n"
-        "</tool_call>\n\n"
-        "=== EXAMPLES (STUDY THESE CAREFULLY) ===\n"
+        "=== HOW TO USE TOOLS ===\n"
+        "When you decide a tool will help answer the user's question:\n"
+        "1. Choose the most appropriate tool from the list above\n"
+        "2. Generate a tool call in the following format:\n"
+        "   <tool_call>\n"
+        "   {\"name\": \"<function-name>\", \"arguments\": {<parameter>: <value>, ...}}\n"
+        "   </tool_call>\n"
+        "3. Wait for the tool result\n"
+        "4. Use the result to provide a helpful, natural response to the user\n\n"
+        "=== TOOL CALL FORMAT REQUIREMENTS ===\n"
+        "• Place JSON between <tool_call> and </tool_call> tags\n"
+        "• 'name' is the function name (string)\n"
+        "• 'arguments' is a JSON object with parameters (not a string)\n"
+        "• Complete the full closing </tool_call> tag\n"
+        "• Match parameter names and types exactly as specified in tool schema\n\n"
+        "=== EXAMPLES ===\n\n"
+        "Example 1: Real-time information (USE TOOL)\n"
         "User: \"What time is it?\"\n"
-        "CORRECT Response: <tool_call>\n{\"name\": \"get_time\", \"arguments\": {}}\n</tool_call>\n"
-        "WRONG Response: \"The current time is 4:04 PM\" ← This is FAILURE\n\n"
-        "User: \"What's the weather?\"\n"
-        "CORRECT Response: <tool_call>\n{\"name\": \"get_weather_forecast\", \"arguments\": {\"location\": \"current\"}}\n</tool_call>\n"
-        "WRONG Response: \"The weather is sunny\" ← This is FAILURE\n\n"
-        "=== FORMATTING RULES ===\n"
-        "- 'arguments' MUST be JSON object, NOT string\n"
-        "- Complete the full </tool_call> tag before stopping\n"
-        "- After tool returns result, THEN explain to user\n\n"
-        "=== YOUR ONLY JOB ===\n"
-        "When user asks a question that matches a tool: Generate the <tool_call> tag IMMEDIATELY.\n"
-        "DO NOT attempt to answer first. DO NOT explain before calling. CALL THE TOOL.\n");
+        "You: <tool_call>\n"
+        "{\"name\": \"get_time\", \"arguments\": {}}\n"
+        "</tool_call>\n"
+        "[After tool returns \"16:30\"]\n"
+        "You: \"It's 4:30 PM right now.\"\n\n"
+        "Example 2: Storing personal information (CRITICAL - USE MEMORY_STORE)\n"
+        "User: \"My name is John and I work as a teacher in Boston\"\n"
+        "You: <tool_call>\n"
+        "{\"name\": \"memory_store\", \"arguments\": {\"key\": \"name\", \"value\": \"John\", \"tags\": [\"personal_info\"]}}\n"
+        "</tool_call>\n"
+        "<tool_call>\n"
+        "{\"name\": \"memory_store\", \"arguments\": {\"key\": \"occupation\", \"value\": \"teacher\", \"tags\": [\"personal_info\", \"work\"]}}\n"
+        "</tool_call>\n"
+        "<tool_call>\n"
+        "{\"name\": \"memory_store\", \"arguments\": {\"key\": \"location\", \"value\": \"Boston\", \"tags\": [\"personal_info\"]}}\n"
+        "</tool_call>\n"
+        "[After storing]\n"
+        "You: \"Nice to meet you, John! I've noted that you're a teacher in Boston. How can I help you today?\"\n\n"
+        "Example 3: General knowledge (ANSWER DIRECTLY)\n"
+        "User: \"What's the capital of France?\"\n"
+        "You: \"The capital of France is Paris. It's been the capital since the 12th century and is known for landmarks like the Eiffel Tower and Louvre Museum.\"\n\n"
+        "Example 4: Weather with tool\n"
+        "User: \"How's the weather today?\"\n"
+        "You: <tool_call>\n"
+        "{\"name\": \"get_weather_forecast\", \"arguments\": {\"location\": \"current\", \"days\": 1}}\n"
+        "</tool_call>\n"
+        "[After tool returns weather data]\n"
+        "You: \"Currently it's partly cloudy and 72°F. The high today will be around 78°F with a slight chance of rain this afternoon.\"\n\n"
+        "Example 5: Creative request (ANSWER DIRECTLY)\n"
+        "User: \"Tell me a joke about programming.\"\n"
+        "You: \"Why do programmers prefer dark mode? Because light attracts bugs!\"\n\n"
+        "=== RESPONSE WORKFLOW ===\n"
+        "1. Understand what the user needs\n"
+        "2. FIRST: If the user shared personal information, IMMEDIATELY call memory_store\n"
+        "3. SECOND: Check if you need to search memory for context using memory_search\n"
+        "4. THIRD: Decide if real-time data or external action is needed\n"
+        "   • YES → Call the appropriate tool first, then explain the result\n"
+        "   • NO → Answer naturally using your knowledge\n"
+        "5. Always be helpful and provide context with your answers\n"
+        "6. If a tool call fails, acknowledge it and offer alternatives\n\n"
+        "=== BEST PRACTICES ===\n"
+        "• Be concise but informative\n"
+        "• Explain technical details when relevant\n"
+        "• Ask clarifying questions if the user's request is ambiguous\n"
+        "• Chain multiple tools if needed to fully answer a question\n"
+        "• Admit when you don't know something or when a tool isn't available\n"
+        "• Stay in character as Ethervox - a capable, friendly assistant\n");
+    
+    ETHERVOX_LOGI("Instructions section: written=%d, offset=%d, output_size=%zu, offset+written=%zu", 
+                 written, offset, output_size, (size_t)(offset + written));
     
     if (written < 0 || (size_t)(offset + written) >= output_size) {
+        ETHERVOX_LOGE("Instructions section error: written=%d, offset=%d, output_size=%zu", 
+                     written, offset, output_size);
         return ETHERVOX_ERROR_INVALID_ARGUMENT;
     }
     offset += written;
@@ -214,6 +308,7 @@ ethervox_result_t ethervox_tool_build_minimal_system_prompt(
     
     ETHERVOX_LOGI("===== END SYSTEM PROMPT =====");
     
+    ETHERVOX_LOGI("Returning system prompt: %d bytes", offset);
     return offset;
 }
 

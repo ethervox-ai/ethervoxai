@@ -1,0 +1,47 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "field_1": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "maxItems": 17
+    },
+    "field_2": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "integer"
+        },
+        "field_1": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "field_0"
+      ]
+    },
+    "field_3": {
+      "type": "string"
+    },
+    "field_4": {
+      "type": "string"
+    },
+    "field_5": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "field_0",
+    "field_1",
+    "field_3",
+    "field_5"
+  ]
+}

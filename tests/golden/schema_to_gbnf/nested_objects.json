@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "properties": {
+    "user": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string"},
+        "age": {"type": "integer"},
+        "address": {
+          "type": "object",
+          "properties": {
+            "street": {"type": "string"},
+            "city": {"type": "string"}
+          },
+          "required": ["street", "city"]
+        }
+      },
+      "required": ["name", "age", "address"]
+    },
+    "timestamp": {"type": "integer"}
+  },
+  "required": ["user", "timestamp"]
+}

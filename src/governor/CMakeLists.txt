@@ -5,6 +5,7 @@ option(ETHERVOX_USE_STREAMING_GOVERNOR "Use new streaming governor architecture"
 add_library(ethervox_governor STATIC
     governor_helpers.c
     tool_registry.c
+    tool_catalogue.c
     chat_template.c
 )
 
@@ -24,7 +25,7 @@ target_include_directories(ethervox_governor PRIVATE
 )
 
 # Link with math library
-target_link_libraries(ethervox_governor m)
+target_link_libraries(ethervox_governor m cJSON)
 
 # ============================================================================
 # Unit Tests (optional)

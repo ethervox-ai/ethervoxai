@@ -10,9 +10,57 @@ env:
   BUILD_TYPE: Release
 
 jobs:
+  four-profile-build:
+    name: Build All Four Profiles (ADR-0023)
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [EDGE, MOBILE, DESKTOP, WORKSPACE]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Setup CMake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: '3.22'
+
+    - name: Cache CMake build directory
+      uses: actions/cache@v4
+      with:
+        path: |
+          build-${{ matrix.profile }}
+          ~/.cmake
+        key: ${{ runner.os }}-cmake-${{ matrix.profile }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+        restore-keys: |
+          ${{ runner.os }}-cmake-${{ matrix.profile }}-
+          ${{ runner.os }}-cmake-
+
+    - name: Install macOS dependencies
+      run: brew install ninja pkg-config
+
+    - name: Configure CMake with ${{ matrix.profile }} profile
+      run: |
+        cmake -S . -B build-${{ matrix.profile }} -G Ninja \
+          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+          -DETHERVOX_PROFILE=${{ matrix.profile }} \
+          -DTARGET_PLATFORM=MACOS
+
+    - name: Build with ${{ matrix.profile }} profile
+      run: cmake --build build-${{ matrix.profile }} --config ${{ env.BUILD_TYPE }}
+
+    - name: Run tests for ${{ matrix.profile }} profile
+      run: ctest --test-dir build-${{ matrix.profile }} --output-on-failure -C ${{ env.BUILD_TYPE }}
+
   build-desktop:
     name: Build Desktop Platforms
     strategy:
+      fail-fast: false  # each platform reports on its own; one failing must not hide the others
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         include:
@@ -24,12 +72,16 @@ jobs:
             platform: windows
             cmake_preset: windows-release
             cmake_platform: WINDOWS
+            shell: 'msys2 {0}'
           - os: macos-latest
             platform: macos
             cmake_preset: macos-release
             cmake_platform: MACOS
 
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell || 'bash' }}
 
     steps:
     - name: Checkout repository
@@ -62,19 +114,29 @@ jobs:
           build-essential \
           libasound2-dev \
           libcurl4-openssl-dev \
+          libncurses-dev \
+          libreadline-dev \
           libssl-dev \
           pkg-config \
           ninja-build
 
-    - name: Install Windows dependencies
+    # Windows is built with MinGW-w64 (GCC) via MSYS2, not MSVC: the core relies on GNU C
+    # (statement attributes, variable-length arrays) and POSIX headers that MSVC lacks.
+    # Note a MinGW-built core links into a Rust x86_64-pc-windows-gnu target, not -msvc.
+    - name: Setup MSYS2 (MinGW-w64)
       if: matrix.platform == 'windows'
-      run: |
-        choco install ninja
-        # Windows SDK and MSVC are pre-installed on GitHub runners
-
-    - name: Setup MSVC environment
-      if: matrix.platform == 'windows'
-      uses: ilammy/msvc-dev-cmd@v1
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          git
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-ninja
+          mingw-w64-x86_64-pkgconf
+          mingw-w64-x86_64-curl
+          mingw-w64-x86_64-speexdsp
 
     - name: Install macOS dependencies
       if: matrix.platform == 'macos'
@@ -86,10 +148,16 @@ jobs:
       run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DTARGET_PLATFORM=${{ matrix.cmake_platform }}
 
     - name: Build C project
-      run: cmake --build build --config ${{ env.BUILD_TYPE }}
+      # -k 0 keeps going after a failure so one run lists every broken file, not just the first.
+      run: cmake --build build --config ${{ env.BUILD_TYPE }} -- -k 0
 
     - name: Run unit tests
-      run: ctest --test-dir build --output-on-failure -C ${{ env.BUILD_TYPE }} || true
+      run: |
+        # Windows has no rpath: the test executables find llama/ggml/cJSON/mtmd DLLs only via PATH.
+        if [ "${{ matrix.platform }}" = "windows" ]; then
+          export PATH="$PWD/build/bin:$PWD/build/_deps/cjson-build:$PWD/build/mtmd_build:$PATH"
+        fi
+        ctest --test-dir build --output-on-failure -C ${{ env.BUILD_TYPE }} || true
 
     - name: Package artifacts
       run: |
@@ -103,6 +171,41 @@ jobs:
         name: ethervoxai-${{ matrix.platform }}-${{ github.sha }}
         path: artifacts/
         retention-days: 30
+
+  workspace-network-symbol-check:
+    name: Workspace-shaped build has zero network symbols (TASK-C1.0)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Setup CMake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: '3.20'
+
+    - name: Install Linux dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libasound2-dev libssl-dev pkg-config ninja-build
+
+    - name: Configure with every network/mutating-file feature OFF
+      run: |
+        cmake -S . -B build-ws -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+          -DTARGET_PLATFORM=LINUX -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_EXECUTABLES=OFF \
+          -DETHERVOX_FEATURE_HTTP=OFF -DETHERVOX_FEATURE_DOWNLOADER=OFF \
+          -DETHERVOX_FEATURE_BUG_REPORT=OFF -DETHERVOX_FEATURE_WEATHER=OFF \
+          -DETHERVOX_FEATURE_FILE_TOOLS=OFF
+
+    - name: Build the library
+      run: cmake --build build-ws --config ${{ env.BUILD_TYPE }} --target ethervoxai
+
+    - name: Fail if any network symbol survives
+      run: scripts/check-no-network-symbols.sh build-ws/libethervoxai.a
 
   smoke:
     name: Quick smoke (fast fail)
@@ -133,13 +236,16 @@ jobs:
   build-raspberry-pi:
     name: Build Raspberry Pi
     runs-on: ubuntu-latest
+    # QUARANTINED until ADR-0033 decides the Pi's role (end date 2026-12-15, BACKLOG-143): the job still
+    # runs and stays visible, but a failure does not block merges. If still undecided on that date, remove
+    # the job instead of leaving it red. `make configure-rpi` does not exist; replace it with the CMake
+    # presets when the role is decided.
+    continue-on-error: true
     strategy:
       matrix:
-        target: ['pi-zero', 'pi-4']
+        # Pi Zero is out of scope (ADR-0033); Pi 5 joins when its preset exists.
+        target: ['pi-4']
         include:
-          - target: 'pi-zero'
-            cmake_preset: 'rpi-zero-release'
-            arch: 'armhf'
           - target: 'pi-4'
             cmake_preset: 'rpi-4-release'
             arch: 'arm64'

@@ -1,0 +1,12 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "field_0": {
+        "type": "string"
+      }
+    }
+  },
+  "maxItems": 46
+}

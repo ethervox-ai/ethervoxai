@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "integer"
+    },
+    "field_1": {
+      "type": "number"
+    },
+    "field_2": {
+      "type": "number"
+    },
+    "field_3": {
+      "type": "string"
+    },
+    "field_4": {
+      "type": "number"
+    },
+    "field_5": {
+      "type": "string"
+    },
+    "field_6": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "field_0",
+    "field_2",
+    "field_3",
+    "field_6"
+  ]
+}

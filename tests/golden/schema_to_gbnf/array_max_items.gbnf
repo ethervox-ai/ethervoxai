@@ -1,0 +1,3 @@
+root-item ::= ("-")? [0-9]+
+root ::= "[" ws (root-item (ws "," ws root-item){0,2})? ws "]"
+ws ::= | " " | "\n" [ \t]{0,20}

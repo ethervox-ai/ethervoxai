@@ -10,6 +10,8 @@
 #include "ethervox/unit_conversion.h"
 #include "ethervox/governor.h"
 #include "ethervox/logging.h"
+#include "ethervox/tool_catalogue.h"
+#include "unit_conversion_catalogue.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -148,34 +150,15 @@ ethervox_result_t ethervox_unit_conversion_register(void* registry_ptr) {
     
     ethervox_tool_t tool = {
         .name = "unit_convert",
-        .description = 
-            "Convert between scientific and engineering units. "
-            "Supports: temperature (celsius/fahrenheit/kelvin/rankine), "
-            "length (meter/km/mile/foot/inch/yard/etc), "
-            "mass (kg/gram/pound/ounce/ton/stone/etc), "
-            "volume (liter/gallon/quart/pint/cup/ml/etc), "
-            "speed (m/s/km/h/mph/knot/mach/etc), "
-            "pressure (pascal/bar/psi/atm/torr/mmHg/etc), "
-            "energy (joule/calorie/kWh/BTU/eV/etc), "
-            "power (watt/hp/BTU/h/etc), "
-            "area (m²/km²/acre/hectare/sq ft/etc), "
-            "data (byte/KB/MB/GB/bit/etc). "
-            "Example: Convert 100 celsius to fahrenheit, or 5 miles to kilometers. "
-            "Always provide value, from_unit, and to_unit.",
-        .parameters_json_schema =
-            "{\"type\":\"object\",\"properties\":{"
-            "\"value\":{\"type\":\"number\",\"description\":\"The numeric value to convert\"},"
-            "\"from\":{\"type\":\"string\",\"description\":\"Source unit (e.g., 'celsius', 'mile', 'kg')\"},"
-            "\"from_unit\":{\"type\":\"string\",\"description\":\"Source unit (alternative to 'from')\"},"
-            "\"to\":{\"type\":\"string\",\"description\":\"Target unit (e.g., 'fahrenheit', 'km', 'pound')\"},"
-            "\"to_unit\":{\"type\":\"string\",\"description\":\"Target unit (alternative to 'to')\"}"
-            "},\"required\":[\"value\"]}",
+        .test_scenario = "Convert 10 miles to kilometers",
         .execute = tool_unit_convert_wrapper,
         .is_deterministic = true,         // Same inputs always produce same outputs
         .requires_confirmation = false,    // Silent conversion
         .is_stateful = false,             // No state modification
         .estimated_latency_ms = 1.0f      // Very fast
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_UNIT_CONVERSION_JSON, "unit_convert",
+        ethervox_tool_catalogue_build_profile(), &tool);
     
     ethervox_result_t ret = ethervox_tool_registry_add(registry, &tool);
     

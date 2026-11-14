@@ -1,0 +1,31 @@
+{
+  "oneOf": [
+    {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 23,
+      "minItems": 0
+    },
+    {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "boolean"
+        }
+      ]
+    }
+  ]
+}

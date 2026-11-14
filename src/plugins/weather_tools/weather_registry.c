@@ -10,6 +10,8 @@
 #include "ethervox/governor.h"
 #include "ethervox/error.h"
 #include "ethervox/logging.h"
+#include "ethervox/tool_catalogue.h"
+#include "weather_tools_catalogue.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -262,21 +264,15 @@ ethervox_result_t ethervox_weather_tools_register(void* governor_registry) {
     
     // Define tool
     ethervox_tool_t tool = {
-        .name = "get_weather_forecast",
-        .description = 
-            "Get weather forecast for a location with temperature, humidity, wind, and precipitation",
-        .parameters_json_schema =
-            "{\"type\":\"object\",\"properties\":{"
-            "\"location\":{\"type\":\"string\",\"description\":\"Location as city name (e.g., 'San Francisco, CA') or coordinates (e.g., '37.7749,-122.4194')\"},"
-            "\"forecast_type\":{\"type\":\"string\",\"enum\":[\"current\",\"hourly\",\"daily\",\"7-day\"],\"description\":\"Type of forecast: 'current' for current conditions, 'hourly' for 24-hour forecast, 'daily' or '7-day' for multi-day forecast\",\"default\":\"current\"},"
-            "\"days_ahead\":{\"type\":\"integer\",\"description\":\"For daily forecast: number of days ahead (1-7)\",\"minimum\":1,\"maximum\":7,\"default\":1}"
-            "},\"required\":[\"location\"]}",
+        .test_scenario = "What's the weather forecast for this weekend?",
         .execute = tool_weather_forecast_wrapper,
         .is_deterministic = false,         // Weather changes over time
         .requires_confirmation = false,    // No user confirmation needed
         .is_stateful = false,              // No state modification
         .estimated_latency_ms = 500.0f     // Network request latency
     };
+    ethervox_tool_catalogue_load(ETHERVOX_CATALOGUE_WEATHER_TOOLS_JSON, "get_weather_forecast",
+        ethervox_tool_catalogue_build_profile(), &tool);
     
     // Register with registry
     ethervox_result_t result = ethervox_tool_registry_add(registry, &tool);

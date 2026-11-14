@@ -1,0 +1,112 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "number"
+            },
+            "field_1": {
+              "type": "boolean"
+            },
+            "field_2": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "field_0",
+            "field_1",
+            "field_2"
+          ]
+        },
+        "field_1": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "integer"
+            },
+            "field_1": {
+              "type": "number"
+            },
+            "field_2": {
+              "type": "number"
+            },
+            "field_3": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "field_1",
+            "field_3"
+          ]
+        },
+        "field_2": {
+          "type": "boolean"
+        },
+        "field_3": {
+          "type": "string",
+          "maxLength": 82
+        },
+        "field_4": {
+          "type": "boolean"
+        },
+        "field_5": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "string"
+            },
+            "field_1": {
+              "type": "string"
+            },
+            "field_2": {
+              "type": "boolean"
+            },
+            "field_3": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "field_0",
+            "field_1",
+            "field_3"
+          ]
+        }
+      },
+      "required": [
+        "field_0",
+        "field_1",
+        "field_4",
+        "field_5"
+      ]
+    },
+    "field_1": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 10,
+          "maximum": 652
+        },
+        {
+          "type": "integer"
+        }
+      ]
+    },
+    "field_2": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 47
+    }
+  },
+  "required": [
+    "field_0",
+    "field_1",
+    "field_2"
+  ]
+}

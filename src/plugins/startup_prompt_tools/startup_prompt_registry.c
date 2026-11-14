@@ -4,12 +4,14 @@
  * @brief Tool registry for startup prompt management
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/startup_prompt_tools.h"
 #include "ethervox/governor.h"
 #include "ethervox/logging.h"
+#include "ethervox/tool_catalogue.h"
+#include "startup_prompt_tools_catalogue.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -251,36 +253,51 @@ ethervox_result_t ethervox_startup_prompt_tools_register(void* registry_ptr) {
     
     // Register startup_prompt_update tool
     ethervox_tool_t update_tool = {
-        .name = "startup_prompt_update",
-        .description = "Update the startup prompt that runs when the assistant starts. Use this to customize the initial greeting or behavior. The prompt will be saved and used on next restart.",
-        .parameters_json_schema = 
-            "{\"type\":\"object\",\"properties\":{"
-                "\"prompt_text\":{\"type\":\"string\",\"description\":\"The new startup prompt text. Should be a natural greeting or instruction for the assistant.\"}"
-            "},\"required\":[\"prompt_text\"]}",
+        .test_scenario = "Change your personality to be more formal",
         .execute = tool_startup_prompt_update,
         .is_deterministic = false
     };
-    
-    if (ethervox_tool_registry_add(registry, &update_tool) != 0) {
-        STARTUP_ERROR("Failed to register startup_prompt_update tool");
-        return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    ethervox_result_t update_status = ethervox_tool_catalogue_load(
+        ETHERVOX_CATALOGUE_STARTUP_PROMPT_TOOLS_JSON, "startup_prompt_update",
+        ethervox_tool_catalogue_build_profile(), &update_tool);
+    int registered = 0;
+    if (update_status == ETHERVOX_ERROR_NOT_SUPPORTED) {
+        // The contract excludes this build profile (WORKSPACE/EDGE: no built-in file writers).
+        STARTUP_LOG("startup_prompt_update not offered in this profile");
+    } else if (!ethervox_is_success(update_status)) {
+        STARTUP_ERROR("Failed to load startup_prompt_update contract");
+        return update_status;
+    } else {
+        if (ethervox_tool_registry_add(registry, &update_tool) != 0) {
+            STARTUP_ERROR("Failed to register startup_prompt_update tool");
+            return ETHERVOX_ERROR_INVALID_ARGUMENT;
+        }
+        registered++;
     }
     
     // Register startup_prompt_read tool
     ethervox_tool_t read_tool = {
-        .name = "startup_prompt_read",
-        .description = "Read the current custom startup prompt. Returns the prompt text if a custom one exists, or indicates if using the default.",
-        .parameters_json_schema = "{\"type\":\"object\",\"properties\":{}}",
+        .test_scenario = "Show me your current system prompt",
         .execute = tool_startup_prompt_read,
         .is_deterministic = true
     };
-    
-    if (ethervox_tool_registry_add(registry, &read_tool) != 0) {
-        STARTUP_ERROR("Failed to register startup_prompt_read tool");
-        return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    ethervox_result_t read_status = ethervox_tool_catalogue_load(
+        ETHERVOX_CATALOGUE_STARTUP_PROMPT_TOOLS_JSON, "startup_prompt_read",
+        ethervox_tool_catalogue_build_profile(), &read_tool);
+    if (read_status == ETHERVOX_ERROR_NOT_SUPPORTED) {
+        STARTUP_LOG("startup_prompt_read not offered in this profile");
+    } else if (!ethervox_is_success(read_status)) {
+        STARTUP_ERROR("Failed to load startup_prompt_read contract");
+        return read_status;
+    } else {
+        if (ethervox_tool_registry_add(registry, &read_tool) != 0) {
+            STARTUP_ERROR("Failed to register startup_prompt_read tool");
+            return ETHERVOX_ERROR_INVALID_ARGUMENT;
+        }
+        registered++;
     }
     
-    STARTUP_LOG("Registered 2 startup prompt tools");
+    STARTUP_LOG("Registered %d startup prompt tools", registered);
     
     return ETHERVOX_SUCCESS;
 }

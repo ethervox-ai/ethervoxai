@@ -1,0 +1,136 @@
+[
+  {
+    "name": "memory_complete_reminder",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Mark a reminder as completed/done by its memory_id. Use the memory_id from memory_reminder_list to complete specific reminders.",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "memory_id": { "type": "string", "description": "The unique ID of the reminder to mark complete (from memory_reminder_list)" }
+      },
+      "required": ["memory_id"]
+    }
+  },
+  {
+    "name": "memory_update_reminder",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Update a reminder's text (e.g., change due date, modify description). Use memory_id from memory_reminder_list. Updates the full text - include all details like deadline.",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "memory_id": { "type": "string", "description": "The unique ID of the reminder to update (from memory_reminder_list)" },
+        "new_text": { "type": "string", "description": "New reminder text with updated deadline/description (e.g., 'Call John at 3:00 PM today')" }
+      },
+      "required": ["memory_id", "new_text"]
+    }
+  },
+  {
+    "name": "memory_store",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Save facts, reminders, or events to memory. For reminders, use 'reminder' tag and include time/deadline in text. Importance: 0.9+ for reminders, 0.95 for personal facts, 0.8 for preferences.",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "description": "Content to remember. For reminders, include deadline/time info in the text. (Aliases: 'key' or 'value' also work)" },
+        "key": { "type": "string", "description": "Alternative to 'text': content to remember." },
+        "value": { "type": "string", "description": "Alternative to 'text': content to remember." },
+        "tags": { "type": "array", "items": { "type": "string" }, "description": "Labels like 'reminder', 'important', 'urgent', etc." },
+        "importance": { "type": "number", "minimum": 0, "maximum": 1, "description": "0.0=low to 1.0=critical. Use 0.9+ for urgent reminders." },
+        "is_user": { "type": "boolean", "description": "True if this is user input, false if assistant generated" }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "memory_search",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Search conversation memory by text similarity and tags. Results are sorted by relevance and importance. Use min_importance to filter for important memories (0.9+ for critical info, 0.8+ for important context).",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "query": { "type": "string", "description": "Search query" },
+        "tag_filter": { "type": "array", "items": { "type": "string" } },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "min_importance": { "type": "number", "minimum": 0.0, "maximum": 1.0, "description": "Minimum importance threshold (0.0-1.0). Use 0.8+ for important context, 0.9+ for critical info." }
+      }
+    }
+  },
+  {
+    "name": "memory_reminder_list",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "List all active reminders (entries tagged with 'reminder'). Returns reminder text, deadlines, importance, and memory_id for completing reminders.",
+    "is_mutating": false,
+    "schema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "memory_export",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Export the entire conversation history to a file. Requires both filepath and format. Example: export to './notes.md' as markdown",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "filepath": { "type": "string", "description": "Path where to save the file (required). Example: './conversation.md' or './notes.json'" },
+        "format": { "type": "string", "enum": ["json", "markdown"], "description": "File format: 'json' or 'markdown' (required)" }
+      },
+      "required": ["filepath", "format"]
+    }
+  },
+  {
+    "name": "memory_forget",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Prune old or low-importance memories",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "older_than_seconds": { "type": "integer", "minimum": 0 },
+        "importance_threshold": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  },
+  {
+    "name": "memory_delete",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Delete specific memories by their IDs. Use memory_ids array for multiple, or memory_id for single deletion.",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "memory_ids": { "type": "array", "items": { "type": "integer" } },
+        "memory_id": { "type": "string" }
+      }
+    }
+  },
+  {
+    "name": "memory_store_correction",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Store user corrections as high-priority learning. Use when the user corrects your understanding, preferences, or mistakes. These corrections will be prioritized in future responses to 'teach' the model.",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "correction": { "type": "string", "description": "What the user corrected (required)" },
+        "context": { "type": "string", "description": "Optional: What was wrong or what this relates to" }
+      },
+      "required": ["correction"]
+    }
+  },
+  {
+    "name": "memory_store_pattern",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP", "WORKSPACE"],
+    "description": "Store successful interaction patterns. Use when an approach works well or the user explicitly approves a method. These patterns reinforce successful behaviors.",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "pattern": { "type": "string", "description": "Description of what worked well (required)" }
+      },
+      "required": ["pattern"]
+    }
+  }
+]

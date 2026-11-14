@@ -4,14 +4,14 @@
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
  *
- * This file is part of EthervoxAI, licensed under CC BY-NC-SA 4.0.
+ * This file is part of EthervoxAI. Proprietary and confidential. See LICENSE.
  * You are free to share and adapt this work under the following terms:
  * - Attribution: Credit the original authors
- * - NonCommercial: Not for commercial use
+ * - Proprietary: internal use only, see LICENSE
  * - ShareAlike: Distribute under same license
  *
- * For full license terms, see: https://creativecommons.org/licenses/by-nc-sa/4.0/
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * For full license terms, see: LICENSE
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 #ifndef ETHERVOX_LLM_H
 #define ETHERVOX_LLM_H
@@ -98,6 +98,11 @@ void ethervox_llm_backend_free(ethervox_llm_backend_t* backend);
 // Model operations
 ethervox_result_t ethervox_llm_backend_load_model(ethervox_llm_backend_t* backend, const char* model_path);
 void ethervox_llm_backend_unload_model(ethervox_llm_backend_t* backend);
+
+// Grammar-constrained decoding
+struct ethervox_grammar;  // Forward declaration
+ethervox_result_t ethervox_llm_backend_set_grammar(ethervox_llm_backend_t* backend, 
+                                                    struct ethervox_grammar* grammar);
 
 // Generation
 ethervox_result_t ethervox_llm_backend_generate(ethervox_llm_backend_t* backend,

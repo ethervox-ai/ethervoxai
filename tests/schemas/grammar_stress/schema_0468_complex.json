@@ -1,0 +1,22 @@
+{
+  "type": "array",
+  "items": {
+    "oneOf": [
+      {
+        "type": "string",
+        "maxLength": 76
+      },
+      {
+        "type": "object",
+        "properties": {
+          "field_0": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "field_0"
+        ]
+      }
+    ]
+  }
+}

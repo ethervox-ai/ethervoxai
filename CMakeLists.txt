@@ -2,6 +2,14 @@ cmake_minimum_required(VERSION 3.16)
 
 project(EthervoxAI VERSION 0.0.5 LANGUAGES C CXX)
 
+# Enable Objective-C for Apple-platform-specific shims (e.g. weather_http_ios.m,
+# and the future AVAudioSession audio HAL shim for iOS voice capture) - the
+# C/CXX languages declared above do not include OBJC by default, and CMake
+# will fail to compile any .m/.mm source without this.
+if(APPLE)
+    enable_language(OBJC)
+endif()
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
@@ -9,15 +17,26 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # Git Information Extraction (REQUIRED)
 # =============================================================================
 
-# Get version tag (cpp repo uses v* pattern, not backend-v*)
+# Get version tag. Releases are tagged `core-vX.Y.Z`; older tags are plain `vX.Y.Z`, used only
+# when no `core-v*` tag is reachable.
 execute_process(
-    COMMAND git describe --tags --abbrev=0 --match=v*
+    COMMAND git describe --tags --abbrev=0 --match=core-v*
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_VERSION_TAG
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET
     RESULT_VARIABLE GIT_TAG_RESULT
 )
+if(NOT GIT_TAG_RESULT EQUAL 0 OR NOT GIT_VERSION_TAG)
+    execute_process(
+        COMMAND git describe --tags --abbrev=0 --match=v*
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_VERSION_TAG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE GIT_TAG_RESULT
+    )
+endif()
 
 # Get branch name (REQUIRED)
 execute_process(
@@ -53,8 +72,8 @@ message(STATUS "Git Commit: ${GIT_COMMIT_HASH}")
 
 # Set backend version string
 if(GIT_TAG_RESULT EQUAL 0 AND GIT_VERSION_TAG)
-    # Tag exists - strip 'v' prefix (e.g., v0.0.5 -> 0.0.5)
-    string(REPLACE "v" "" ETHERVOX_BACKEND_VERSION "${GIT_VERSION_TAG}")
+    # Tag exists - strip the prefix (core-v0.5.0 -> 0.5.0, v0.0.5 -> 0.0.5)
+    string(REGEX REPLACE "^(core-)?v" "" ETHERVOX_BACKEND_VERSION "${GIT_VERSION_TAG}")
     message(STATUS "Backend Version Tag: ${ETHERVOX_BACKEND_VERSION}")
 else()
     # No tag - use branch-commit format
@@ -196,6 +215,22 @@ elseif(TARGET_PLATFORM STREQUAL "ANDROID")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast -fno-finite-math-only -march=x86-64-v3 -mtune=generic")
         message(STATUS "Enabled MAXIMUM x86_64 optimizations for ${ANDROID_ABI}")
     endif()
+
+elseif(TARGET_PLATFORM STREQUAL "IOS" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # iOS platform configuration
+    message(STATUS "===================================================")
+    message(STATUS "iOS platform configuration enabled")
+    add_definitions(-DTARGET_IOS=1)
+    add_definitions(-DETHERVOX_PLATFORM_IOS=1)
+    add_definitions(-DETHERVOX_PLATFORM_MACOS=1)  # iOS shares many macOS APIs
+    add_definitions(-DPLATFORM_MOBILE=1)
+    set(ETHERVOX_PLATFORM_IOS 1)
+    set(ETHERVOX_PLATFORM_MACOS 1)  # For platform_utils_unix.c
+    set(ETHERVOX_PLATFORM_MOBILE 1)
+
+    # iOS requires all libraries to be static (no dylibs in app bundles)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libraries for iOS" FORCE)
+    message(STATUS "Forcing static libraries for iOS platform")
 endif()
 
 # Show which platform macros are defined
@@ -224,8 +259,9 @@ endif()
 
 # Define runtime directory paths based on platform
 if(TARGET_PLATFORM STREQUAL "WINDOWS")
-    # Windows: %USERPROFILE%\.ethervox
-    add_definitions(-DETHERVOX_RUNTIME_DIR_BASE="%USERPROFILE%\\\\.ethervox")
+    # Windows: %USERPROFILE%\.ethervox comes from the fallback in include/ethervox/config.h. It is not
+    # passed as a compile definition: a global -D with embedded quotes and %...% is rejected by MSVC
+    # (D8038) and, being global, also reached llama.cpp's targets.
 elseif(TARGET_PLATFORM STREQUAL "ANDROID")
     # Android: app-specific internal storage (handled at runtime via Java)
     add_definitions(-DETHERVOX_RUNTIME_DIR_BASE=NULL)
@@ -242,12 +278,19 @@ message(STATUS "Runtime directory base configured for ${TARGET_PLATFORM}")
 # Git info already extracted and defined above
 # GIT_COMMIT_HASH and GIT_BRANCH are already available
 
+# Optional network / mutating-file subsystems (TASK-C1.0) - defaults ON, all
+# guards live in cmake/EthervoxFeatures.cmake so profiles can compose them.
+include(cmake/EthervoxFeatures.cmake)
+
 # Build configuration
 option(BUILD_TESTS "Build test suite" ON)
 option(BUILD_EXAMPLES "Build example applications" ON)
+option(BUILD_EXECUTABLES "Build CLI executables (main app and tools)" ON)
 option(ENABLE_DEBUG "Enable debug logging" OFF)
 option(WITH_LLAMA "Enable Llama.cpp backend support" ON)
 option(WITH_TINYLLAMA "Enable TinyLlama backend support" ON)
+# TASK-N7.7: temporary transcription-latency instrumentation, removed by N7.8 - never on in playRelease.
+option(ETHERVOX_LATENCY_TRACE "Log transcription pipeline stage timings (temporary, N7.7)" OFF)
 
 # Fetch cJSON for settings persistence
 include(FetchContent)
@@ -272,7 +315,9 @@ if(NOT cjson_POPULATED)
                    "cmake_minimum_required(VERSION 3.16)" 
                    CJSON_CMAKE_CONTENT "${CJSON_CMAKE_CONTENT}")
     file(WRITE "${cjson_SOURCE_DIR}/CMakeLists.txt" "${CJSON_CMAKE_CONTENT}")
-    add_subdirectory(${cjson_SOURCE_DIR} ${cjson_BINARY_DIR})
+    # EXCLUDE_FROM_ALL keeps cJSON's own install rules (absolute /usr/local paths) out of `install` and
+    # CPack; it is linked statically into the library, so it is still built as a dependency.
+    add_subdirectory(${cjson_SOURCE_DIR} ${cjson_BINARY_DIR} EXCLUDE_FROM_ALL)
     # Remove -Werror from cjson compilation flags
     if(TARGET cjson)
         get_target_property(CJSON_FLAGS cjson COMPILE_OPTIONS)
@@ -288,8 +333,16 @@ if(NOT cjson_POPULATED)
     endif()
 endif()
 
-# Find libcurl for bug reporter (optional on Windows, not needed on Android)
-if(NOT TARGET_PLATFORM STREQUAL "ANDROID" AND NOT WIN32)
+# Find libcurl only when a networked feature is compiled in. A build with every network feature OFF
+# (the WORKSPACE profile) must configure and link without libcurl, OpenSSL or any socket code (I1).
+set(ETHERVOX_NEEDS_CURL OFF)
+if(ETHERVOX_FEATURE_HTTP OR ETHERVOX_FEATURE_DOWNLOADER OR ETHERVOX_FEATURE_BUG_REPORT OR ETHERVOX_FEATURE_WEATHER)
+    set(ETHERVOX_NEEDS_CURL ON)
+endif()
+
+if(NOT ETHERVOX_NEEDS_CURL)
+    message(STATUS "Skipping CURL (no networked feature enabled)")
+elseif(NOT TARGET_PLATFORM STREQUAL "ANDROID" AND NOT TARGET_PLATFORM STREQUAL "IOS" AND NOT WIN32)
     find_package(CURL REQUIRED)
     if(CURL_FOUND)
         message(STATUS "Found CURL: ${CURL_LIBRARIES}")
@@ -305,11 +358,15 @@ elseif(WIN32)
         message(STATUS "CURL not found on Windows - bug reporter will be disabled")
     endif()
 else()
-    message(STATUS "Skipping CURL (Android uses Kotlin BugReporter)")
+    message(STATUS "Skipping CURL (Android/iOS uses native BugReporter)")
 endif()
 
 if(ENABLE_DEBUG)
     add_definitions(-DDEBUG_ENABLED=1)
+endif()
+
+if(ETHERVOX_LATENCY_TRACE)
+    add_definitions(-DETHERVOX_LATENCY_TRACE=1)
 endif()
 
 # LLM backend configuration
@@ -324,7 +381,7 @@ if(WITH_TINYLLAMA)
 endif()
 
 # ============================================================================
-# Dependency Management - llama.cpp and whisper.cpp
+# Dependency Management - llama.cpp (+ mtmd/Granite Speech)
 # ============================================================================
 # Automatically fetches dependencies if not present as git submodules
 # Users can:
@@ -335,15 +392,11 @@ endif()
 
 include(cmake/FetchDependencies.cmake)
 
-# Fetch llama.cpp
+# Fetch llama.cpp (also provides mtmd - the multimodal library used to load
+# Granite Speech's audio-in GGUF pair. whisper.cpp has been removed entirely;
+# there is no WITH_WHISPER option anymore.)
 if(WITH_LLAMA)
     fetch_llama_cpp()
-endif()
-
-# Fetch whisper.cpp  
-option(WITH_WHISPER "Enable whisper.cpp for speech-to-text" ON)
-if(WITH_WHISPER)
-    fetch_whisper_cpp()
 endif()
 
 # Print summary
@@ -360,7 +413,20 @@ if(WITH_LLAMA AND LLAMA_CPP_SOURCE_DIR)
     set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
-    set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+    # iOS/Android require static linking - dynamic libs not supported in app bundles
+    if(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS" OR TARGET_PLATFORM STREQUAL "IOS" OR ANDROID)
+        set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+        message(STATUS "Using static libraries for mobile platform")
+    elseif(ETHERVOX_FORCE_STATIC)
+        # Opt-in (default OFF, i.e. unchanged behavior for every other consumer): a macOS/desktop
+        # static build, for consumers that can't ship/rpath dylibs (e.g. an Xcode/SwiftPM
+        # XCFramework, `ethervoxai-apple` TASK-E6.3). Set via `-DETHERVOX_FORCE_STATIC=ON` or
+        # `ev-llm`'s `EV_LLM_STATIC_APPLE=1` (which passes this through).
+        set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+        message(STATUS "Using static libraries (ETHERVOX_FORCE_STATIC)")
+    else()
+        set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+    endif()
     
     # Enable CPU backend optimizations
     set(GGML_CPU ON CACHE BOOL "" FORCE)
@@ -374,10 +440,11 @@ if(WITH_LLAMA AND LLAMA_CPP_SOURCE_DIR)
         set(LLAMA_OPENBLAS OFF CACHE BOOL "" FORCE)
         set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
         
-        # Vulkan GPU acceleration is complex on Android and requires device-specific setup
-        # Currently disabled - relying on ARM NEON optimizations instead
-        # Future: Enable with proper Android Vulkan SDK integration
+        # Vulkan GPU acceleration disabled on Android for CI/CD compatibility
+        # Most Android devices don't support the required Vulkan features anyway
+        # (storageBuffer16BitAccess, Vulkan 1.2, etc.)
         set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+        message(STATUS "Vulkan GPU disabled on Android (limited device support, CI build compatibility)")
         
         # Disable NEON for ARM processors to fix SIGILL crash
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" OR ANDROID_ABI STREQUAL "arm64-v8a")
@@ -388,68 +455,97 @@ if(WITH_LLAMA AND LLAMA_CPP_SOURCE_DIR)
         # Android 15+ 16KB page size compatibility - apply to llama.cpp libraries
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
         message(STATUS "Applied 16KB page alignment to llama.cpp libraries for Android 15+ compatibility")
+    
+    # iOS-specific optimizations
+    elseif(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS" OR TARGET_PLATFORM STREQUAL "IOS")
+        message(STATUS "=== Configuring llama.cpp with iOS optimizations ===")
+        
+        # ✅ CRITICAL: Enable Metal GPU acceleration (10-50x speedup)
+        set(GGML_METAL ON CACHE BOOL "" FORCE)
+        set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)
+        message(STATUS "✓ Metal GPU acceleration enabled")
+        
+        # ✅ CRITICAL: Enable Accelerate framework (Apple BLAS, 2-5x speedup)
+        set(GGML_ACCELERATE ON CACHE BOOL "" FORCE)
+        set(GGML_BLAS ON CACHE BOOL "" FORCE)
+        set(GGML_BLAS_VENDOR "Apple" CACHE STRING "" FORCE)
+        message(STATUS "✓ Accelerate framework (Apple BLAS) enabled")
+        
+        # ✅ IMPORTANT: Enable ARM NEON SIMD (safe on iOS, 2-3x speedup)
+        # All iOS devices are ARMv8-A minimum and support NEON
+        message(STATUS "✓ ARM NEON SIMD enabled (safe on iOS)")
+        
+        # ❌ Disable other GPU backends (not available on iOS)
+        set(GGML_CUDA OFF CACHE BOOL "" FORCE)
+        set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+        set(GGML_CLBLAST OFF CACHE BOOL "" FORCE)
+        set(GGML_OPENBLAS OFF CACHE BOOL "" FORCE)
+        set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
+        
+        message(STATUS "=== iOS optimizations complete - expect 20-30x speedup ===")
     endif()
     
     # Add llama.cpp as subdirectory
     add_subdirectory(${LLAMA_CPP_SOURCE_DIR})
-    
+
+    # ------------------------------------------------------------------------
+    # mtmd (multimodal library) - required for Granite Speech's audio-in GGUF.
+    # llama.cpp's own tools/CMakeLists.txt (add_subdirectory(tools) at the top
+    # level, gated behind LLAMA_BUILD_TOOLS) would also build llama-server,
+    # llama-cli, rpc, etc. - unnecessary weight and platform risk (server
+    # networking code, RPC sockets) for a mobile/embedded STT dependency. mtmd
+    # itself deliberately does not depend on llama-common (enforced by its own
+    # CMakeLists.txt), so it is added directly here instead, pulling in only
+    # `libmtmd` (ggml + llama only) and nothing else from tools/.
+    # ------------------------------------------------------------------------
+    if(COMMAND llama_add_compile_flags)
+        llama_add_compile_flags()
+    endif()
+    # LLAMA_INSTALL_VERSION is normally set by llama.cpp's own top-level
+    # CMakeLists.txt (cmake/build-info.cmake), but that scope isn't visible
+    # here since mtmd is added directly rather than through llama.cpp's own
+    # tools/CMakeLists.txt. mtmd/CMakeLists.txt's set_target_properties()
+    # call needs it defined, so provide the same default it would otherwise
+    # compute (exact version number doesn't matter for our use - this is not
+    # a public install target).
+    if(NOT DEFINED LLAMA_INSTALL_VERSION)
+        set(LLAMA_INSTALL_VERSION "0.0.0")
+    endif()
+    # EXCLUDE_FROM_ALL: mtmd/CMakeLists.txt unconditionally also defines
+    # llama-mtmd-cli/llama-mtmd-debug executables that link against
+    # llama-common (arg.h, etc.), which we deliberately don't build here (see
+    # comment above - avoiding the full tools/ tree). EXCLUDE_FROM_ALL keeps
+    # those extra targets out of the default build; the `mtmd` library target
+    # itself still builds because ethervoxai links against it directly below.
+    add_subdirectory(${LLAMA_CPP_SOURCE_DIR}/tools/mtmd mtmd_build EXCLUDE_FROM_ALL)
+    if(TARGET mtmd)
+        add_definitions(-DMTMD_AVAILABLE=1)
+        message(STATUS "✓ mtmd (Granite Speech audio support) successfully configured")
+    else()
+        add_definitions(-DMTMD_AVAILABLE=0)
+        message(WARNING "mtmd target not found after add_subdirectory - Granite Speech STT will not be available")
+    endif()
+
     add_definitions(-DLLAMA_CPP_AVAILABLE=1)
     message(STATUS "✓ llama.cpp successfully configured")
 elseif(WITH_LLAMA)
     message(WARNING "llama.cpp not available - LLM features will be limited")
     message(WARNING "To enable: git submodule update --init or set ETHERVOX_AUTO_FETCH_DEPS=ON")
     add_definitions(-DLLAMA_CPP_AVAILABLE=0)
+    add_definitions(-DMTMD_AVAILABLE=0)
 else()
     add_definitions(-DLLAMA_CPP_AVAILABLE=0)
+    add_definitions(-DMTMD_AVAILABLE=0)
 endif()
 
 # ============================================================================
-# whisper.cpp Integration
+# mtmd / Granite Speech Integration (see llama.cpp block above)
 # ============================================================================
 
-if(WITH_WHISPER AND WHISPER_CPP_SOURCE_DIR)
-    message(STATUS "Configuring whisper.cpp from: ${WHISPER_CPP_SOURCE_DIR}")
-    
-    # whisper.cpp build options
-    set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(WHISPER_BUILD_SERVER OFF CACHE BOOL "" FORCE)
-    set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
-    
-    # Match llama.cpp settings for consistency
-    set(GGML_CPU ON CACHE BOOL "" FORCE)
-    set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
-    
-    # Android-specific settings
-    if(ANDROID)
-        set(WHISPER_METAL OFF CACHE BOOL "" FORCE)
-        set(WHISPER_CUBLAS OFF CACHE BOOL "" FORCE)
-        set(WHISPER_CLBLAST OFF CACHE BOOL "" FORCE)
-        set(WHISPER_OPENBLAS OFF CACHE BOOL "" FORCE)
-        
-        # Disable NEON for ARM processors to fix SIGILL crash
-        if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" OR ANDROID_ABI STREQUAL "arm64-v8a")
-            set(GGML_CPU_ARM_NEON OFF CACHE BOOL "" FORCE)
-            message(STATUS "Disabled ARM NEON optimizations for whisper.cpp (fixing SIGILL crash)")
-        endif()
-        
-        # Android 15+ 16KB page size compatibility
-        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
-        message(STATUS "Applied 16KB page alignment to whisper.cpp libraries for Android 15+ compatibility")
-    endif()
-    
-    # Add whisper.cpp as subdirectory
-    add_subdirectory(${WHISPER_CPP_SOURCE_DIR})
-    
-    add_definitions(-DWHISPER_CPP_AVAILABLE=1)
-    message(STATUS "✓ whisper.cpp successfully configured")
-elseif(WITH_WHISPER)
-    message(WARNING "whisper.cpp not available - Voice features will be disabled")
-    message(WARNING "To enable: git submodule update --init or set ETHERVOX_AUTO_FETCH_DEPS=ON")
-    add_definitions(-DWHISPER_CPP_AVAILABLE=0)
-else()
-    add_definitions(-DWHISPER_CPP_AVAILABLE=0)
-endif()
+# ============================================================================
+# whisper.cpp has been removed entirely - see mtmd setup above (Granite
+# Speech replaces it for all STT, both BASE and PLUS/SAA variants).
+# ============================================================================
 
 # Include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -459,141 +555,56 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 set(COMMON_SOURCES
     src/common/error.c
     src/common/logging.c
+    src/common/paths.c
+    src/common/event_stream.c
     src/common/language_detector.c
     src/common/model_downloader.c
+    src/common/version.c
     src/config/settings.c
 )
 
-# Terminal settings menu (requires unistd.h - skip on Windows)
-if(NOT WIN32)
+# Terminal settings_menu (requires ncurses - skip on Windows, Android, iOS)
+if(NOT WIN32 AND NOT ANDROID AND NOT TARGET_PLATFORM STREQUAL "IOS")
     list(APPEND COMMON_SOURCES src/common/settings_menu.c)
 endif()
 
 # Platform-specific utility implementations
 if(ETHERVOX_PLATFORM_WINDOWS)
     list(APPEND COMMON_SOURCES src/common/platform_utils_windows.c)
-elseif(ETHERVOX_PLATFORM_LINUX OR ETHERVOX_PLATFORM_MACOS OR ETHERVOX_PLATFORM_RPI OR ETHERVOX_PLATFORM_ANDROID)
+elseif(ETHERVOX_PLATFORM_LINUX OR ETHERVOX_PLATFORM_MACOS OR ETHERVOX_PLATFORM_RPI OR ETHERVOX_PLATFORM_ANDROID OR ETHERVOX_PLATFORM_IOS)
     list(APPEND COMMON_SOURCES src/common/platform_utils_unix.c)
 endif()
 
 # Continue adding common sources
-if(WIN32)
+if(MSVC)
     # Windows: Exclude pthread and M_PI dependent sources
     list(APPEND COMMON_SOURCES
         src/audio/aec_speex.c
-        src/tts/tts.c
+        src/tts/tts_host.c
         src/tts/text_normalizer.c
-        src/tts/piper_backend.c
-        src/tts/phonemizer/phonemizer.c
-        src/tts/phonemizer/dictionary.c
-        src/tts/phonemizer/espeak_dict.c
-        src/tts/phonemizer/rules_en.c
-        src/tts/phonemizer/rules_de.c
-        src/tts/phonemizer/dict_chinese.c
-        src/tts/phonemizer/chinese_segmenter.c
-        src/tts/phonemizer/pronunciation_overrides.c
-        src/tts/phonemizer/stress_reduction.c
     )
-    message(STATUS "Windows: Excluded reference_buffer, audio_stream_player (pthread), pronunciation_trainer (M_PI)")
+    message(STATUS "Windows: Excluded reference_buffer, audio_stream_player (pthread)")
 else()
     list(APPEND COMMON_SOURCES
         src/audio/reference_buffer.c
         src/audio/aec_speex.c
         src/audio/audio_stream_player.c
-        src/tts/tts.c
+        src/tts/tts_host.c
         src/tts/text_normalizer.c
-        src/tts/piper_backend.c
-        src/tts/phonemizer/phonemizer.c
-        src/tts/phonemizer/dictionary.c
-        src/tts/phonemizer/espeak_dict.c
-        src/tts/phonemizer/rules_en.c
-        src/tts/phonemizer/rules_de.c
-        src/tts/phonemizer/dict_chinese.c
-        src/tts/phonemizer/chinese_segmenter.c
-        src/tts/phonemizer/pronunciation_overrides.c
-        src/tts/phonemizer/pronunciation_trainer.c
-        src/tts/phonemizer/stress_reduction.c
     )
 endif()
 
-# Espeak-trained dictionary embeddings (VARIANT-SPECIFIC DICTIONARIES REQUIRED)
-# Each Piper model is trained with a SPECIFIC espeak language variant (e.g., en-us vs en-gb-x-rp).
-# Using the wrong variant causes poor quality because espeak phonemes differ by variant:
-#   en-us:     həlˈoʊ  (US English: /oʊ/ diphthong)
-#   en-gb-x-rp: həlˈəʊ (British RP: /əʊ/ diphthong)
-# 
-# The dictionaries must match the model's phonemes.language field from its .onnx.json config.
-# Generated dictionaries are variant-specific:
-#   - espeak_dict_en_us.h      → for models with language: "en-us"
-#   - espeak_dict_en_gb_rp.h   → for models with language: "en-gb-x-rp"
-#   - espeak_dict_de.h         → for models with language: "de"
-#   - espeak_dict_cmn.h        → for models with language: "cmn"
-#   - espeak_dict_es_419.h     → for models with language: "es-419"
-# 
-# Generate all variants with: ./tools/train_phonemizer.sh (takes ~30 min per variant)
-option(ENABLE_ESPEAK_DICT "Enable embedded espeak-trained dictionaries (variant-specific)" OFF)
-
-set(ESPEAK_DICT_ENABLED FALSE)
-if(ENABLE_ESPEAK_DICT)
-    # Check for generated dictionary headers
-    set(ESPEAK_DICT_DIR "${CMAKE_SOURCE_DIR}/src/tts/phonemizer/data")
-    
-    if(EXISTS "${ESPEAK_DICT_DIR}/espeak_dict_en_us.h")
-        message(STATUS "✅ Espeak dictionary (en-us) found - enabling")
-        add_definitions(-DESPEAK_DICT_EN_US_ENABLED)
-        set(ESPEAK_DICT_ENABLED TRUE)
-    else()
-        message(STATUS "⚠️  Espeak dictionary (en-us) not found. Run: tools/train_phonemizer.sh")
-    endif()
-    
-    if(EXISTS "${ESPEAK_DICT_DIR}/espeak_dict_en_gb_rp.h")
-        message(STATUS "✅ Espeak dictionary (en-gb-rp) found - enabling")
-        add_definitions(-DESPEAK_DICT_EN_GB_RP_ENABLED)
-        set(ESPEAK_DICT_ENABLED TRUE)
-    else()
-        message(STATUS "⚠️  Espeak dictionary (en-gb-rp) not found. Run: tools/train_phonemizer.sh")
-    endif()
-    
-    if(EXISTS "${ESPEAK_DICT_DIR}/espeak_dict_de.h")
-        message(STATUS "✅ Espeak dictionary (de) found - enabling")
-        add_definitions(-DESPEAK_DICT_DE_ENABLED)
-        set(ESPEAK_DICT_ENABLED TRUE)
-    else()
-        message(STATUS "⚠️  Espeak dictionary (de) not found. Run: tools/train_phonemizer.sh")
-    endif()
-    
-    if(EXISTS "${ESPEAK_DICT_DIR}/espeak_dict_cmn.h")
-        message(STATUS "✅ Espeak dictionary (cmn) found - enabling")
-        add_definitions(-DESPEAK_DICT_CMN_ENABLED)
-        set(ESPEAK_DICT_ENABLED TRUE)
-    else()
-        message(STATUS "⚠️  Espeak dictionary (cmn) not found. Run: tools/train_phonemizer.sh")
-    endif()
-    
-    if(EXISTS "${ESPEAK_DICT_DIR}/espeak_dict_es_419.h")
-        message(STATUS "✅ Espeak dictionary (es-419) found - enabling")
-        add_definitions(-DESPEAK_DICT_ES_419_ENABLED)
-        set(ESPEAK_DICT_ENABLED TRUE)
-    else()
-        message(STATUS "⚠️  Espeak dictionary (es-419) not found. Run: tools/train_phonemizer.sh")
-    endif()
-    
-    # Add the data file if any dictionaries are enabled
-    if(ESPEAK_DICT_ENABLED)
-        list(APPEND COMMON_SOURCES src/tts/phonemizer/espeak_dict_data.c)
-        message(STATUS "✅ Espeak dictionary data file included in build")
-    endif()
-endif()
+# Phonemizer and Piper TTS removed (TASK-C1.0) - TTS now handled via ethervox_tts_host_t
 
 # Add bug_reporter.c only for non-Android platforms (Android uses Kotlin BugReporter)
-if(NOT TARGET_PLATFORM STREQUAL "ANDROID" AND NOT WIN32)
+if(ETHERVOX_FEATURE_BUG_REPORT AND NOT TARGET_PLATFORM STREQUAL "ANDROID" AND NOT WIN32)
     list(APPEND COMMON_SOURCES src/common/bug_reporter.c)
     message(STATUS "Bug reporter enabled")
 else()
-    message(STATUS "Bug reporter disabled (Android or Windows)")
+    message(STATUS "Bug reporter disabled (ETHERVOX_FEATURE_BUG_REPORT=OFF, Android, or Windows)")
 endif()
 
-# Collect core source files (non-platform specific)
+# TASK-C1.0: Exclude voice_training.c and global_tts.c - depend on removed phonemizer/TTS
 file(GLOB ETHERVOXAI_CORE_SOURCES 
     "src/dialogue/*.c"
     "src/plugins/*.c"
@@ -602,6 +613,76 @@ file(GLOB ETHERVOXAI_CORE_SOURCES
     "src/governor/*.c"
     "src/plugins/compute_tools/*.c"
     "src/plugins/timer_tools/*.c"
+)
+list(REMOVE_ITEM ETHERVOXAI_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/dialogue/voice_training.c")
+list(REMOVE_ITEM ETHERVOXAI_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/dialogue/global_tts.c")
+
+# TASK-C2.6a: tool contracts (name/description/schema/profiles) come from
+# tools/catalogue/*.json, not C literals - see ethervox_tool_catalogue_load().
+# Embedded at configure time so there is no runtime file I/O (works sandboxed
+# and on ESP32).
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedCatalogue.cmake)
+set(ETHERVOX_CATALOGUE_GENERATED_DIR "${CMAKE_BINARY_DIR}/generated")
+file(MAKE_DIRECTORY "${ETHERVOX_CATALOGUE_GENERATED_DIR}")
+ethervox_embed_catalogue(
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/catalogue/compute_tools.json
+    ETHERVOX_CATALOGUE_COMPUTE_TOOLS_JSON
+    ${ETHERVOX_CATALOGUE_GENERATED_DIR}/compute_tools_catalogue.h
+)
+ethervox_embed_catalogue(
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/catalogue/system_info_tools.json
+    ETHERVOX_CATALOGUE_SYSTEM_INFO_TOOLS_JSON
+    ${ETHERVOX_CATALOGUE_GENERATED_DIR}/system_info_tools_catalogue.h
+)
+ethervox_embed_catalogue(
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/catalogue/weather_tools.json
+    ETHERVOX_CATALOGUE_WEATHER_TOOLS_JSON
+    ${ETHERVOX_CATALOGUE_GENERATED_DIR}/weather_tools_catalogue.h
+)
+ethervox_embed_catalogue(
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/catalogue/context_tools.json
+    ETHERVOX_CATALOGUE_CONTEXT_TOOLS_JSON
+    ${ETHERVOX_CATALOGUE_GENERATED_DIR}/context_tools_catalogue.h
+)
+ethervox_embed_catalogue(
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/catalogue/meta_tools.json
+    ETHERVOX_CATALOGUE_META_TOOLS_JSON
+    ${ETHERVOX_CATALOGUE_GENERATED_DIR}/meta_tools_catalogue.h
+)
+ethervox_embed_catalogue(
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/catalogue/startup_prompt_tools.json
+    ETHERVOX_CATALOGUE_STARTUP_PROMPT_TOOLS_JSON
+    ${ETHERVOX_CATALOGUE_GENERATED_DIR}/startup_prompt_tools_catalogue.h
+)
+ethervox_embed_catalogue(
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/catalogue/timer_tools.json
+    ETHERVOX_CATALOGUE_TIMER_TOOLS_JSON
+    ${ETHERVOX_CATALOGUE_GENERATED_DIR}/timer_tools_catalogue.h
+)
+ethervox_embed_catalogue(
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/catalogue/unit_conversion.json
+    ETHERVOX_CATALOGUE_UNIT_CONVERSION_JSON
+    ${ETHERVOX_CATALOGUE_GENERATED_DIR}/unit_conversion_catalogue.h
+)
+ethervox_embed_catalogue(
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/catalogue/memory_tools.json
+    ETHERVOX_CATALOGUE_MEMORY_TOOLS_JSON
+    ${ETHERVOX_CATALOGUE_GENERATED_DIR}/memory_tools_catalogue.h
+)
+ethervox_embed_catalogue(
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/catalogue/file_tools.json
+    ETHERVOX_CATALOGUE_FILE_TOOLS_JSON
+    ${ETHERVOX_CATALOGUE_GENERATED_DIR}/file_tools_catalogue.h
+)
+ethervox_embed_catalogue(
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/catalogue/conversation_tools.json
+    ETHERVOX_CATALOGUE_CONVERSATION_TOOLS_JSON
+    ${ETHERVOX_CATALOGUE_GENERATED_DIR}/conversation_tools_catalogue.h
+)
+ethervox_embed_catalogue(
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/catalogue/workspace_tools.json
+    ETHERVOX_CATALOGUE_WORKSPACE_TOOLS_JSON
+    ${ETHERVOX_CATALOGUE_GENERATED_DIR}/workspace_tools_catalogue.h
 )
 
 # Note: src/dialogue/voice_conversation.c is included via GLOB above
@@ -613,7 +694,7 @@ list(FILTER ETHERVOXAI_CORE_SOURCES EXCLUDE REGEX ".*test_.*\\.c$")
 list(APPEND ETHERVOXAI_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/governor/kv_cache_persistence.c")
 
 # Exclude Windows-incompatible sources (wake_word, stt require Unix headers)
-if(WIN32)
+if(MSVC)
     list(FILTER ETHERVOXAI_CORE_SOURCES EXCLUDE REGEX ".*/wake_word/.*\\.c$")
     list(FILTER ETHERVOXAI_CORE_SOURCES EXCLUDE REGEX ".*/stt/.*\\.c$")
     # Exclude dialogue sources that require pthread
@@ -623,6 +704,13 @@ if(WIN32)
     list(FILTER ETHERVOXAI_CORE_SOURCES EXCLUDE REGEX ".*/dialogue/integration_tests\\.c$")
     list(FILTER ETHERVOXAI_CORE_SOURCES EXCLUDE REGEX ".*/dialogue/llm_tool_tests\\.c$")
     message(STATUS "Excluded wake_word, STT, and pthread-dependent dialogue sources on Windows")
+endif()
+
+# Exclude files that use system() on iOS (system() is not available on iOS)
+if(TARGET_PLATFORM STREQUAL "IOS" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    list(FILTER ETHERVOXAI_CORE_SOURCES EXCLUDE REGEX ".*/dialogue/integration_tests\\.c$")
+    list(FILTER ETHERVOXAI_CORE_SOURCES EXCLUDE REGEX ".*/dialogue/llm_tool_tests\\.c$")
+    message(STATUS "Excluded files that use system() calls on iOS")
 endif()
 
 # Add LLM sources only if LLM backends are enabled
@@ -639,7 +727,7 @@ else()
 endif()
 
 # Add memory tools plugin sources
-if(NOT WIN32)
+if(NOT MSVC)
     file(GLOB MEMORY_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/memory_tools/*.c")
     list(APPEND ETHERVOXAI_CORE_SOURCES ${MEMORY_TOOLS_SOURCES})
     message(STATUS "Memory tools plugin sources included")
@@ -648,12 +736,26 @@ else()
 endif()
 
 # Add file tools plugin sources
-if(NOT WIN32)
+# TASK-C2.6b: gated on ETHERVOX_FEATURE_FILE_TOOLS (OFF for EDGE/WORKSPACE, see
+# cmake/EthervoxFeatures.cmake) so an EDGE/WORKSPACE binary contains no
+# file_tools code or catalogue contract, not just an unreached registration
+# call - previously this flag only skipped the main.c call site, while the
+# plugin (and its embedded catalogue JSON) still linked into every profile.
+if(NOT MSVC)
+    # path_config.c is pure path configuration (no file mutation) and voice_tools.c, which every profile
+    # builds, depends on it, so it is part of the library in every profile.
+    list(APPEND ETHERVOXAI_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/file_tools/path_config.c")
+endif()
+
+if(NOT MSVC AND ETHERVOX_FEATURE_FILE_TOOLS)
     file(GLOB FILE_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/file_tools/*.c")
+    list(REMOVE_ITEM FILE_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/file_tools/path_config.c")
     list(APPEND ETHERVOXAI_CORE_SOURCES ${FILE_TOOLS_SOURCES})
     message(STATUS "File tools plugin sources included")
-else()
+elseif(MSVC)
     message(STATUS "File tools plugin SKIPPED on Windows (requires PATH_MAX)")
+else()
+    message(STATUS "File tools plugin SKIPPED (ETHERVOX_FEATURE_FILE_TOOLS=OFF)")
 endif()
 
 # Add unit conversion plugin sources
@@ -661,14 +763,21 @@ file(GLOB UNIT_CONVERSION_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/unit_
 list(APPEND ETHERVOXAI_CORE_SOURCES ${UNIT_CONVERSION_SOURCES})
 message(STATUS "Unit conversion plugin sources included")
 
-# Add startup prompt tools plugin sources
-file(GLOB STARTUP_PROMPT_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/startup_prompt_tools/*.c")
-list(APPEND ETHERVOXAI_CORE_SOURCES ${STARTUP_PROMPT_TOOLS_SOURCES})
+# Add startup prompt tools plugin sources.
+# The update tool writes startup_prompt.txt with fopen(..., "w"), so the plugin follows the file-tools
+# gate: an EDGE/WORKSPACE binary contains no built-in file writer (AGENTS.md I2).
+if(ETHERVOX_FEATURE_FILE_TOOLS)
+    file(GLOB STARTUP_PROMPT_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/startup_prompt_tools/*.c")
+    list(APPEND ETHERVOXAI_CORE_SOURCES ${STARTUP_PROMPT_TOOLS_SOURCES})
+    message(STATUS "Startup prompt tools plugin sources included")
+else()
+    message(STATUS "Startup prompt tools plugin SKIPPED (ETHERVOX_FEATURE_FILE_TOOLS=OFF)")
+endif()
 
 # System info tools
 file(GLOB SYSTEM_INFO_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/system_info_tools/*.c")
 list(APPEND ETHERVOXAI_CORE_SOURCES ${SYSTEM_INFO_TOOLS_SOURCES})
-message(STATUS "Startup prompt tools plugin sources included")
+message(STATUS "System info tools plugin sources included")
 
 # Add context tools plugin sources
 file(GLOB CONTEXT_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/context_tools/*.c")
@@ -676,8 +785,10 @@ list(APPEND ETHERVOXAI_CORE_SOURCES ${CONTEXT_TOOLS_SOURCES})
 message(STATUS "Context tools plugin sources included")
 
 # Add conversation tools plugin sources (speak, listen for LLM-controlled interaction)
-if(NOT WIN32)
+if(NOT MSVC)
+    # TASK-C1.0: Exclude train_pronunciation.c - depends on removed phonemizer
     file(GLOB CONVERSATION_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/conversation_tools/*.c")
+    list(REMOVE_ITEM CONVERSATION_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/conversation_tools/train_pronunciation.c")
     list(APPEND ETHERVOXAI_CORE_SOURCES ${CONVERSATION_TOOLS_SOURCES})
     message(STATUS "Conversation tools plugin sources included")
 else()
@@ -685,7 +796,7 @@ else()
 endif()
 
 # Add voice tools plugin sources
-if(NOT WIN32)
+if(NOT MSVC)
     file(GLOB VOICE_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/voice_tools/*.c")
     list(APPEND ETHERVOXAI_CORE_SOURCES ${VOICE_TOOLS_SOURCES})
     message(STATUS "Voice tools plugin sources included")
@@ -712,17 +823,33 @@ if(NOT ANDROID)
 endif()
 
 # Add weather tools plugin sources (Open-Meteo API integration)
-# Desktop: requires libcurl, Android: uses JNI HTTP client
-if(ANDROID OR HAVE_LIBCURL OR CURL_FOUND)
+# Desktop: requires libcurl, Android: uses JNI HTTP client, iOS: uses NSURLSession
+if(ETHERVOX_FEATURE_WEATHER AND (ANDROID OR TARGET_PLATFORM STREQUAL "IOS" OR CMAKE_SYSTEM_NAME STREQUAL "iOS" OR HAVE_LIBCURL OR CURL_FOUND))
     file(GLOB WEATHER_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/weather_tools/*.c")
+    if(NOT ANDROID)
+        # weather_http_android.c depends on <android/log.h> and <jni.h> and
+        # only makes sense on Android - exclude it from non-Android builds
+        # (this glob previously pulled it in unconditionally, breaking desktop
+        # builds; unrelated to the Granite Speech work but found while
+        # verifying this branch compiles).
+        list(FILTER WEATHER_TOOLS_SOURCES EXCLUDE REGEX ".*weather_http_android\\.c$")
+    endif()
+    if(TARGET_PLATFORM STREQUAL "IOS" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        # weather_http_ios.m is added explicitly below (Objective-C, not picked
+        # up by the *.c glob); nothing to exclude here since there's no
+        # weather_http_ios.c counterpart.
+        list(APPEND WEATHER_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/weather_tools/weather_http_ios.m")
+    endif()
     list(APPEND ETHERVOXAI_CORE_SOURCES ${WEATHER_TOOLS_SOURCES})
     if(ANDROID)
         message(STATUS "Weather tools plugin sources included (Android JNI HTTP)")
+    elseif(TARGET_PLATFORM STREQUAL "IOS" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        message(STATUS "Weather tools plugin sources included (iOS NSURLSession)")
     else()
         message(STATUS "Weather tools plugin sources included (libcurl available)")
     endif()
 else()
-    message(STATUS "Weather tools plugin SKIPPED (libcurl not available)")
+    message(STATUS "Weather tools plugin SKIPPED (ETHERVOX_FEATURE_WEATHER=OFF or libcurl not available)")
 endif()
 
 # Note: Dialogue sources already added via initial GLOB (lines 596-603)
@@ -753,7 +880,20 @@ elseif(WIN32 OR TARGET_PLATFORM STREQUAL "WINDOWS")
     set(PLATFORM_SOURCES
         src/audio/platform_windows.c
         src/platform/desktop_hal.c
-        src/platform/windows_stubs.c  # Stubs for excluded features
+        src/platform/device_profile.c  # Hardware detection and adaptive configuration (needed for governor)
+        src/platform/gguf_config_helper.c  # GGUF metadata extraction and config calculation
+    )
+elseif(TARGET_PLATFORM STREQUAL "IOS" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # ARCHITECTURE CHANGE (Granite Speech / multiplatform voice integration):
+    # This branch MUST be checked before "APPLE OR MACOS" below - CMake's
+    # APPLE variable is also true when cross-compiling for iOS, so without
+    # this explicit branch iOS builds silently fell into the macOS platform
+    # sources and src/platform/ios_hal.c was never actually compiled in.
+    message(STATUS "Building for iOS - using iOS platform sources")
+    set(PLATFORM_SOURCES
+        src/audio/platform_ios.c
+        src/platform/ios_hal.c
+        src/platform/ios_avaudiosession.m  # ObjC shim: AVAudioSession category/mode config for mic capture
         src/platform/device_profile.c  # Hardware detection and adaptive configuration (needed for governor)
         src/platform/gguf_config_helper.c  # GGUF metadata extraction and config calculation
     )
@@ -819,13 +959,20 @@ if(ANDROID)
     message(STATUS "Enabled 16KB page alignment for Android")
 else()
     add_library(ethervoxai STATIC ${ETHERVOXAI_SOURCES})
+    if(MSVC)
+        # <stdatomic.h> (cancel_token.c) needs MSVC's opt-in C11 atomics support (VS 2022 17.5+).
+        target_compile_options(ethervoxai PRIVATE /experimental:c11atomics)
+    endif()
 endif()
+
+# Phonemizer removed (TASK-C1.0)
 
 target_include_directories(ethervoxai
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${ETHERVOX_CATALOGUE_GENERATED_DIR})
 
 # Link llama.cpp if available
 if(WITH_LLAMA)
@@ -837,6 +984,19 @@ if(WITH_LLAMA)
         )
         target_link_libraries(ethervoxai PUBLIC llama)
         message(STATUS "Linked llama.cpp library to ethervoxai")
+        
+        # Link Vulkan backend if enabled and available
+        if(GGML_VULKAN AND TARGET ggml-vulkan)
+            target_link_libraries(ethervoxai PUBLIC ggml-vulkan)
+            message(STATUS "Linked ggml-vulkan backend for GPU acceleration")
+        endif()
+        
+        # Link OpenCL backend if enabled and available
+        # NOTE: Excluded from APK by default (most devices don't support OpenCL)
+        if(GGML_OPENCL AND TARGET ggml-opencl)
+            target_link_libraries(ethervoxai PUBLIC ggml-opencl)
+            message(STATUS "Linked ggml-opencl backend for GPU acceleration")
+        endif()
     else()
         message(WARNING "llama target not found - checking for ggml and llama-base")
         if(TARGET ggml AND TARGET llama-base)
@@ -846,23 +1006,53 @@ if(WITH_LLAMA)
             )
             target_link_libraries(ethervoxai PUBLIC ggml llama-base)
             message(STATUS "Linked ggml and llama-base libraries to ethervoxai")
+            
+            # Link Vulkan backend if enabled and available
+            if(GGML_VULKAN AND TARGET ggml-vulkan)
+                target_link_libraries(ethervoxai PUBLIC ggml-vulkan)
+                message(STATUS "Linked ggml-vulkan backend for GPU acceleration")
+            endif()
+            
+            # Link OpenCL backend if enabled and available
+            # NOTE: Excluded from APK by default (most devices don't support OpenCL)
+            if(GGML_OPENCL AND TARGET ggml-opencl)
+                target_link_libraries(ethervoxai PUBLIC ggml-opencl)
+                message(STATUS "Linked ggml-opencl backend for GPU acceleration")
+            endif()
         else()
             message(WARNING "No llama.cpp targets found - LLM will not be available")
         endif()
     endif()
 endif()
 
-# Link whisper.cpp if available
-if(WITH_WHISPER)
-    if(TARGET whisper)
-        target_include_directories(ethervoxai PRIVATE 
-            ${CMAKE_CURRENT_SOURCE_DIR}/external/whisper.cpp/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/external/whisper.cpp/src
+# Link Vulkan library on Android when GPU acceleration is enabled
+if(ANDROID AND GGML_VULKAN)
+    find_library(VULKAN_LIB vulkan REQUIRED)
+    target_link_libraries(ethervoxai PUBLIC ${VULKAN_LIB})
+    message(STATUS "Linked Vulkan library for GPU acceleration: ${VULKAN_LIB}")
+endif()
+
+# Link OpenCL library on Android when OpenCL acceleration is enabled
+if(ANDROID AND GGML_OPENCL)
+    # On Android, OpenCL is a system library available at runtime
+    # Link it directly - symbols will be resolved from system libOpenCL.so if available
+    target_link_libraries(ethervoxai PUBLIC OpenCL)
+    message(STATUS "Linked OpenCL library for GPU acceleration (runtime resolution)")
+    
+    # Note: The library is excluded from APK packaging by default
+    # since most Android devices don't have OpenCL support
+endif()
+
+# Link mtmd (Granite Speech audio support) if available
+if(WITH_LLAMA)
+    if(TARGET mtmd)
+        target_include_directories(ethervoxai PRIVATE
+            ${LLAMA_CPP_SOURCE_DIR}/tools/mtmd
         )
-        target_link_libraries(ethervoxai PUBLIC whisper)
-        message(STATUS "Linked whisper.cpp library to ethervoxai")
+        target_link_libraries(ethervoxai PUBLIC mtmd)
+        message(STATUS "Linked mtmd library to ethervoxai (Granite Speech STT)")
     else()
-        message(WARNING "whisper target not found - Voice features will be limited")
+        message(WARNING "mtmd target not found - Granite Speech STT will not be available")
     endif()
 endif()
 
@@ -895,50 +1085,7 @@ if(PkgConfig_FOUND)
         message(STATUS "⊘ Skipped Speex DSP (Android uses platform audio processing)")
     endif()
     
-    # Link ONNX Runtime for Piper TTS
-    pkg_check_modules(ONNXRUNTIME onnxruntime)
-    if(ONNXRUNTIME_FOUND)
-        target_link_libraries(ethervoxai PUBLIC ${ONNXRUNTIME_LINK_LIBRARIES})
-        target_include_directories(ethervoxai PRIVATE ${ONNXRUNTIME_INCLUDE_DIRS})
-        target_link_directories(ethervoxai PRIVATE ${ONNXRUNTIME_LIBRARY_DIRS})
-        target_compile_definitions(ethervoxai PUBLIC HAVE_PIPER_TTS=1)
-        message(STATUS "Linked ONNX Runtime library: ${ONNXRUNTIME_VERSION}")
-        message(STATUS "✅ Piper TTS backend ENABLED")
-    else()
-        # Try manual detection (Homebrew on macOS)
-        find_path(ONNXRUNTIME_INCLUDE_DIR 
-            NAMES onnxruntime_c_api.h
-            PATHS /opt/homebrew/Cellar/onnxruntime/*/include/onnxruntime
-                  /usr/local/Cellar/onnxruntime/*/include/onnxruntime
-                  /opt/homebrew/include/onnxruntime
-                  /usr/local/include/onnxruntime
-        )
-        find_library(ONNXRUNTIME_LIBRARY
-            NAMES onnxruntime
-            PATHS /opt/homebrew/Cellar/onnxruntime/*/lib
-                  /usr/local/Cellar/onnxruntime/*/lib
-                  /opt/homebrew/lib
-                  /usr/local/lib
-        )
-        
-        if(ONNXRUNTIME_INCLUDE_DIR AND ONNXRUNTIME_LIBRARY)
-            # Include parent directory so we can use #include <onnxruntime/...>
-            get_filename_component(ONNXRUNTIME_INCLUDE_PARENT "${ONNXRUNTIME_INCLUDE_DIR}" DIRECTORY)
-            target_include_directories(ethervoxai PRIVATE ${ONNXRUNTIME_INCLUDE_PARENT})
-            target_link_libraries(ethervoxai PUBLIC ${ONNXRUNTIME_LIBRARY})
-            target_compile_definitions(ethervoxai PUBLIC HAVE_PIPER_TTS=1)
-            message(STATUS "Found ONNX Runtime manually:")
-            message(STATUS "  Include: ${ONNXRUNTIME_INCLUDE_PARENT}")
-            message(STATUS "  Library: ${ONNXRUNTIME_LIBRARY}")
-            message(STATUS "✅ Piper TTS backend ENABLED")
-        else()
-            message(WARNING "ONNX Runtime not found - Piper TTS will be unavailable. Install with: brew install onnxruntime")
-        endif()
-    endif()
-    
-    # espeak-ng REMOVED - replaced with custom phonemizer (MIT-licensed)
-    # See src/tts/phonemizer.c for dictionary-based G2P implementation
-    message(STATUS "Using custom phonemizer (espeak-ng dependency removed for licensing)")
+    # ONNX Runtime/Piper TTS removed (TASK-C1.0) - TTS now via ethervox_tts_host_t
     
     # Link libcurl for HTTP downloads (model downloader) - Skip on Android (uses Kotlin HTTP)
     if(NOT ANDROID)
@@ -985,9 +1132,9 @@ else()
     endif()
 endif()
 
-# Add platform HTTP utilities (uses libcurl) - only on non-Android platforms with curl
-# Android uses Kotlin ModelDownloader.kt for HTTP downloads instead
-if(NOT ANDROID)
+# Add platform HTTP utilities (uses libcurl) - only on non-Android/iOS platforms with curl
+# Android uses Kotlin ModelDownloader.kt, iOS uses URLSession for HTTP downloads instead
+if(ETHERVOX_FEATURE_HTTP AND NOT ANDROID AND NOT TARGET_PLATFORM STREQUAL "IOS")
     get_target_property(HAVE_CURL ethervoxai COMPILE_DEFINITIONS)
     if(HAVE_CURL MATCHES "HAVE_LIBCURL=1")
         target_sources(ethervoxai PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/common/platform_http.c)
@@ -996,7 +1143,7 @@ if(NOT ANDROID)
         message(STATUS "⊘ Skipped platform_http.c (libcurl not available)")
     endif()
 else()
-    message(STATUS "⊘ Skipped platform_http.c (Android uses Kotlin HTTP)")
+    message(STATUS "⊘ Skipped platform_http.c (ETHERVOX_FEATURE_HTTP=OFF, or Android/iOS uses native HTTP)")
 endif()
 
 # Platform-specific linking for library consumers
@@ -1053,7 +1200,10 @@ elseif(ANDROID)
     endif()
     
 elseif(UNIX AND NOT APPLE)
-    set(ETHERVOXAI_PLATFORM_LIBS asound pthread ${CURL_LIBRARIES} ssl crypto m)
+    set(ETHERVOXAI_PLATFORM_LIBS asound pthread m)
+    if(ETHERVOX_NEEDS_CURL)
+        list(APPEND ETHERVOXAI_PLATFORM_LIBS ${CURL_LIBRARIES} ssl crypto)
+    endif()
 elseif(APPLE)
     set(ETHERVOXAI_PLATFORM_LIBS "-framework CoreAudio" "-framework AudioToolbox" "-framework AudioUnit" "-framework CoreFoundation" pthread ${CURL_LIBRARIES})
 endif()
@@ -1066,7 +1216,7 @@ endif()
 set_property(GLOBAL PROPERTY ETHERVOXAI_PLATFORM_LIBS "${ETHERVOXAI_PLATFORM_LIBS}")
 
 # CLI executable built on top of the reusable library (not for Android or Windows)
-if(NOT ANDROID AND NOT WIN32)
+if(BUILD_EXECUTABLES AND NOT ANDROID AND NOT WIN32)
     add_executable(ethervoxai_app src/main.c)
     target_link_libraries(ethervoxai_app PRIVATE ethervoxai)
     
@@ -1093,26 +1243,6 @@ if(NOT ANDROID AND NOT WIN32)
     set_target_properties(ethervoxai_app PROPERTIES OUTPUT_NAME ethervoxai)
 endif()
 
-# Voice quality tuner tool (Unix only - uses termios.h)
-if(NOT ANDROID AND NOT WIN32)
-    add_executable(voice_tuner tools/voice_tuner.c)
-    target_link_libraries(voice_tuner PRIVATE ethervoxai cjson)
-    target_include_directories(voice_tuner PRIVATE 
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${cjson_SOURCE_DIR})
-    set_target_properties(voice_tuner PROPERTIES OUTPUT_NAME ethervox-tune-voice)
-    install(TARGETS voice_tuner RUNTIME DESTINATION bin)
-    
-    # Emotion tester tool for multi-speaker models
-    add_executable(emotion_tester tools/emotion_tester.c)
-    target_link_libraries(emotion_tester PRIVATE ethervoxai cjson)
-    target_include_directories(emotion_tester PRIVATE 
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${cjson_SOURCE_DIR})
-    set_target_properties(emotion_tester PROPERTIES OUTPUT_NAME ethervox-test-emotions)
-    install(TARGETS emotion_tester RUNTIME DESTINATION bin)
-endif()
-
 # Optional: Examples and tests (if directories exist and not Android)
 if(BUILD_EXAMPLES AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples" AND NOT ANDROID)
     add_subdirectory(examples)
@@ -1127,8 +1257,14 @@ endif()
 install(TARGETS ethervoxai
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib)
-if(NOT ANDROID AND NOT WIN32)
-    install(TARGETS ethervoxai_app RUNTIME DESTINATION bin)
+if(BUILD_EXECUTABLES AND NOT ANDROID AND NOT WIN32)
+    if(TARGET_PLATFORM STREQUAL "IOS" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        install(TARGETS ethervoxai_app 
+            RUNTIME DESTINATION bin
+            BUNDLE DESTINATION .)
+    else()
+        install(TARGETS ethervoxai_app RUNTIME DESTINATION bin)
+    endif()
 endif()
 install(DIRECTORY include/ DESTINATION include)
 install(FILES README.md LICENSE DESTINATION share/doc/ethervoxai)

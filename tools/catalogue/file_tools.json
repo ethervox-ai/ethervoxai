@@ -1,0 +1,127 @@
+[
+  {
+    "name": "file_list",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP"],
+    "description": "List files and directories in a given path. Use '.' for current directory, '..' for parent, or provide an absolute path.",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "directory": { "type": "string", "description": "Directory path to list (use '.' for current directory)" },
+        "path": { "type": "string", "description": "Directory path to list (alternative to 'directory')" },
+        "recursive": { "type": "boolean", "description": "Recurse into subdirectories" }
+      }
+    }
+  },
+  {
+    "name": "file_read",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP"],
+    "description": "Read contents of a text based file (.txt, .md, .org, .c, etc.). Maximum 10MB.",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "Path to file to read" },
+        "file_path": { "type": "string", "description": "Path to file to read (alternative to 'path')" }
+      }
+    }
+  },
+  {
+    "name": "file_search",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP"],
+    "description": "Search for text pattern in all allowed files within a directory",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "directory": { "type": "string", "description": "Directory to search in" },
+        "pattern": { "type": "string", "description": "Text pattern to search for" }
+      },
+      "required": ["directory", "pattern"]
+    }
+  },
+  {
+    "name": "file_write",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP"],
+    "description": "Create or overwrite a file with specified content. Useful for saving notes, documentation, or generated text. Always provide both file_path and content.",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "file_path": { "type": "string", "description": "Path to file to write. Use relative paths like './notes.md' or './output.txt'. File must have an allowed extension (.txt, .md, .org, .c, .cpp, .h, .sh)" },
+        "content": { "type": "string", "description": "The complete text content to write to the file. Can be markdown, code, plain text, or any supported format." }
+      },
+      "required": ["file_path", "content"]
+    }
+  },
+  {
+    "name": "file_append",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP"],
+    "description": "Append content to the end of an existing file. Useful for adding to notes, logs, or summaries without overwriting. Always provide both path and content.",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "Path to file to append to" },
+        "file_path": { "type": "string", "description": "Path to file to append to (alternative to 'path')" },
+        "content": { "type": "string", "description": "The text content to append to the file. Can include newlines." }
+      },
+      "required": ["content"]
+    }
+  },
+  {
+    "name": "path_list",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP"],
+    "description": "List all configured user paths (Documents, Notes, etc.). Shows which paths are verified and accessible. Use this to discover where the user keeps important files.",
+    "is_mutating": false,
+    "schema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "path_get",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP"],
+    "description": "Get the absolute path for a specific label (e.g., 'Notes', 'Documents', 'Downloads'). Use this to get the exact path before reading or listing files.",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "label": { "type": "string", "description": "Path label to retrieve (e.g., 'Notes', 'Documents')" }
+      },
+      "required": ["label"]
+    }
+  },
+  {
+    "name": "path_set",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP"],
+    "description": "Configure or update a user path. Use this to remember important directories the user mentions. Paths are persisted across sessions. Ask the user for the actual path if defaults don't exist.",
+    "is_mutating": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "label": { "type": "string", "description": "Human-friendly label (e.g., 'Notes', 'Projects', 'Documents')" },
+        "path": { "type": "string", "description": "Absolute directory path" },
+        "description": { "type": "string", "description": "Optional description of what this path contains" }
+      },
+      "required": ["label", "path"]
+    }
+  },
+  {
+    "name": "path_check_unverified",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP"],
+    "description": "Check for unverified paths (default paths that don't exist on this system). Use this to discover which paths need configuration and proactively ask the user for the correct locations.",
+    "is_mutating": false,
+    "schema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "file_set_safe_mode",
+    "profiles": ["EDGE", "MOBILE", "DESKTOP"],
+    "description": "Enable or disable safe mode to restrict file write access. Use this like 'plan mode' - enable safe mode before exploring user files, disable only when user explicitly asks to write/modify files. Returns current mode status.",
+    "is_mutating": false,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "enable": { "type": "boolean", "description": "true to enable read-only safe mode, false to allow writes" }
+      },
+      "required": ["enable"]
+    }
+  }
+]

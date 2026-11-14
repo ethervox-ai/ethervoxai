@@ -1,0 +1,178 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "number"
+        }
+      },
+      "minItems": 0
+    },
+    "field_1": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "object",
+              "properties": {
+                "field_0": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "field_0"
+              ]
+            },
+            "field_1": {
+              "type": "string"
+            },
+            "field_2": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{8}$"
+            },
+            "field_3": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "field_1": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "number",
+              "minimum": 84,
+              "maximum": 371
+            },
+            "field_1": {
+              "type": "boolean"
+            },
+            "field_2": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{8}$"
+            }
+          },
+          "required": [
+            "field_0",
+            "field_2"
+          ]
+        },
+        "field_2": {
+          "type": "number"
+        },
+        "field_3": {
+          "type": "boolean"
+        },
+        "field_4": {
+          "type": "boolean"
+        },
+        "field_5": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field_1",
+        "field_3",
+        "field_4"
+      ]
+    },
+    "field_2": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "field_1": {
+          "type": "integer"
+        },
+        "field_2": {
+          "type": "number"
+        },
+        "field_3": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "object",
+              "properties": {
+                "field_0": {
+                  "type": "string"
+                },
+                "field_1": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "field_1"
+              ]
+            }
+          }
+        },
+        "field_4": {
+          "type": "object",
+          "properties": {
+            "field_0": {
+              "type": "object",
+              "properties": {
+                "field_0": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "field_1": {
+              "type": "object",
+              "properties": {
+                "field_0": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "field_0"
+              ]
+            },
+            "field_2": {
+              "type": "number"
+            },
+            "field_3": {
+              "type": "object",
+              "properties": {
+                "field_0": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "required": [
+            "field_3"
+          ]
+        },
+        "field_5": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]{3}-[0-9]{4}$"
+          },
+          "maxItems": 16,
+          "minItems": 3
+        }
+      },
+      "required": [
+        "field_0",
+        "field_2",
+        "field_4"
+      ]
+    }
+  },
+  "required": [
+    "field_1"
+  ]
+}

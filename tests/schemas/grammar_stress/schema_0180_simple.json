@@ -1,0 +1,42 @@
+{
+  "type": "object",
+  "properties": {
+    "field_0": {
+      "type": "number",
+      "minimum": 92,
+      "maximum": 950
+    },
+    "field_1": {
+      "type": "object",
+      "properties": {
+        "field_0": {
+          "type": "string"
+        },
+        "field_1": {
+          "type": "integer"
+        },
+        "field_2": {
+          "type": "integer"
+        },
+        "field_3": {
+          "type": "number"
+        },
+        "field_4": {
+          "type": "string"
+        },
+        "field_5": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "field_2",
+        "field_3",
+        "field_4"
+      ]
+    }
+  },
+  "required": [
+    "field_0",
+    "field_1"
+  ]
+}

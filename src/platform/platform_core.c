@@ -4,14 +4,14 @@
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
  *
- * This file is part of EthervoxAI, licensed under CC BY-NC-SA 4.0.
+ * This file is part of EthervoxAI. Proprietary and confidential. See LICENSE.
  * You are free to share and adapt this work under the following terms:
  * - Attribution: Credit the original authors
- * - NonCommercial: Not for commercial use
+ * - Proprietary: internal use only, see LICENSE
  * - ShareAlike: Distribute under same license
  *
- * For full license terms, see: https://creativecommons.org/licenses/by-nc-sa/4.0/
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * For full license terms, see: LICENSE
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include <stddef.h>
@@ -28,6 +28,10 @@
 #include <windows.h>
 #endif
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 // Forward declarations ONLY (no function bodies)
 #ifdef ETHERVOX_PLATFORM_RPI
 #pragma message("-----Compiling with ETHERVOX_PLATFORM_RPI")
@@ -42,6 +46,9 @@ extern ethervox_result_t desktop_hal_register(ethervox_platform_t* platform);
 #if defined(ETHERVOX_PLATFORM_ANDROID) || defined(__ANDROID__)
 extern ethervox_result_t ethervox_platform_hal_register_android(ethervox_platform_t* platform);
 #endif
+#if defined(ETHERVOX_PLATFORM_IOS) || (defined(__APPLE__) && (TARGET_OS_IOS || TARGET_OS_MACCATALYST))
+extern ethervox_result_t ethervox_platform_hal_register_ios(ethervox_platform_t* platform);
+#endif
 
 // Register platform-specific HAL
 ethervox_result_t ethervox_platform_register_hal(ethervox_platform_t* platform) {
@@ -53,6 +60,8 @@ ethervox_result_t ethervox_platform_register_hal(ethervox_platform_t* platform) 
   return rpi_hal_register(platform);
 #elif defined(ETHERVOX_PLATFORM_ANDROID) || defined(__ANDROID__)
   return ethervox_platform_hal_register_android(platform);
+#elif defined(ETHERVOX_PLATFORM_IOS) || (defined(__APPLE__) && (TARGET_OS_IOS || TARGET_OS_MACCATALYST))
+  return ethervox_platform_hal_register_ios(platform);
 #elif defined(ETHERVOX_PLATFORM_DESKTOP)
   return desktop_hal_register(platform);
 #else
@@ -68,6 +77,8 @@ const char* ethervox_platform_get_name(void) {
   return "Raspberry Pi";
 #elif defined(ETHERVOX_PLATFORM_ANDROID) || defined(__ANDROID__)
   return "Android";
+#elif defined(ETHERVOX_PLATFORM_IOS) || (defined(__APPLE__) && (TARGET_OS_IOS || TARGET_OS_MACCATALYST))
+  return "iOS";
 #elif defined(ETHERVOX_PLATFORM_WINDOWS)
   return "Windows";
 #elif defined(ETHERVOX_PLATFORM_LINUX)

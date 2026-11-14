@@ -3,8 +3,8 @@
  * @brief Weather forecast core implementation using Open-Meteo API
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * Licensed under CC BY-NC-SA 4.0
- * For full license terms, see: https://creativecommons.org/licenses/by-nc-sa/4.0/
+ * Proprietary and confidential. See LICENSE.
+ * For full license terms, see: LICENSE
  * 
  * Weather data provided by Open-Meteo (MIT License)
  * API: https://open-meteo.com
@@ -29,6 +29,13 @@ extern ethervox_result_t android_http_get_request(
     char** response_out,
     char** error_message_out);
 #define PLATFORM_HTTP_GET android_http_get_request
+#elif defined(ETHERVOX_PLATFORM_IOS)
+// iOS: Use NSURLSession-based HTTP client (implemented in weather_http_ios.m)
+extern ethervox_result_t ios_http_get_request(
+    const char* url,
+    char** response_out,
+    char** error_message_out);
+#define PLATFORM_HTTP_GET ios_http_get_request
 #else
 // Desktop: Use libcurl
 #if HAVE_LIBCURL
@@ -128,6 +135,50 @@ static char* url_encode(const char* str) {
     if (!str) return NULL;
     
     // Simple URL encoding for Android (handles spaces and special chars)
+    size_t len = strlen(str);
+    char* encoded = malloc(len * 3 + 1);  // Max 3x expansion
+    if (!encoded) return NULL;
+    
+    const char* hex = "0123456789ABCDEF";
+    size_t pos = 0;
+    
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)str[i];
+        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+            encoded[pos++] = c;
+        } else if (c == ' ') {
+            encoded[pos++] = '+';
+        } else {
+            encoded[pos++] = '%';
+            encoded[pos++] = hex[c >> 4];
+            encoded[pos++] = hex[c & 0x0F];
+        }
+    }
+    encoded[pos] = '\0';
+    
+    return encoded;
+}
+
+#elif defined(ETHERVOX_PLATFORM_IOS)
+/**
+ * @brief Make HTTP GET request - iOS implementation (delegates to NSURLSession)
+ */
+static ethervox_result_t http_get_request(
+    const char* url,
+    char** response_out,
+    char** error_message_out
+) {
+    // On iOS, use NSURLSession-based HTTP client
+    return ios_http_get_request(url, response_out, error_message_out);
+}
+
+/**
+ * @brief URL-encode a string - iOS simple implementation
+ */
+static char* url_encode(const char* str) {
+    if (!str) return NULL;
+    
+    // Simple URL encoding for iOS (handles spaces and special chars)
     size_t len = strlen(str);
     char* encoded = malloc(len * 3 + 1);  // Max 3x expansion
     if (!encoded) return NULL;
@@ -971,8 +1022,8 @@ ethervox_result_t ethervox_weather_init(const ethervox_weather_config_t* config)
         g_config = *config;
     }
     
-#ifndef ETHERVOX_PLATFORM_ANDROID
-    // Initialize curl globally (not needed on Android - using JNI HTTP)
+#if !defined(ETHERVOX_PLATFORM_ANDROID) && !defined(ETHERVOX_PLATFORM_IOS)
+    // Initialize curl globally (not needed on Android/iOS - using native HTTP)
     curl_global_init(CURL_GLOBAL_DEFAULT);
 #endif
     
@@ -993,7 +1044,7 @@ void ethervox_weather_cleanup(void) {
     
     weather_cache_clear();
     
-#ifndef ETHERVOX_PLATFORM_ANDROID
+#if !defined(ETHERVOX_PLATFORM_ANDROID) && !defined(ETHERVOX_PLATFORM_IOS)
     curl_global_cleanup();
 #endif
     

@@ -1,5 +1,7 @@
 # FetchDependencies.cmake
-# Automatic dependency fetching for llama.cpp and whisper.cpp
+# Automatic dependency fetching for llama.cpp (whisper.cpp has been removed -
+# STT now runs entirely on Granite Speech via llama.cpp's mtmd library, which
+# ships inside the llama.cpp tree itself - see fetch_llama_cpp() below)
 #
 # This module handles dependency acquisition with multiple strategies:
 # 1. Check if external/<dep> exists (git submodule)
@@ -9,7 +11,6 @@
 # Usage:
 #   include(cmake/FetchDependencies.cmake)
 #   fetch_llama_cpp()
-#   fetch_whisper_cpp()
 
 include(FetchContent)
 
@@ -45,11 +46,21 @@ function(fetch_llama_cpp)
         
         set(FETCHCONTENT_QUIET OFF)
         
+        # Granite Speech's GGUF is a multimodal (mtmd) pair - main GGUF (LLM +
+        # Conformer audio encoder) plus a companion mmproj GGUF (QFormer audio
+        # projector). llama.cpp only gained Granite Speech's mtmd support in
+        # tools/mtmd/models/granite-speech.cpp as of release b9045; floating on
+        # `master` risks a future upstream change silently breaking ASR, so this
+        # is pinned to the exact commit that shipped it (verified via the
+        # upstream PR "mtmd: add granite-speech support", #22101). Re-pin
+        # deliberately if upgrading, and re-verify both BASE and PLUS (SAA)
+        # variants still tokenize/decode correctly against the new commit.
+        set(LLAMA_CPP_PINNED_COMMIT "a00e47e422bc4e48b8d2cdcfb16b7e55748237c2")  # b9045
         if(ETHERVOX_FETCH_SHALLOW)
             FetchContent_Declare(
                 llama_cpp
-                GIT_REPOSITORY https://github.com/ggerganov/llama.cpp.git
-                GIT_TAG        master  # You should pin to a specific tag/commit
+                GIT_REPOSITORY https://github.com/ggml-org/llama.cpp.git
+                GIT_TAG        ${LLAMA_CPP_PINNED_COMMIT}
                 GIT_SHALLOW    TRUE
                 GIT_PROGRESS   TRUE
                 SOURCE_DIR     "${LLAMA_CPP_DIR}"
@@ -57,8 +68,8 @@ function(fetch_llama_cpp)
         else()
             FetchContent_Declare(
                 llama_cpp
-                GIT_REPOSITORY https://github.com/ggerganov/llama.cpp.git
-                GIT_TAG        master
+                GIT_REPOSITORY https://github.com/ggml-org/llama.cpp.git
+                GIT_TAG        ${LLAMA_CPP_PINNED_COMMIT}
                 GIT_PROGRESS   TRUE
                 SOURCE_DIR     "${LLAMA_CPP_DIR}"
             )
@@ -96,63 +107,10 @@ function(fetch_llama_cpp)
     endif()
 endfunction()
 
-# whisper.cpp dependency
-function(fetch_whisper_cpp)
-    set(WHISPER_CPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/whisper.cpp")
-    
-    # Check if user provided custom path
-    if(DEFINED WHISPER_CPP_CUSTOM_DIR)
-        set(WHISPER_CPP_DIR "${WHISPER_CPP_CUSTOM_DIR}")
-        message(STATUS "Using custom whisper.cpp from: ${WHISPER_CPP_DIR}")
-    endif()
-    
-    # Strategy 1: Check if submodule exists
-    if(EXISTS "${WHISPER_CPP_DIR}/CMakeLists.txt")
-        message(STATUS "✓ whisper.cpp found at: ${WHISPER_CPP_DIR}")
-        set(WHISPER_CPP_SOURCE_DIR "${WHISPER_CPP_DIR}" PARENT_SCOPE)
-        return()
-    endif()
-    
-    # Strategy 2: Auto-fetch if enabled
-    if(ETHERVOX_AUTO_FETCH_DEPS)
-        message(STATUS "⬇️  whisper.cpp not found, downloading automatically...")
-        message(STATUS "   This is a one-time download (~30MB)")
-        message(STATUS "   Tip: Use 'git submodule update --init' to avoid future downloads")
-        
-        set(FETCHCONTENT_QUIET OFF)
-        
-        if(ETHERVOX_FETCH_SHALLOW)
-            FetchContent_Declare(
-                whisper_cpp
-                GIT_REPOSITORY https://github.com/ggerganov/whisper.cpp.git
-                GIT_TAG        master  # You should pin to a specific tag/commit
-                GIT_SHALLOW    TRUE
-                GIT_PROGRESS   TRUE
-                SOURCE_DIR     "${WHISPER_CPP_DIR}"
-            )
-        else()
-            FetchContent_Declare(
-                whisper_cpp
-                GIT_REPOSITORY https://github.com/ggerganov/whisper.cpp.git
-                GIT_TAG        master
-                GIT_PROGRESS   TRUE
-                SOURCE_DIR     "${WHISPER_CPP_DIR}"
-            )
-        endif()
-        
-        FetchContent_GetProperties(whisper_cpp)
-        if(NOT whisper_cpp_POPULATED)
-            FetchContent_Populate(whisper_cpp)
-            set(WHISPER_CPP_SOURCE_DIR "${whisper_cpp_SOURCE_DIR}" PARENT_SCOPE)
-            message(STATUS "✓ whisper.cpp downloaded to: ${whisper_cpp_SOURCE_DIR}")
-        endif()
-    else()
-        message(WARNING "whisper.cpp not found and ETHERVOX_AUTO_FETCH_DEPS=OFF")
-        message(WARNING "Please run: git submodule update --init --recursive")
-        message(WARNING "Or set: -DETHERVOX_AUTO_FETCH_DEPS=ON")
-        set(WHISPER_CPP_SOURCE_DIR "" PARENT_SCOPE)
-    endif()
-endfunction()
+# whisper.cpp has been removed entirely - Granite Speech (loaded via
+# llama.cpp's mtmd library, fetched as part of fetch_llama_cpp() above)
+# replaces it for all STT. No fetch_whisper_cpp() function remains; there is
+# no backward-compat path back to Whisper.
 
 # Helper function to print dependency status
 function(print_dependency_status)
@@ -162,15 +120,9 @@ function(print_dependency_status)
     message(STATUS "Shallow clones: ${ETHERVOX_FETCH_SHALLOW}")
     
     if(LLAMA_CPP_SOURCE_DIR)
-        message(STATUS "✓ llama.cpp: ${LLAMA_CPP_SOURCE_DIR}")
+        message(STATUS "✓ llama.cpp (+ mtmd/Granite Speech): ${LLAMA_CPP_SOURCE_DIR}")
     else()
         message(STATUS "✗ llama.cpp: NOT AVAILABLE")
-    endif()
-    
-    if(WHISPER_CPP_SOURCE_DIR)
-        message(STATUS "✓ whisper.cpp: ${WHISPER_CPP_SOURCE_DIR}")
-    else()
-        message(STATUS "✗ whisper.cpp: NOT AVAILABLE")
     endif()
     
     message(STATUS "=====================================")

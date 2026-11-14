@@ -5,7 +5,7 @@
  * Collects system information and submits issues to GitHub anonymously.
  *
  * Copyright (c) 2024-2025 EthervoxAI Team
- * SPDX-License-Identifier: CC-BY-NC-SA-4.0
+ * SPDX-License-Identifier: LicenseRef-EthervoxAI-Proprietary
  */
 
 #include "ethervox/bug_reporter.h"
@@ -19,7 +19,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+// CURL not available on iOS/Android - use native APIs instead
+#if !defined(TARGET_ANDROID) && !defined(__ANDROID__) && !defined(TARGET_OS_IPHONE) && !defined(TARGET_PLATFORM_IOS)
 #include <curl/curl.h>
+#define HAVE_CURL 1
+#endif
 
 // GitHub API configuration
 #define GITHUB_API_URL "https://api.github.com/repos/timkos98/ethervoxai/issues"
@@ -28,6 +33,7 @@
 // The build will FAIL if the token is not set, invalid, or expired
 // Fine-grained token must have issues:write permission for timkos98/ethervoxai
 
+#ifdef HAVE_CURL
 // Response buffer for HTTP responses
 typedef struct {
     char* data;
@@ -51,6 +57,45 @@ static size_t write_callback(void* contents, size_t size, size_t nmemb, void* us
     
     return realsize;
 }
+
+static char* json_escape(const char* str) {
+    if (!str) return NULL;
+    
+    size_t len = strlen(str);
+    // Worst case: every char needs escaping (e.g., all quotes)
+    char* escaped = malloc(len * 2 + 1);
+    if (!escaped) return NULL;
+    
+    char* out = escaped;
+    for (const char* in = str; *in; in++) {
+        switch (*in) {
+            case '"':
+            case '\\':
+                *out++ = '\\';
+                *out++ = *in;
+                break;
+            case '\n':
+                *out++ = '\\';
+                *out++ = 'n';
+                break;
+            case '\r':
+                *out++ = '\\';
+                *out++ = 'r';
+                break;
+            case '\t':
+                *out++ = '\\';
+                *out++ = 't';
+                break;
+            default:
+                *out++ = *in;
+                break;
+        }
+    }
+    *out = '\0';
+    
+    return escaped;
+}
+#endif  // HAVE_CURL
 
 static int get_configuration_info(char* buffer, size_t buffer_size) {
     if (!buffer || buffer_size == 0) {
@@ -205,44 +250,6 @@ ethervox_result_t ethervox_report_get_system_info(char* buffer, size_t buffer_si
     return written;
 }
 
-static char* json_escape(const char* str) {
-    if (!str) return NULL;
-    
-    size_t len = strlen(str);
-    // Worst case: every char needs escaping (e.g., all quotes)
-    char* escaped = malloc(len * 2 + 1);
-    if (!escaped) return NULL;
-    
-    char* out = escaped;
-    for (const char* in = str; *in; in++) {
-        switch (*in) {
-            case '"':
-            case '\\':
-                *out++ = '\\';
-                *out++ = *in;
-                break;
-            case '\n':
-                *out++ = '\\';
-                *out++ = 'n';
-                break;
-            case '\r':
-                *out++ = '\\';
-                *out++ = 'r';
-                break;
-            case '\t':
-                *out++ = '\\';
-                *out++ = 't';
-                break;
-            default:
-                *out++ = *in;
-                break;
-        }
-    }
-    *out = '\0';
-    
-    return escaped;
-}
-
 ethervox_result_t ethervox_report_submit(
     ethervox_report_type_t type,
     const char* title,
@@ -271,6 +278,7 @@ ethervox_result_t ethervox_report_submit(
         return ETHERVOX_ERROR_INVALID_ARGUMENT;
     }
     
+#ifdef HAVE_CURL
     // Initialize curl
     CURL* curl = curl_easy_init();
     if (!curl) {
@@ -407,4 +415,11 @@ ethervox_result_t ethervox_report_submit(
     curl_easy_cleanup(curl);
     
     return result->success ? 0 : -1;
+#else
+    // Mobile platforms (iOS/Android) - use native bug reporting instead
+    snprintf(result->error_message, sizeof(result->error_message),
+             "Bug reporting via libcurl not available on mobile. Use native bug reporter.");
+    ETHERVOX_LOG_WARN("libcurl not available - use native bug reporter on iOS/Android");
+    return ETHERVOX_ERROR_NOT_SUPPORTED;
+#endif  // HAVE_CURL
 }
