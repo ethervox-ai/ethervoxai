@@ -76,8 +76,8 @@ void test_plugin_manager_null_handling() {
   printf("Testing plugin manager null pointer handling...\n");
 
   // Test NULL manager
-  CHECK(ethervox_plugin_manager_init(NULL, NULL) == -1);
-  CHECK(ethervox_plugin_manager_init(NULL, "./plugins") == -1);
+  CHECK(ethervox_plugin_manager_init(NULL, NULL) == ETHERVOX_ERROR_INVALID_ARGUMENT);
+  CHECK(ethervox_plugin_manager_init(NULL, "./plugins") == ETHERVOX_ERROR_INVALID_ARGUMENT);
 
   // Test NULL plugin directory (should be allowed - uses default)
   ethervox_plugin_manager_t manager;

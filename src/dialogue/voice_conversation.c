@@ -885,6 +885,9 @@ static void* conversation_thread(void* arg) {
             printf("[OK] Microphone ready\n");
         } else {
             printf("❌ Failed to initialize microphone\n");
+            pthread_mutex_lock(&session->mutex);
+            conversation_set_state(session, ETHERVOX_CONV_STATE_ERROR);
+            pthread_mutex_unlock(&session->mutex);
             return NULL;
         }
     }
@@ -932,6 +935,9 @@ static void* conversation_thread(void* arg) {
             printf("[OK] Speech recognition ready\n");
         } else {
             printf("❌ Failed to initialize speech recognition\n");
+            pthread_mutex_lock(&session->mutex);
+            conversation_set_state(session, ETHERVOX_CONV_STATE_ERROR);
+            pthread_mutex_unlock(&session->mutex);
             return NULL;
         }
     }

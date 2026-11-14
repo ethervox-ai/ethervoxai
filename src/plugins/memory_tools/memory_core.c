@@ -353,6 +353,27 @@ ethervox_result_t ethervox_memory_store_add(
     uint64_t* memory_id_out
 ) {
     if (!store) return ETHERVOX_ERROR_INVALID_ARGUMENT;
+
+    // Secret mode: do not log, but report success so the caller's flow is unchanged.
+    if (ethervox_memory_get_privacy_mode()) {
+        if (memory_id_out) *memory_id_out = 0;
+        return ETHERVOX_SUCCESS;
+    }
+
+    return ethervox_memory_store_add_always(store, text, tags, tag_count, importance,
+                                            is_user_message, memory_id_out);
+}
+
+ethervox_result_t ethervox_memory_store_add_always(
+    ethervox_memory_store_t* store,
+    const char* text,
+    const char* tags[],
+    uint32_t tag_count,
+    float importance,
+    bool is_user_message,
+    uint64_t* memory_id_out
+) {
+    if (!store) return ETHERVOX_ERROR_INVALID_ARGUMENT;
     
     // Generate new ID and timestamp
     uint64_t memory_id = store->total_memories_stored;

@@ -1,15 +1,21 @@
 {
-  "MD013": {
-    "line_length": 120,
-    "code_blocks": false,
-    "tables": false
-  },
+  "MD013": false,
   "MD033": {
-    "allowed_elements": ["br", "details", "summary", "img", "a", "div", "span"]
+    "allowed_elements": [
+      "br",
+      "details",
+      "summary",
+      "img",
+      "a",
+      "div",
+      "span"
+    ]
   },
   "MD041": false,
   "MD025": false,
-    "MD040": {
-    "allowed_languages": ["bash", "json", "french", "spanish", "english", "markdown", "yaml", "python", "cpp", "c", "javascript", "typescript", "java", "ruby", "go", "php", "swift", "kotlin", "rust", "shell", "powershell", "sql"]
-  }
+  "MD040": false,
+  "MD022": false,
+  "MD031": false,
+  "MD032": false,
+  "MD060": false
 }

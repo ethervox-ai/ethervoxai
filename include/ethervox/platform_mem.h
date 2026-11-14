@@ -102,7 +102,7 @@ typedef struct {
  * @return ETHERVOX_SUCCESS or error code
  */
 static inline ethervox_result_t ethervox_mmap_open(const char* path, ethervox_mmap_t* mapping) {
-    if (!path || !mmap) return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    if (!path || !mapping) return ETHERVOX_ERROR_INVALID_ARGUMENT;
     
     mapping->file_handle = CreateFileA(
         path,
@@ -162,7 +162,7 @@ static inline ethervox_result_t ethervox_mmap_open(const char* path, ethervox_mm
  * @param mmap Memory map structure
  */
 static inline void ethervox_mmap_close(ethervox_mmap_t* mapping) {
-    if (!mmap) return;
+    if (!mapping) return;
     
     if (mapping->data) {
         UnmapViewOfFile(mapping->data);
@@ -194,7 +194,7 @@ typedef struct {
 } ethervox_mmap_t;
 
 static inline ethervox_result_t ethervox_mmap_open(const char* path, ethervox_mmap_t* mapping) {
-    if (!path || !mmap) return ETHERVOX_ERROR_INVALID_ARGUMENT;
+    if (!path || !mapping) return ETHERVOX_ERROR_INVALID_ARGUMENT;
     
     mapping->fd = open(path, O_RDONLY);
     if (mapping->fd < 0) {
@@ -218,7 +218,7 @@ static inline ethervox_result_t ethervox_mmap_open(const char* path, ethervox_mm
 }
 
 static inline void ethervox_mmap_close(ethervox_mmap_t* mapping) {
-    if (!mmap) return;
+    if (!mapping) return;
     
     if (mapping->data && mapping->data != MAP_FAILED) {
         munmap(mapping->data, mapping->size);

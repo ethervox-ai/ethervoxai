@@ -25,12 +25,15 @@
 void test_version_constants() {
   printf("Testing version constants...\n");
 
-  CHECK(ETHERVOX_VERSION_MAJOR == 0);
-  CHECK(ETHERVOX_VERSION_MINOR == 1);
-  CHECK(ETHERVOX_VERSION_PATCH == 0);
+  // The version is parsed from the git tag (core-vX.Y.Z) at build time, so it is not a fixed number.
+  // Check that the components are sane and that the string is built from them.
+  CHECK(ETHERVOX_VERSION_MAJOR >= 0);
+  CHECK(ETHERVOX_VERSION_MINOR >= 0);
+  CHECK(ETHERVOX_VERSION_PATCH >= 0);
 
-  // Test version string
-  const char* expected_version = "0.1.0";
+  char expected_version[32];
+  snprintf(expected_version, sizeof(expected_version), "%d.%d.%d", ETHERVOX_VERSION_MAJOR,
+           ETHERVOX_VERSION_MINOR, ETHERVOX_VERSION_PATCH);
   CHECK(strcmp(ETHERVOX_VERSION_STRING, expected_version) == 0);
 
   printf("✓ Version constants test passed\n");

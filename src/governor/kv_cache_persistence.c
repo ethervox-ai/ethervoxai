@@ -28,6 +28,11 @@
 #include <errno.h>
 #include <unistd.h>  // For unlink(), fsync(), usleep()
 #include <fcntl.h>   // For open(), O_RDONLY
+#ifdef _WIN32
+#include <direct.h>  // _mkdir
+#include <io.h>      // _commit
+#define mkdir(path, mode) _mkdir(path)
+#endif
 #include <dirent.h>  // For directory iteration (evict/usage functions)
 
 #if defined(ETHERVOX_WITH_LLAMA) && defined(LLAMA_CPP_AVAILABLE) && LLAMA_CPP_AVAILABLE
@@ -335,7 +340,16 @@ ethervox_result_t ethervox_kv_cache_save(
     // llama_state_seq_save_file uses FILE* which is buffered - must sync to disk
     ETHERVOX_LOG_INFO("Forcing file sync to disk...");
     
-    #if defined(__APPLE__)
+    #if defined(_WIN32)
+    int fd = open(cache_path, O_WRONLY | O_BINARY);
+    if (fd >= 0) {
+        if (_commit(fd) != 0) {
+            ETHERVOX_LOG_WARN("_commit() failed (errno=%d: %s) - file may not be fully written",
+                             errno, strerror(errno));
+        }
+        close(fd);
+    }
+    #elif defined(__APPLE__)
     // iOS/macOS: Open file in write mode and call fsync() to force kernel to write all buffers to disk
     // MUST use O_WRONLY or O_RDWR - O_RDONLY will not sync writes!
     int fd = open(cache_path, O_WRONLY);

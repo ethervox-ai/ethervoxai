@@ -309,7 +309,11 @@ ethervox_result_t ethervox_path_join(const char* base,
     size_t comp_len = strlen(component);
     
     // Check if we need a separator
+    // Windows accepts '/' as well as '\\' as a separator, so a trailing '/' needs no extra one.
     bool needs_sep = (base_len > 0 && base[base_len - 1] != PATH_SEP);
+#ifdef _WIN32
+    if (base_len > 0 && base[base_len - 1] == '/') needs_sep = false;
+#endif
     
     // Calculate total length needed
     size_t total_len = base_len + (needs_sep ? 1 : 0) + comp_len + 1;  // +1 for null

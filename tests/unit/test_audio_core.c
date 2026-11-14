@@ -41,10 +41,10 @@ void test_audio_runtime_init() {
   printf("Testing ethervox_audio_init...\n");
 
   // Test null pointer handling
-  CHECK(ethervox_audio_init(NULL, NULL) == -1);
+  CHECK(ethervox_audio_init(NULL, NULL) == ETHERVOX_ERROR_NULL_POINTER);
 
   ethervox_audio_runtime_t runtime;
-  CHECK(ethervox_audio_init(&runtime, NULL) == -1);
+  CHECK(ethervox_audio_init(&runtime, NULL) == ETHERVOX_ERROR_NULL_POINTER);
 
   // Test with valid config
   ethervox_audio_config_t config = ethervox_audio_get_default_config();

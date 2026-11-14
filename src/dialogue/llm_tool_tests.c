@@ -328,8 +328,10 @@ static const char* signal_name(int sig) {
       return "SIGFPE (Floating Point Exception)";
     case SIGILL:
       return "SIGILL (Illegal Instruction)";
+#ifdef SIGBUS  // not defined on Windows
     case SIGBUS:
       return "SIGBUS (Bus Error)";
+#endif
     default:
       return "Unknown Signal";
   }
@@ -422,7 +424,9 @@ static void install_crash_handlers(void) {
   signal(SIGABRT, crash_handler);
   signal(SIGFPE, crash_handler);
   signal(SIGILL, crash_handler);
+#ifdef SIGBUS
   signal(SIGBUS, crash_handler);
+#endif
   signal(SIGINT, interrupt_handler);  // Ctrl+C handler
 }
 
@@ -431,7 +435,9 @@ static void remove_crash_handlers(void) {
   signal(SIGABRT, SIG_DFL);
   signal(SIGFPE, SIG_DFL);
   signal(SIGILL, SIG_DFL);
+#ifdef SIGBUS
   signal(SIGBUS, SIG_DFL);
+#endif
   signal(SIGINT, SIG_DFL);
 }
 

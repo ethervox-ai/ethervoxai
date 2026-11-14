@@ -82,6 +82,25 @@ static struct {
     .initialized = false
 };
 
+#ifdef _WIN32
+// A zeroed CRITICAL_SECTION is not valid, so the global mutex is initialised on first use.
+static INIT_ONCE g_backend_once = INIT_ONCE_STATIC_INIT;
+
+static BOOL CALLBACK backend_mutex_init_once(PINIT_ONCE once, PVOID param, PVOID* context) {
+    (void)once; (void)param; (void)context;
+    ethervox_mutex_init(&g_backend.mutex);
+    return TRUE;
+}
+
+#define BACKEND_LOCK() \
+    do { \
+        InitOnceExecuteOnce(&g_backend_once, backend_mutex_init_once, NULL, NULL); \
+        MUTEX_LOCK(g_backend.mutex); \
+    } while (0)
+#else
+#define BACKEND_LOCK() MUTEX_LOCK(g_backend.mutex)
+#endif
+
 /**
  * Model handle structure
  */
@@ -140,7 +159,7 @@ struct ethervox_model_pool {
  * Initialize global llama backend (refcounted)
  */
 static ethervox_result_t backend_init(void) {
-    MUTEX_LOCK(g_backend.mutex);
+    BACKEND_LOCK();
     
     if (!g_backend.initialized) {
 #if LLAMA_AVAILABLE
@@ -173,7 +192,7 @@ static ethervox_result_t backend_init(void) {
  * Cleanup global llama backend (refcounted)
  */
 static void backend_cleanup(void) {
-    MUTEX_LOCK(g_backend.mutex);
+    BACKEND_LOCK();
     
     if (g_backend.refcount > 0) {
         g_backend.refcount--;

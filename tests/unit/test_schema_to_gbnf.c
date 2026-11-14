@@ -36,7 +36,7 @@
 // =============================================================================
 
 static char* read_file(const char* path) {
-    FILE* f = fopen(path, "r");
+    FILE* f = fopen(path, "rb");  // binary: text mode would shrink CRLF files on Windows
     if (!f) return NULL;
     
     fseek(f, 0, SEEK_END);

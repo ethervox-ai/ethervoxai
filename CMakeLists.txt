@@ -576,7 +576,7 @@ elseif(ETHERVOX_PLATFORM_LINUX OR ETHERVOX_PLATFORM_MACOS OR ETHERVOX_PLATFORM_R
 endif()
 
 # Continue adding common sources
-if(WIN32)
+if(MSVC)
     # Windows: Exclude pthread and M_PI dependent sources
     list(APPEND COMMON_SOURCES
         src/audio/aec_speex.c
@@ -694,7 +694,7 @@ list(FILTER ETHERVOXAI_CORE_SOURCES EXCLUDE REGEX ".*test_.*\\.c$")
 list(APPEND ETHERVOXAI_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/governor/kv_cache_persistence.c")
 
 # Exclude Windows-incompatible sources (wake_word, stt require Unix headers)
-if(WIN32)
+if(MSVC)
     list(FILTER ETHERVOXAI_CORE_SOURCES EXCLUDE REGEX ".*/wake_word/.*\\.c$")
     list(FILTER ETHERVOXAI_CORE_SOURCES EXCLUDE REGEX ".*/stt/.*\\.c$")
     # Exclude dialogue sources that require pthread
@@ -727,7 +727,7 @@ else()
 endif()
 
 # Add memory tools plugin sources
-if(NOT WIN32)
+if(NOT MSVC)
     file(GLOB MEMORY_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/memory_tools/*.c")
     list(APPEND ETHERVOXAI_CORE_SOURCES ${MEMORY_TOOLS_SOURCES})
     message(STATUS "Memory tools plugin sources included")
@@ -741,18 +741,18 @@ endif()
 # file_tools code or catalogue contract, not just an unreached registration
 # call - previously this flag only skipped the main.c call site, while the
 # plugin (and its embedded catalogue JSON) still linked into every profile.
-if(NOT WIN32)
+if(NOT MSVC)
     # path_config.c is pure path configuration (no file mutation) and voice_tools.c, which every profile
     # builds, depends on it, so it is part of the library in every profile.
     list(APPEND ETHERVOXAI_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/file_tools/path_config.c")
 endif()
 
-if(NOT WIN32 AND ETHERVOX_FEATURE_FILE_TOOLS)
+if(NOT MSVC AND ETHERVOX_FEATURE_FILE_TOOLS)
     file(GLOB FILE_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/file_tools/*.c")
     list(REMOVE_ITEM FILE_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/file_tools/path_config.c")
     list(APPEND ETHERVOXAI_CORE_SOURCES ${FILE_TOOLS_SOURCES})
     message(STATUS "File tools plugin sources included")
-elseif(WIN32)
+elseif(MSVC)
     message(STATUS "File tools plugin SKIPPED on Windows (requires PATH_MAX)")
 else()
     message(STATUS "File tools plugin SKIPPED (ETHERVOX_FEATURE_FILE_TOOLS=OFF)")
@@ -785,7 +785,7 @@ list(APPEND ETHERVOXAI_CORE_SOURCES ${CONTEXT_TOOLS_SOURCES})
 message(STATUS "Context tools plugin sources included")
 
 # Add conversation tools plugin sources (speak, listen for LLM-controlled interaction)
-if(NOT WIN32)
+if(NOT MSVC)
     # TASK-C1.0: Exclude train_pronunciation.c - depends on removed phonemizer
     file(GLOB CONVERSATION_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/conversation_tools/*.c")
     list(REMOVE_ITEM CONVERSATION_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/conversation_tools/train_pronunciation.c")
@@ -796,7 +796,7 @@ else()
 endif()
 
 # Add voice tools plugin sources
-if(NOT WIN32)
+if(NOT MSVC)
     file(GLOB VOICE_TOOLS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/voice_tools/*.c")
     list(APPEND ETHERVOXAI_CORE_SOURCES ${VOICE_TOOLS_SOURCES})
     message(STATUS "Voice tools plugin sources included")
@@ -880,7 +880,6 @@ elseif(WIN32 OR TARGET_PLATFORM STREQUAL "WINDOWS")
     set(PLATFORM_SOURCES
         src/audio/platform_windows.c
         src/platform/desktop_hal.c
-        src/platform/windows_stubs.c  # Stubs for excluded features
         src/platform/device_profile.c  # Hardware detection and adaptive configuration (needed for governor)
         src/platform/gguf_config_helper.c  # GGUF metadata extraction and config calculation
     )

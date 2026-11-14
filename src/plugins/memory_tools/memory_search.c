@@ -108,9 +108,9 @@ static int compare_results(const void* a, const void* b) {
     const ethervox_memory_search_result_t* r1 = a;
     const ethervox_memory_search_result_t* r2 = b;
     
-    if (r1->relevance > r2->relevance) return ETHERVOX_ERROR_INVALID_ARGUMENT;
-    if (r1->relevance < r2->relevance) return ETHERVOX_SUCCESS;
-    return ETHERVOX_SUCCESS;
+    if (r1->relevance > r2->relevance) return -1;
+    if (r1->relevance < r2->relevance) return 1;
+    return 0;
 }
 
 ethervox_result_t ethervox_memory_search(

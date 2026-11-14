@@ -395,8 +395,14 @@ static void test_default_path(void) {
     const char* path = ethervox_settings_get_default_path();
     TEST_ASSERT(path != NULL, "Default path should not be NULL");
     TEST_ASSERT(strlen(path) > 0, "Default path should not be empty");
+#ifdef _WIN32
+    // Windows keeps settings under %APPDATA%\\EthervoxAI rather than a dot-directory.
+    TEST_ASSERT(strstr(path, "EthervoxAI") != NULL,
+                "Default path should contain the EthervoxAI directory");
+#else
     TEST_ASSERT(strstr(path, ".ethervox") != NULL,
                 "Default path should contain .ethervox directory");
+#endif
     TEST_ASSERT(strstr(path, "settings.json") != NULL,
                 "Default path should end with settings.json");
     

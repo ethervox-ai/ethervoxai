@@ -91,6 +91,12 @@ static int test_audio_capture(void) {
     
     // Start capture
     result = runtime.driver.start_capture(&runtime);
+    if (result == ETHERVOX_ERROR_AUDIO_DEVICE_NOT_FOUND) {
+        // CI runners (notably Windows) have no input device; this test needs real hardware.
+        runtime.driver.cleanup(&runtime);
+        printf("SKIP (no audio input device)\n");
+        return ETHERVOX_SUCCESS;
+    }
     CHECK(result == 0);
     
     // Let some audio accumulate

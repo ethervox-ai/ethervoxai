@@ -7,3 +7,6 @@
 "État" = "État"
 "Confidentialité" = "Confidentialité"
 "Paramètres" = "Paramètres"
+
+[files]
+extend-exclude = ["docs/archive/**", "**/*.fr.md", "**/*.es.md", "docs/i18n/**"]

@@ -99,7 +99,11 @@ typedef struct {
     int transcribe_calls_ok;
 } transcribe_thread_arg_t;
 
+#ifdef _WIN32
+static DWORD WINAPI transcribe_worker(LPVOID arg_ptr) {
+#else
 static void* transcribe_worker(void* arg_ptr) {
+#endif
     transcribe_thread_arg_t* arg = (transcribe_thread_arg_t*)arg_ptr;
     for (int i = 0; i < 5; i++) {
         char* text = NULL;
@@ -110,7 +114,11 @@ static void* transcribe_worker(void* arg_ptr) {
         }
         free(text);
     }
+#ifdef _WIN32
+    return 0;
+#else
     return NULL;
+#endif
 }
 
 int main(int argc, char** argv) {

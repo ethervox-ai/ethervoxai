@@ -333,8 +333,9 @@ static void test_golden_workspace_tools_catalogue(void) {
         ETHERVOX_CATALOGUE_WORKSPACE_TOOLS_JSON, "workspace_highlight_nodes",
         "WORKSPACE", &tool)));
     CHECK(strcmp(tool.parameters_json_schema,
-        "{\"node_ids\":{\"type\":\"array\",\"description\":\"Array of node UUIDs to highlight "
-        "in the graph\",\"items\":{\"type\":\"string\"},\"required\":true}}") == 0);
+        "{\"type\":\"object\",\"properties\":{\"node_ids\":{\"type\":\"array\",\"description\":"
+        "\"Array of node UUIDs to highlight in the graph\",\"items\":{\"type\":\"string\"}}},"
+        "\"required\":[\"node_ids\"]}") == 0);
 }
 
 int main(void) {
